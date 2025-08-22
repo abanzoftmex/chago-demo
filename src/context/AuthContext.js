@@ -4,6 +4,9 @@ import {
   signOut,
   onAuthStateChanged,
   sendPasswordResetEmail,
+  updatePassword as firebaseUpdatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
 } from "firebase/auth";
 import { auth } from "../lib/firebase/firebaseConfig";
 import {
@@ -101,6 +104,27 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Update password function
+  const updatePassword = async (currentPassword, newPassword) => {
+    if (!user) {
+      throw new Error("No user logged in");
+    }
+
+    try {
+      // Re-authenticate user with current password
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+      
+      // Update password
+      await firebaseUpdatePassword(user, newPassword);
+      
+      return { success: true };
+    } catch (error) {
+      console.error("Error updating password:", error);
+      throw error;
+    }
+  };
+
   // Update last activity
   const updateActivity = () => {
     setLastActivity(Date.now());
@@ -194,6 +218,7 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     resetPassword,
+    updatePassword,
     updateActivity,
     checkPermission,
     getUserPermissions,

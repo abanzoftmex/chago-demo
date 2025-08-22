@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import { useAuth } from '../../context/AuthContext';
 import { 
   Bars3Icon, 
@@ -14,6 +15,7 @@ const Header = ({ title, breadcrumbs = [], onMenuClick, onToggleCollapse, sideba
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { user, logout, userRole, ROLES } = useAuth();
   const userMenuRef = useRef(null);
+  const router = useRouter();
   
   const getRoleDisplayName = (role) => {
     switch (role) {
@@ -42,6 +44,11 @@ const Header = ({ title, breadcrumbs = [], onMenuClick, onToggleCollapse, sideba
 
   const handleLogout = async () => {
     await logout();
+    setUserMenuOpen(false);
+  };
+
+  const handleProfileClick = () => {
+    router.push('/admin/mi-perfil');
     setUserMenuOpen(false);
   };
 
@@ -145,6 +152,14 @@ const Header = ({ title, breadcrumbs = [], onMenuClick, onToggleCollapse, sideba
                       {getRoleDisplayName(userRole)}
                     </div>
                   </div>
+                  
+                  <button
+                    onClick={handleProfileClick}
+                    className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <UserCircleIcon className="h-4 w-4 mr-3" />
+                    Mi Perfil
+                  </button>
                   
                   <button
                     onClick={handleLogout}
