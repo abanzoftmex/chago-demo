@@ -13,6 +13,7 @@ import FileUpload from "../ui/FileUpload";
 import { conceptService } from "../../lib/services/conceptService";
 import { subconceptService } from "../../lib/services/subconceptService";
 import { paymentService } from "../../lib/services/paymentService";
+import { recurringExpenseService } from "../../lib/services/recurringExpenseService";
 
 const TransactionForm = ({
   type,
@@ -51,6 +52,7 @@ const TransactionForm = ({
       date: initialDate,
       providerId: initialData?.providerId || "", // Only for salidas
       division: initialData?.division || "general", // Nueva opción para categorizar gastos
+      isRecurring: initialData?.isRecurring || false, // Toggle para gastos recurrentes
     };
   });
 
@@ -237,6 +239,22 @@ const TransactionForm = ({
       } else {
         // Create new transaction
         result = await transactionService.create(transactionData, user);
+        
+        // If it's a recurring expense, also create the recurring expense record
+        if (formData.type === "salida" && formData.isRecurring) {
+          const recurringData = {
+            generalId: formData.generalId,
+            conceptId: formData.conceptId,
+            subconceptId: formData.subconceptId,
+            description: formData.description,
+            amount: parseFloat(formData.amount),
+            providerId: formData.providerId,
+            division: formData.division,
+          };
+          
+          await recurringExpenseService.create(recurringData, user);
+          toast.success("Gasto recurrente configurado exitosamente");
+        }
         // Upload optional attachments and save on transaction
         if (files.length > 0) {
           try {
@@ -398,6 +416,7 @@ const TransactionForm = ({
           date: new Date().toISOString().split("T")[0],
           providerId: "",
           division: "general",
+          isRecurring: false,
         });
         setFiles([]);
         setAttachmentProgress(0);
@@ -572,6 +591,8 @@ const TransactionForm = ({
           </div>
         )}
 
+
+
         {/* Amount */}
         <div>
           <label
@@ -691,6 +712,78 @@ const TransactionForm = ({
             <p className="mt-1 text-sm text-red-600">{errors.date}</p>
           )}
         </div>
+
+        {/* Recurring Expense Toggle - Only for salidas */}
+        {formData.type === "salida" && !initialData && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-blue-600 rounded-lg">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900">Gasto Recurrente</h4>
+                  <p className="text-sm text-gray-600">
+                    Este gasto se repetirá automáticamente cada mes como pendiente
+                  </p>
+                  {/* Debug info */}
+                  <p className="text-xs text-gray-500 mt-1">
+                    Debug - Tipo: {formData.type}, InitialData: {initialData ? 'Sí' : 'No'}, Estado: {formData.isRecurring ? 'ON' : 'OFF'}
+                  </p>
+                </div>
+              </div>
+              
+              {/* Toggle Switch */}
+              <div className="flex items-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    console.log('Toggle clicked, current state:', formData.isRecurring);
+                    const newState = !formData.isRecurring;
+                    console.log('Setting new state:', newState);
+                    setFormData(prev => {
+                      const updated = { ...prev, isRecurring: newState };
+                      console.log('Updated formData:', updated);
+                      return updated;
+                    });
+                  }}
+                  disabled={loading}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                    formData.isRecurring ? 'bg-blue-600' : 'bg-gray-200'
+                  } ${loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      formData.isRecurring ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <span className="ml-3 text-sm font-medium text-gray-900">
+                  {formData.isRecurring ? 'Activado' : 'Desactivado'}
+                </span>
+              </div>
+            </div>
+            {formData.isRecurring && (
+              <div className="mt-4 p-3 bg-blue-100 rounded-md">
+                <div className="flex items-start space-x-2">
+                  <svg className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div className="text-xs text-blue-700">
+                    <p className="font-medium mb-1">¿Cómo funciona?</p>
+                    <ul className="space-y-1">
+                      <li>• Se creará automáticamente una transacción pendiente cada mes</li>
+                      <li>• Aparecerá el primer día del siguiente mes</li>
+                      <li>• Podrás gestionar los gastos recurrentes desde el panel de administración</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Form Actions */}
         <div className="flex justify-end space-x-3 pt-4 border-t">

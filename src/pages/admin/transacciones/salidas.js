@@ -8,12 +8,14 @@ import { useToast } from "../../../components/ui/Toast";
 import { transactionService } from "../../../lib/services/transactionService";
 import { conceptService } from "../../../lib/services/conceptService";
 import { providerService } from "../../../lib/services/providerService";
+import { useRecurringExpenses } from "../../../lib/hooks/useRecurringExpenses";
 import Link from "next/link";
 import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
 
 const SolicitudesPago = () => {
   const router = useRouter();
   const { checkPermission } = useAuth();
+  const { hasPendingGeneration, pendingExpenses } = useRecurringExpenses();
   const [showForm, setShowForm] = useState(false);
   const [transactions, setTransactions] = useState([]);
   const [concepts, setConcepts] = useState([]);
@@ -356,25 +358,54 @@ const SolicitudesPago = () => {
                 </div>
               </div>
               {!showForm && canManageTransactions && (
-                <button
-                  onClick={handleNewTransaction}
-                  className="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 focus:ring-4 focus:ring-red-500/20 focus:ring-offset-2 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl font-medium"
-                >
-                  <svg
-                    className="w-5 h-5 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                <div className="flex flex-col sm:flex-row gap-3">
+                  {/* Botón Gastos Recurrentes */}
+                  <button
+                    onClick={() => router.push('/admin/transacciones/recurrentes')}
+                    className="px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 focus:ring-4 focus:ring-purple-500/20 focus:ring-offset-2 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl font-medium relative"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 4v16m8-8H4"
-                    />
-                  </svg>
-                  Nuevo Gasto
-                </button>
+                    <svg
+                      className="w-5 h-5 mr-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      />
+                    </svg>
+                    Gastos Recurrentes
+                    {hasPendingGeneration && pendingExpenses.length > 0 && (
+                      <span className="absolute -top-2 -right-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
+                        {pendingExpenses.length}
+                      </span>
+                    )}
+                  </button>
+                  
+                  {/* Botón Nuevo Gasto */}
+                  <button
+                    onClick={handleNewTransaction}
+                    className="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 focus:ring-4 focus:ring-red-500/20 focus:ring-offset-2 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl font-medium"
+                  >
+                    <svg
+                      className="w-5 h-5 mr-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 4v16m8-8H4"
+                      />
+                    </svg>
+                    Nuevo Gasto
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -544,7 +575,7 @@ const SolicitudesPago = () => {
                 </div>
               ) : transactions.length === 0 ? (
                 <div className="p-12 text-center">
-                  <div className="max-w-md mx-auto">
+                  <div className="max-w-lg mx-auto">
                     <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
                       <svg
                         className="w-12 h-12 text-gray-400"
@@ -561,31 +592,69 @@ const SolicitudesPago = () => {
                       </svg>
                     </div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      No hay gastos registrados
+                      No hay gastos registrados este mes
                     </h3>
-                    <p className="text-gray-600 mb-6">
-                      Comienza creando tu primer gasto para gestionar los gastos
-                      de tu organización
+                    <p className="text-gray-600 mb-4">
+                      Comienza creando tu primer gasto para gestionar los gastos de tu organización
                     </p>
-                    <button
-                      onClick={handleNewTransaction}
-                      className="inline-flex items-center px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 focus:ring-4 focus:ring-red-500/20 transition-all duration-200 font-medium shadow-lg"
-                    >
-                      <svg
-                        className="w-5 h-5 mr-2"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+                    
+                    {/* Información sobre gastos recurrentes */}
+                    {hasPendingGeneration && pendingExpenses.length > 0 && (
+                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+                        <div className="flex items-center justify-center mb-2">
+                          <svg className="w-5 h-5 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          <h4 className="text-sm font-semibold text-purple-900">
+                            Gastos Recurrentes Pendientes
+                          </h4>
+                        </div>
+                        <p className="text-sm text-purple-700 mb-3">
+                          Tienes <span className="font-semibold">{pendingExpenses.length}</span> gastos recurrentes 
+                          que se generarán automáticamente el próximo mes
+                        </p>
+                        <button
+                          onClick={() => router.push('/admin/transacciones/recurrentes')}
+                          className="text-sm text-purple-600 hover:text-purple-800 font-medium underline"
+                        >
+                          Ver gastos recurrentes →
+                        </button>
+                      </div>
+                    )}
+                    
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                      <button
+                        onClick={handleNewTransaction}
+                        className="inline-flex items-center px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 focus:ring-4 focus:ring-red-500/20 transition-all duration-200 font-medium shadow-lg"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 4v16m8-8H4"
-                        />
-                      </svg>
-                      Crear primer gasto
-                    </button>
+                        <svg
+                          className="w-5 h-5 mr-2"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 4v16m8-8H4"
+                          />
+                        </svg>
+                        Crear primer gasto
+                      </button>
+                      
+                      {hasPendingGeneration && (
+                        <button
+                          onClick={() => router.push('/admin/transacciones/recurrentes')}
+                          className="inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 focus:ring-4 focus:ring-purple-500/20 transition-all duration-200 font-medium shadow-lg"
+                        >
+                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          Gestionar recurrentes
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ) : (

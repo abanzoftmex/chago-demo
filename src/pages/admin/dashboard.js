@@ -4,6 +4,7 @@ import { useToast } from "../../components/ui/Toast";
 import SummaryCards from "../../components/dashboard/SummaryCards";
 import MonthlyTrendsChart from "../../components/charts/MonthlyTrendsChart";
 import BarConceptChart from "../../components/charts/BarConceptChart";
+import RecurringExpenseAlert from "../../components/dashboard/RecurringExpenseAlert";
 import { dashboardService } from "../../lib/services/dashboardService";
 import { generalService } from "../../lib/services/generalService";
 import { transactionService } from "../../lib/services/transactionService";
@@ -327,6 +328,9 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+
+        {/* Recurring Expense Alert */}
+        <RecurringExpenseAlert />
 
         {/* Summary Cards */}
         <SummaryCards summary={summary} />

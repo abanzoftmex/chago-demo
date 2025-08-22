@@ -182,6 +182,8 @@ const Sidebar = ({
                           <span className="ml-3">Historial</span>
                         </button>
                       )}
+
+
                     </div>
                   )}
                 </div>
@@ -507,6 +509,8 @@ const Sidebar = ({
                         <span className="ml-3">Historial</span>
                       </button>
                     )}
+
+
                   </div>
                 )}
               </div>
