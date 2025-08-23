@@ -3,7 +3,8 @@ import AdminLayout from "../../components/layout/AdminLayout";
 import { useToast } from "../../components/ui/Toast";
 import { Button } from "../../components/ui/Button";
 import { reportService } from "../../lib/services/reportService";
-import { conceptService } from "../../lib/services/conceptService";
+
+import { generalService } from "../../lib/services/generalService";
 import {
   CalendarIcon,
   DocumentArrowDownIcon,
@@ -19,13 +20,13 @@ const Reportes = () => {
   const [exporting, setExporting] = useState(false);
   const [transactions, setTransactions] = useState([]);
   const [stats, setStats] = useState(null);
-  const [concepts, setConcepts] = useState([]);
+  const [generals, setGenerals] = useState([]);
 
   const [filters, setFilters] = useState({
     startDate: "",
     endDate: "",
     type: "",
-    conceptId: "",
+    generalId: "",
   });
   const [currentMonthName, setCurrentMonthName] = useState("");
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -66,8 +67,8 @@ const Reportes = () => {
 
   const loadReferenceData = async () => {
     try {
-      const conceptsData = await conceptService.getAll();
-      setConcepts(conceptsData);
+      const generalsData = await generalService.getAll();
+      setGenerals(generalsData);
     } catch (err) {
       console.error("Error loading reference data:", err);
       error("Error al cargar datos de referencia");
@@ -238,22 +239,22 @@ const Reportes = () => {
 
 
 
-            {/* Concept Filter */}
+            {/* General Filter */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                Concepto
+                General
               </label>
               <select
-                value={filters.conceptId}
+                value={filters.generalId}
                 onChange={(e) =>
-                  handleFilterChange("conceptId", e.target.value)
+                  handleFilterChange("generalId", e.target.value)
                 }
                 className="input-field"
               >
                 <option value="">Todos</option>
-                {concepts.map((concept) => (
-                  <option key={concept.id} value={concept.id}>
-                    {concept.name} ({concept.type})
+                {generals.map((general) => (
+                  <option key={general.id} value={general.id}>
+                    {general.name} ({general.type})
                   </option>
                 ))}
               </select>

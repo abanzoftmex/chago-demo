@@ -20,7 +20,7 @@ export const reportService = {
           {
             type: filters.type,
             providerId: filters.providerId,
-            conceptId: filters.conceptId
+            generalId: filters.generalId
           }
         );
 
@@ -55,7 +55,7 @@ export const reportService = {
         transactions = await transactionService.getAll({
           type: filters.type,
           providerId: filters.providerId,
-          conceptId: filters.conceptId
+          generalId: filters.generalId
         });
       }
       

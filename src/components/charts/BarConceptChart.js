@@ -18,7 +18,7 @@ Chart.register(
   Legend
 );
 
-const BarConceptChart = ({ data, type = 'total' }) => {
+const BarConceptChart = ({ data, type = 'total', chartType = 'concepto' }) => {
   // Filter concepts based on type
   const filteredConcepts = Object.keys(data).filter(concept => {
     if (type === 'entradas') return data[concept].entradas > 0;
@@ -69,7 +69,7 @@ const BarConceptChart = ({ data, type = 'total' }) => {
       },
       title: {
         display: true,
-        text: `${type === 'entradas' ? 'Ingresos' : type === 'salidas' ? 'Gastos' : 'Balance'} por Concepto`,
+        text: `${type === 'entradas' ? 'Ingresos' : type === 'salidas' ? 'Gastos' : 'Balance'} por ${chartType === 'general' ? 'General' : 'Concepto'}`,
       },
       tooltip: {
         callbacks: {

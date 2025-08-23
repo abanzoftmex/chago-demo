@@ -323,7 +323,7 @@ const Dashboard = () => {
           <div className="w-full">
             <h2 className="text-xl font-bold text-foreground mb-4">Gastos por General</h2>
             {Object.keys(generalData).length > 0 ? (
-              <BarConceptChart data={generalData} type="salidas" />
+              <BarConceptChart data={generalData} type="salidas" chartType="general" />
             ) : (
               <div className="bg-background rounded-lg border border-border p-6">
                 <div className="border-2 border-dashed border-border rounded-lg h-64 flex items-center justify-center">
