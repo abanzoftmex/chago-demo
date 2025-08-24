@@ -263,7 +263,7 @@ const Dashboard = () => {
         <div className="space-y-6">
           {/* Gastos por General */}
           <div className="w-full">
-            <h2 className="text-xl font-bold text-foreground mb-4">Gastos por General</h2>
+            <h2 className="text-xl font-bold text-foreground mb-4">Gastos por Generales</h2>
             {Object.keys(generalData).length > 0 ? (
               <BarConceptChart data={generalData} type="salidas" chartType="general" />
             ) : (
@@ -281,7 +281,7 @@ const Dashboard = () => {
           <div className="w-full">
             <h2 className="text-xl font-bold text-foreground mb-4">Gastos por Concepto</h2>
             {Object.keys(conceptData).length > 0 ? (
-              <BarConceptChart data={conceptData} type="salidas" />
+              <BarConceptChart data={conceptData}  />
             ) : (
               <div className="bg-background rounded-lg border border-border p-6">
                 <div className="border-2 border-dashed border-border rounded-lg h-64 flex items-center justify-center">

@@ -6,9 +6,21 @@ import {
 } from '@heroicons/react/24/outline';
 
 const SummaryCards = ({ summary }) => {
+  // Obtener el nombre del mes actual
+  const getCurrentMonthName = () => {
+    const months = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+    const currentMonth = new Date().getMonth();
+    return months[currentMonth];
+  };
+
+  const currentMonthName = getCurrentMonthName();
+
   const cards = [
     {
-      title: 'Entradas del Mes',
+      title: `Entradas del Mes (${currentMonthName})`,
       value: summary.entradas,
       icon: ArrowTrendingUpIcon,
       color: 'text-green-600',
@@ -16,7 +28,7 @@ const SummaryCards = ({ summary }) => {
       count: summary.entradasCount
     },
     {
-      title: 'Salidas del Mes',
+      title: `Salidas del Mes (${currentMonthName})`,
       value: summary.salidas,
       icon: ArrowTrendingDownIcon,
       color: 'text-red-600',
@@ -24,7 +36,7 @@ const SummaryCards = ({ summary }) => {
       count: summary.salidasCount
     },
     {
-      title: 'Saldo',
+      title: 'Saldo General',
       value: summary.balance,
       icon: ScaleIcon,
       color: summary.balance >= 0 ? 'text-green-600' : 'text-red-600',

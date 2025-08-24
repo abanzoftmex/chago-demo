@@ -8,6 +8,7 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
+import { CHART_COLORS } from '../../lib/constants';
 
 Chart.register(
   CategoryScale,
@@ -32,20 +33,8 @@ const BarConceptChart = ({ data, type = 'total', chartType = 'concepto' }) => {
     return data[concept].total;
   });
 
-  // Generate a set of distinct colors (HSL-based) equal to the number of bars
-  const generateDistinctColors = (count) => {
-    const colors = [];
-    // Distribute hues evenly around the color wheel, use pleasant saturation/lightness
-    for (let i = 0; i < count; i++) {
-      const hue = Math.round((360 * i) / Math.max(count, 1));
-      const saturation = 70; // %
-      const lightness = 55; // %
-      colors.push(`hsl(${hue}, ${saturation}%, ${lightness}%)`);
-    }
-    return colors;
-  };
-
-  const colors = generateDistinctColors(filteredConcepts.length);
+  // Generate alternating orange and gray colors for each bar
+  const colors = CHART_COLORS.generateAlternating(filteredConcepts.length);
 
   const chartData = {
     labels: filteredConcepts,

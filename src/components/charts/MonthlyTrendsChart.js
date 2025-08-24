@@ -27,22 +27,22 @@ const MonthlyTrendsChart = ({ data }) => {
       {
         label: 'Entradas',
         data: data.map(item => item.entradas),
-        borderColor: 'rgb(34, 197, 94)',
-        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+        borderColor: '#10B981', // Verde
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
         tension: 0.1,
       },
       {
         label: 'Salidas',
         data: data.map(item => item.salidas),
-        borderColor: 'rgb(239, 68, 68)',
+        borderColor: '#EF4444', // Rojo
         backgroundColor: 'rgba(239, 68, 68, 0.1)',
         tension: 0.1,
       },
       {
         label: 'Balance',
         data: data.map(item => item.balance),
-        borderColor: 'rgb(59, 130, 246)',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        borderColor: '#6B7280', // Gris
+        backgroundColor: 'rgba(107, 114, 128, 0.1)',
         tension: 0.1,
       }
     ],

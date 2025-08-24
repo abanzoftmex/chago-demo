@@ -5,6 +5,7 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
+import { CHART_COLORS } from '../../lib/constants';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -16,25 +17,16 @@ const ConceptChart = ({ data, type = 'total' }) => {
     return data[concept].total;
   });
 
-  // Generate colors for each concept
-  const colors = [
-    'rgba(249, 115, 22, 0.8)',   // orange-500
-    'rgba(234, 88, 12, 0.8)',    // orange-600
-    'rgba(0, 0, 0, 0.8)',        // black
-    'rgba(194, 65, 12, 0.8)',    // orange-700
-    'rgba(0, 0, 0, 0.8)',        // black
-    'rgba(251, 146, 60, 0.8)',   // orange-400
-    'rgba(0, 0, 0, 0.8)',        // black
-    'rgba(253, 186, 116, 0.8)',  // orange-300
-  ];
+  // Generate alternating orange and gray colors for each concept
+  const colors = CHART_COLORS.generateAlternating(concepts.length);
 
   const chartData = {
     labels: concepts,
     datasets: [
       {
         data: values,
-        backgroundColor: colors.slice(0, concepts.length),
-        borderColor: colors.slice(0, concepts.length).map(color => color.replace('0.8', '1')),
+        backgroundColor: colors,
+        borderColor: colors.map(color => color.replace('0.8', '1')),
         borderWidth: 2,
       },
     ],
