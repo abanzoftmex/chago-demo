@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import ProviderForm from '../../../components/forms/ProviderForm';
+import ProviderCsvImportModal from '../../../components/admin/ProviderCsvImportModal';
 import { providerService } from '../../../lib/services/providerService';
 import { useToast } from '../../../components/ui/Toast';
 import { 
@@ -23,6 +24,7 @@ const Proveedores = () => {
   const [showProviderForm, setShowProviderForm] = useState(false);
   const [editingProvider, setEditingProvider] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
   
   const { success, error } = useToast();
   const itemsPerPage = 10;
@@ -101,6 +103,10 @@ const Proveedores = () => {
     setEditingProvider(null);
   };
 
+  const handleCsvImportSuccess = () => {
+    loadProviders();
+  };
+
   // Pagination logic
   const totalPages = Math.ceil(filteredProviders.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -150,13 +156,34 @@ const Proveedores = () => {
               </p>
             </div>
             
-            <button
-              onClick={handleCreateProvider}
-              className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-            >
-              <PlusIcon className="h-4 w-4 mr-2" />
-              Nuevo Proveedor
-            </button>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setIsCsvModalOpen(true)}
+                className="inline-flex items-center px-4 py-2 border border-orange-300 rounded-md shadow-sm text-sm font-medium text-orange-700 bg-orange-50 hover:bg-orange-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+              >
+                <svg
+                  className="-ml-1 mr-2 h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
+                  />
+                </svg>
+                Importar CSV
+              </button>
+              <button
+                onClick={handleCreateProvider}
+                className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+              >
+                <PlusIcon className="h-4 w-4 mr-2" />
+                Nuevo Proveedor
+              </button>
+            </div>
           </div>
 
           {/* Search */}
@@ -476,6 +503,13 @@ const Proveedores = () => {
         isOpen={showProviderForm}
         onSubmit={handleProviderFormSubmit}
         onCancel={handleProviderFormCancel}
+      />
+
+      {/* CSV Import Modal */}
+      <ProviderCsvImportModal
+        isOpen={isCsvModalOpen}
+        onClose={() => setIsCsvModalOpen(false)}
+        onSuccess={handleCsvImportSuccess}
       />
     </AdminLayout>
   );
