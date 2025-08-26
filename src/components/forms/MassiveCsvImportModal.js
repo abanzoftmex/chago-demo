@@ -8,6 +8,7 @@ export default function MassiveCsvImportModal({ isOpen, onClose, onSuccess }) {
   const [isImporting, setIsImporting] = useState(false);
   const [importResults, setImportResults] = useState(null);
   const [errors, setErrors] = useState([]);
+  const [showTableExample, setShowTableExample] = useState(false);
 
   const downloadTemplate = () => {
     const csvContent = `tipo,nombre,descripcion,general_nombre,concepto_nombre
@@ -342,13 +343,97 @@ subconcepto,Torneo Apertura,Torneo inicio temporada,Ingresos por Eventos,Torneos
           </div>
 
           <div className="bg-gray-50 p-4 rounded-lg">
-            <h4 className="font-medium text-gray-900 mb-3">2. Formato del Archivo</h4>
-            <div className="text-sm text-gray-700 space-y-2">
-              <p><strong>Columnas requeridas:</strong> tipo, nombre, descripcion, general_nombre, concepto_nombre</p>
-              <p><strong>Valores válidos para 'tipo':</strong> general, concepto, subconcepto</p>
-              <p><strong>Orden recomendado:</strong> Primero generales, luego conceptos, finalmente subconceptos</p>
-            </div>
-          </div>
+             <h4 className="font-medium text-gray-900 mb-3">2. Formato del Archivo</h4>
+             <div className="text-sm text-gray-700 space-y-2">
+               <p><strong>Columnas requeridas:</strong> tipo, nombre, descripcion, general_nombre, concepto_nombre</p>
+               <p><strong>Valores válidos para 'tipo':</strong> general, concepto, subconcepto</p>
+               <p><strong>Orden recomendado:</strong> Primero generales, luego conceptos, finalmente subconceptos</p>
+             </div>
+             
+             {/* Accordion para ejemplo de tabla */}
+             <div className="mt-4 border border-gray-200 rounded-lg">
+               <button
+                 onClick={() => setShowTableExample(!showTableExample)}
+                 className="w-full px-4 py-3 text-left bg-gray-100 hover:bg-gray-200 rounded-t-lg flex items-center justify-between transition-colors"
+               >
+                 <span className="font-medium text-gray-800">📊 Ver Ejemplo de Tabla</span>
+                 <svg 
+                   className={`w-5 h-5 text-gray-600 transform transition-transform ${showTableExample ? 'rotate-180' : ''}`}
+                   fill="none" 
+                   stroke="currentColor" 
+                   viewBox="0 0 24 24"
+                 >
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                 </svg>
+               </button>
+               
+               {showTableExample && (
+                 <div className="p-4 bg-white border-t border-gray-200">
+                   <p className="text-sm text-gray-600 mb-3">Ejemplo de cómo se vería la tabla con los datos del CSV:</p>
+                   <div className="overflow-x-auto">
+                     <table className="min-w-full text-xs border border-gray-300">
+                       <thead className="bg-orange-50">
+                         <tr>
+                           <th className="px-2 py-2 border border-gray-300 text-left font-semibold text-orange-800">Tipo</th>
+                           <th className="px-2 py-2 border border-gray-300 text-left font-semibold text-orange-800">Nombre</th>
+                           <th className="px-2 py-2 border border-gray-300 text-left font-semibold text-orange-800">Descripción</th>
+                           <th className="px-2 py-2 border border-gray-300 text-left font-semibold text-orange-800">General</th>
+                           <th className="px-2 py-2 border border-gray-300 text-left font-semibold text-orange-800">Concepto</th>
+                         </tr>
+                       </thead>
+                       <tbody>
+                         <tr className="bg-green-50">
+                           <td className="px-2 py-2 border border-gray-300 font-medium text-green-700">general</td>
+                           <td className="px-2 py-2 border border-gray-300">Ingresos por Cuotas</td>
+                           <td className="px-2 py-2 border border-gray-300">Ingresos generados por cuotas de socios</td>
+                           <td className="px-2 py-2 border border-gray-300 text-gray-400">-</td>
+                           <td className="px-2 py-2 border border-gray-300 text-gray-400">-</td>
+                         </tr>
+                         <tr className="bg-green-50">
+                           <td className="px-2 py-2 border border-gray-300 font-medium text-green-700">general</td>
+                           <td className="px-2 py-2 border border-gray-300">Gastos Operativos</td>
+                           <td className="px-2 py-2 border border-gray-300">Gastos necesarios para el funcionamiento</td>
+                           <td className="px-2 py-2 border border-gray-300 text-gray-400">-</td>
+                           <td className="px-2 py-2 border border-gray-300 text-gray-400">-</td>
+                         </tr>
+                         <tr className="bg-blue-50">
+                           <td className="px-2 py-2 border border-gray-300 font-medium text-blue-700">concepto</td>
+                           <td className="px-2 py-2 border border-gray-300">Cuotas Mensuales</td>
+                           <td className="px-2 py-2 border border-gray-300">Cuotas regulares de socios</td>
+                           <td className="px-2 py-2 border border-gray-300 font-medium">Ingresos por Cuotas</td>
+                           <td className="px-2 py-2 border border-gray-300 text-gray-400">-</td>
+                         </tr>
+                         <tr className="bg-blue-50">
+                           <td className="px-2 py-2 border border-gray-300 font-medium text-blue-700">concepto</td>
+                           <td className="px-2 py-2 border border-gray-300">Servicios Básicos</td>
+                           <td className="px-2 py-2 border border-gray-300">Electricidad agua gas internet</td>
+                           <td className="px-2 py-2 border border-gray-300 font-medium">Gastos Operativos</td>
+                           <td className="px-2 py-2 border border-gray-300 text-gray-400">-</td>
+                         </tr>
+                         <tr className="bg-purple-50">
+                           <td className="px-2 py-2 border border-gray-300 font-medium text-purple-700">subconcepto</td>
+                           <td className="px-2 py-2 border border-gray-300">Cuotas Juveniles</td>
+                           <td className="px-2 py-2 border border-gray-300">Cuotas categorías juveniles</td>
+                           <td className="px-2 py-2 border border-gray-300 font-medium">Ingresos por Cuotas</td>
+                           <td className="px-2 py-2 border border-gray-300 font-medium">Cuotas Mensuales</td>
+                         </tr>
+                         <tr className="bg-purple-50">
+                           <td className="px-2 py-2 border border-gray-300 font-medium text-purple-700">subconcepto</td>
+                           <td className="px-2 py-2 border border-gray-300">Electricidad</td>
+                           <td className="px-2 py-2 border border-gray-300">Factura mensual electricidad</td>
+                           <td className="px-2 py-2 border border-gray-300 font-medium">Gastos Operativos</td>
+                           <td className="px-2 py-2 border border-gray-300 font-medium">Servicios Básicos</td>
+                         </tr>
+                       </tbody>
+                     </table>
+                   </div>
+                   <div className="mt-3 text-xs text-gray-600">
+                     <p><strong>💡 Nota:</strong> Los colores indican la jerarquía: <span className="text-green-600">Verde = Generales</span>, <span className="text-blue-600">Azul = Conceptos</span>, <span className="text-purple-600">Morado = Subconceptos</span></p>
+                   </div>
+                 </div>
+               )}
+             </div>
+           </div>
 
           <div className="bg-yellow-50 p-4 rounded-lg">
             <h4 className="font-medium text-yellow-900 mb-2">3. Seleccionar Archivo</h4>
