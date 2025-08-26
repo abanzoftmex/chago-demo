@@ -497,159 +497,185 @@ const TransactionForm = ({
         )}
 
         {/* General -> Concept -> Subconcept */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            General *
-          </label>
-          {loadingGenerals ? (
-            <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500">
-              Cargando categorías...
-            </div>
-          ) : generalsError ? (
-            <div className="w-full px-3 py-2 border border-red-300 rounded-md bg-red-50 text-red-600">
-              Error al cargar categorías
-            </div>
-          ) : (
-            <select
-              value={formData.generalId}
-              onChange={(e) => setFormData(prev => ({ ...prev, generalId: e.target.value, conceptId: '', subconceptId: '' }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500"
-              disabled={loading}
-              required
-            >
-              <option value="">Selecciona una categoría general</option>
-              {generals.map(g => (
-                <option key={g.id} value={g.id}>
-                  {g.name} ({g.type === 'entrada' ? 'Ingreso' : 'Gasto'})
-                </option>
-              ))}
-            </select>
-          )}
-          {errors.generalId && (
-            <p className="mt-1 text-sm text-red-600">{errors.generalId}</p>
-          )}
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Concepto *</label>
-          <ConceptSelector
-            ref={conceptSelectorRef}
-            type={formData.type}
-            generalId={formData.generalId}
-            value={formData.conceptId}
-            onChange={handleConceptChange}
-            onCreateNew={() => setShowConceptModal(true)}
-            required
-            disabled={loading}
-          />
-          {errors.conceptId && (
-            <p className="mt-1 text-sm text-red-600">{errors.conceptId}</p>
-          )}
-        </div>
-
-        {/* Subconcept Selector */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Subconcepto *
-          </label>
-          <SubconceptSelector
-            ref={subconceptSelectorRef}
-            conceptId={formData.conceptId}
-            value={formData.subconceptId}
-            onChange={handleSubconceptChange}
-            onCreateNew={() => setShowSubconceptModal(true)}
-            required
-            disabled={loading}
-          />
-          {errors.subconceptId && (
-            <p className="mt-1 text-sm text-red-600">{errors.subconceptId}</p>
-          )}
-        </div>
-
-        {/* Provider Selector - Only for salidas */}
-        {formData.type === "salida" && (
+        {/* Primera fila: General / Concepto / Subconcepto */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Proveedor *
+              General *
             </label>
-            <ProviderSelector
-              ref={providerSelectorRef}
-              value={formData.providerId}
-              onChange={handleProviderChange}
-              onCreateNew={() =>
-                toast.info(
-                  "Funcionalidad de crear proveedor será implementada próximamente"
-                )
-              }
-              required
-              disabled={loading}
-            />
-            {errors.providerId && (
-              <p className="mt-1 text-sm text-red-600">{errors.providerId}</p>
+            {loadingGenerals ? (
+              <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500">
+                Cargando categorías...
+              </div>
+            ) : generalsError ? (
+              <div className="w-full px-3 py-2 border border-red-300 rounded-md bg-red-50 text-red-600">
+                Error al cargar categorías
+              </div>
+            ) : (
+              <select
+                value={formData.generalId}
+                onChange={(e) => setFormData(prev => ({ ...prev, generalId: e.target.value, conceptId: '', subconceptId: '' }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500"
+                disabled={loading}
+                required
+              >
+                <option value="">Selecciona una categoría general</option>
+                {generals.map(g => (
+                  <option key={g.id} value={g.id}>
+                    {g.name} ({g.type === 'entrada' ? 'Ingreso' : 'Gasto'})
+                  </option>
+                ))}
+              </select>
+            )}
+            {errors.generalId && (
+              <p className="mt-1 text-sm text-red-600">{errors.generalId}</p>
             )}
           </div>
-        )}
-
-        {/* División Selector - Only for salidas */}
-        {formData.type === "salida" && (
+          
           <div>
-            <label htmlFor="division" className="block text-sm font-medium text-gray-700 mb-2">
-              División *
-            </label>
-            <select
-              id="division"
-              name="division"
-              value={formData.division}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500"
-              disabled={loading}
+            <label className="block text-sm font-medium text-gray-700 mb-2">Concepto *</label>
+            <ConceptSelector
+              ref={conceptSelectorRef}
+              type={formData.type}
+              generalId={formData.generalId}
+              value={formData.conceptId}
+              onChange={handleConceptChange}
+              onCreateNew={() => setShowConceptModal(true)}
               required
-            >
-              <option value="general">General</option>
-              <option value="2da_division">2nda división profesional</option>
-              <option value="3ra_division">3ra división profesional</option>
-            </select>
-            {errors.division && (
-              <p className="mt-1 text-sm text-red-600">{errors.division}</p>
+              disabled={loading}
+            />
+            {errors.conceptId && (
+              <p className="mt-1 text-sm text-red-600">{errors.conceptId}</p>
             )}
           </div>
-        )}
 
-
-
-        {/* Amount */}
-        <div>
-          <label
-            htmlFor="amount"
-            className="block text-sm font-medium text-gray-700 mb-2"
-          >
-            Monto *
-          </label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-              $
-            </span>
-            <input
-              type="number"
-              id="amount"
-              name="amount"
-              value={formData.amount}
-              onChange={handleInputChange}
-              step="0.01"
-              min="0"
-              className={`w-full pl-8 pr-3 py-2 border rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500 ${
-                errors.amount ? "border-red-300" : "border-gray-300"
-              }`}
-              placeholder="0.00"
-              disabled={loading}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Subconcepto *
+            </label>
+            <SubconceptSelector
+              ref={subconceptSelectorRef}
+              conceptId={formData.conceptId}
+              value={formData.subconceptId}
+              onChange={handleSubconceptChange}
+              onCreateNew={() => setShowSubconceptModal(true)}
               required
+              disabled={loading}
             />
+            {errors.subconceptId && (
+              <p className="mt-1 text-sm text-red-600">{errors.subconceptId}</p>
+            )}
           </div>
-          {errors.amount && (
-            <p className="mt-1 text-sm text-red-600">{errors.amount}</p>
-          )}
         </div>
 
-        {/* Freeform Description (Notas) */}
+        {/* Segunda fila: Fecha / Monto */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label
+              htmlFor="date"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Fecha *
+            </label>
+            <input
+              type="date"
+              id="date"
+              name="date"
+              value={formData.date}
+              onChange={handleInputChange}
+              className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500 ${
+                errors.date ? "border-red-300" : "border-gray-300"
+              }`}
+              disabled={loading}
+              required
+            />
+            {errors.date && (
+              <p className="mt-1 text-sm text-red-600">{errors.date}</p>
+            )}
+          </div>
+
+          <div>
+            <label
+              htmlFor="amount"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Monto *
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                $
+              </span>
+              <input
+                type="number"
+                id="amount"
+                name="amount"
+                value={formData.amount}
+                onChange={handleInputChange}
+                step="0.01"
+                min="0"
+                className={`w-full pl-8 pr-3 py-2 border rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500 ${
+                  errors.amount ? "border-red-300" : "border-gray-300"
+                }`}
+                placeholder="0.00"
+                disabled={loading}
+                required
+              />
+            </div>
+            {errors.amount && (
+              <p className="mt-1 text-sm text-red-600">{errors.amount}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Tercera fila: Proveedor / División - Solo para salidas */}
+        {formData.type === "salida" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Proveedor *
+              </label>
+              <ProviderSelector
+                ref={providerSelectorRef}
+                value={formData.providerId}
+                onChange={handleProviderChange}
+                onCreateNew={() =>
+                  toast.info(
+                    "Funcionalidad de crear proveedor será implementada próximamente"
+                  )
+                }
+                required
+                disabled={loading}
+              />
+              {errors.providerId && (
+                <p className="mt-1 text-sm text-red-600">{errors.providerId}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="division" className="block text-sm font-medium text-gray-700 mb-2">
+                División *
+              </label>
+              <select
+                id="division"
+                name="division"
+                value={formData.division}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500"
+                disabled={loading}
+                required
+              >
+                <option value="general">General</option>
+                <option value="2da_division">2nda división profesional</option>
+                <option value="3ra_division">3ra división profesional</option>
+              </select>
+              {errors.division && (
+                <p className="mt-1 text-sm text-red-600">{errors.division}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Cuarta fila: Descripción */}
         <div>
           <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
             Descripción (opcional)
@@ -666,7 +692,7 @@ const TransactionForm = ({
           />
         </div>
 
-        {/* Attachments (optional) */}
+        {/* Quinta fila: Adjuntos */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Adjuntos (opcional)
@@ -727,30 +753,7 @@ const TransactionForm = ({
           )}
         </div>
 
-        {/* Date */}
-        <div>
-          <label
-            htmlFor="date"
-            className="block text-sm font-medium text-gray-700 mb-2"
-          >
-            Fecha *
-          </label>
-          <input
-            type="date"
-            id="date"
-            name="date"
-            value={formData.date}
-            onChange={handleInputChange}
-            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500 ${
-              errors.date ? "border-red-300" : "border-gray-300"
-            }`}
-            disabled={loading}
-            required
-          />
-          {errors.date && (
-            <p className="mt-1 text-sm text-red-600">{errors.date}</p>
-          )}
-        </div>
+
 
         {/* Recurring Expense Toggle - Only for salidas */}
         {formData.type === "salida" && !initialData && (
