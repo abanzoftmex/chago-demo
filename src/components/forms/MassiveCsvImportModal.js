@@ -10,13 +10,13 @@ export default function MassiveCsvImportModal({ isOpen, onClose, onSuccess }) {
   const [showTableExample, setShowTableExample] = useState(false);
 
   const downloadTemplate = () => {
-    const csvContent = `tipo,nombre,descripcion,general_nombre
-general,Ingresos por Cuotas,Ingresos generados por cuotas de socios,
-general,Gastos Operativos,Gastos necesarios para el funcionamiento,
-general,Ingresos por Eventos,Ingresos por eventos especiales,
-concepto,Cuotas Mensuales,Cuotas regulares de socios,Ingresos por Cuotas
-concepto,Servicios Básicos,Electricidad agua gas internet,Gastos Operativos
-concepto,Torneos,Organización de torneos,Ingresos por Eventos`;
+    const csvContent = `tipo,nombre,descripcion,tipo_movimiento,general_nombre
+general,Ingresos por Cuotas,Ingresos generados por cuotas de socios,ingreso,
+general,Gastos Operativos,Gastos necesarios para el funcionamiento,gasto,
+general,Ingresos por Eventos,Ingresos por eventos especiales,ingreso,
+concepto,Cuotas Mensuales,Cuotas regulares de socios,ingreso,Ingresos por Cuotas
+concepto,Servicios Básicos,Electricidad agua gas internet,gasto,Gastos Operativos
+concepto,Torneos,Organización de torneos,ingreso,Ingresos por Eventos`;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -39,7 +39,7 @@ concepto,Torneos,Organización de torneos,Ingresos por Eventos`;
     
     const headers = lines[0].split(",").map(h => h.trim().toLowerCase());
     
-    const requiredHeaders = ['tipo', 'nombre'];
+    const requiredHeaders = ['tipo', 'nombre', 'tipo_movimiento'];
     const missingHeaders = requiredHeaders.filter(header => 
       !headers.some(h => h.includes(header))
     );
@@ -65,6 +65,9 @@ concepto,Torneos,Organización de torneos,Ingresos por Eventos`;
       }
       if (!row.nombre || row.nombre.trim() === '') {
         throw new Error(`Línea ${row.lineNumber}: El campo 'nombre' es requerido`);
+      }
+      if (!row.tipo_movimiento || !['ingreso', 'gasto'].includes(row.tipo_movimiento.toLowerCase())) {
+        throw new Error(`Línea ${row.lineNumber}: Tipo de movimiento '${row.tipo_movimiento}' no válido. Use: ingreso, gasto`);
       }
       if (row.tipo.toLowerCase() === 'concepto' && (!row.general_nombre || row.general_nombre.trim() === '')) {
         throw new Error(`Línea ${row.lineNumber}: Los conceptos requieren 'general_nombre'`);
@@ -127,7 +130,7 @@ concepto,Torneos,Organización de torneos,Ingresos por Eventos`;
             const generalData = {
               name: row.nombre.trim(),
               description: row.descripcion || '',
-              type: 'entrada'
+              type: row.tipo_movimiento.toLowerCase() === 'ingreso' ? 'entrada' : 'salida' // Convertir a formato backend
             };
 
             const createdGeneral = await generalService.create(generalData);
@@ -172,7 +175,7 @@ concepto,Torneos,Organización de torneos,Ingresos por Eventos`;
               name: row.nombre.trim(),
               description: row.descripcion || '',
               generalId: general.id,
-              type: general.type
+              type: row.tipo_movimiento.toLowerCase() === 'ingreso' ? 'entrada' : 'salida' // Convertir a formato backend
             };
 
             const createdConcept = await conceptService.create(conceptData);
@@ -280,8 +283,9 @@ concepto,Torneos,Organización de torneos,Ingresos por Eventos`;
           <div className="bg-gray-50 p-4 rounded-lg">
              <h4 className="font-medium text-gray-900 mb-3">2. Formato del Archivo</h4>
              <div className="text-sm text-gray-700 space-y-2">
-               <p><strong>Columnas requeridas:</strong> tipo, nombre, descripcion, general_nombre</p>
+               <p><strong>Columnas requeridas:</strong> tipo, nombre, descripcion, tipo_movimiento, general_nombre</p>
                <p><strong>Valores válidos para 'tipo':</strong> general, concepto</p>
+               <p><strong>Valores válidos para 'tipo_movimiento':</strong> ingreso, gasto</p>
                <p><strong>Orden recomendado:</strong> Primero generales, luego conceptos</p>
              </div>
              
@@ -312,6 +316,7 @@ concepto,Torneos,Organización de torneos,Ingresos por Eventos`;
                            <th className="px-2 py-2 border border-gray-300 text-left font-semibold text-orange-800">Tipo</th>
                            <th className="px-2 py-2 border border-gray-300 text-left font-semibold text-orange-800">Nombre</th>
                            <th className="px-2 py-2 border border-gray-300 text-left font-semibold text-orange-800">Descripción</th>
+                           <th className="px-2 py-2 border border-gray-300 text-left font-semibold text-orange-800">Tipo Mov.</th>
                            <th className="px-2 py-2 border border-gray-300 text-left font-semibold text-orange-800">General</th>
                          </tr>
                        </thead>
@@ -320,31 +325,36 @@ concepto,Torneos,Organización de torneos,Ingresos por Eventos`;
                            <td className="px-2 py-2 border border-gray-300 font-medium text-green-700">general</td>
                            <td className="px-2 py-2 border border-gray-300">Ingresos por Cuotas</td>
                            <td className="px-2 py-2 border border-gray-300">Ingresos generados por cuotas de socios</td>
+                           <td className="px-2 py-2 border border-gray-300 font-medium text-green-600">ingreso</td>
                            <td className="px-2 py-2 border border-gray-300 text-gray-400">-</td>
                          </tr>
                          <tr className="bg-green-50">
                            <td className="px-2 py-2 border border-gray-300 font-medium text-green-700">general</td>
                            <td className="px-2 py-2 border border-gray-300">Gastos Operativos</td>
                            <td className="px-2 py-2 border border-gray-300">Gastos necesarios para el funcionamiento</td>
+                           <td className="px-2 py-2 border border-gray-300 font-medium text-red-600">gasto</td>
                            <td className="px-2 py-2 border border-gray-300 text-gray-400">-</td>
                          </tr>
                          <tr className="bg-blue-50">
                            <td className="px-2 py-2 border border-gray-300 font-medium text-blue-700">concepto</td>
                            <td className="px-2 py-2 border border-gray-300">Cuotas Mensuales</td>
                            <td className="px-2 py-2 border border-gray-300">Cuotas regulares de socios</td>
+                           <td className="px-2 py-2 border border-gray-300 font-medium text-green-600">entrada</td>
                            <td className="px-2 py-2 border border-gray-300 font-medium">Ingresos por Cuotas</td>
                          </tr>
                          <tr className="bg-blue-50">
                            <td className="px-2 py-2 border border-gray-300 font-medium text-blue-700">concepto</td>
                            <td className="px-2 py-2 border border-gray-300">Servicios Básicos</td>
                            <td className="px-2 py-2 border border-gray-300">Electricidad agua gas internet</td>
+                           <td className="px-2 py-2 border border-gray-300 font-medium text-red-600">salida</td>
                            <td className="px-2 py-2 border border-gray-300 font-medium">Gastos Operativos</td>
                          </tr>
                        </tbody>
                      </table>
                    </div>
                    <div className="mt-3 text-xs text-gray-600">
-                     <p><strong>💡 Nota:</strong> Los colores indican la jerarquía: <span className="text-green-600">Verde = Generales</span>, <span className="text-blue-600">Azul = Conceptos</span></p>
+                     <p><strong>💡 Nota:</strong> Los colores indican: <span className="text-green-600">Verde = Generales</span>, <span className="text-blue-600">Azul = Conceptos</span></p>
+                     <p><strong>💰 Tipo Movimiento:</strong> <span className="text-green-600">Verde = Ingreso</span>, <span className="text-red-600">Rojo = Gasto</span></p>
                    </div>
                  </div>
                )}
