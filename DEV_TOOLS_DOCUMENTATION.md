@@ -6,8 +6,8 @@ Se ha agregado una nueva funcionalidad para eliminar todas las transacciones de 
 
 ## Características
 
-### 🔒 Seguridad
-- **Solo disponible en desarrollo**: La funcionalidad está completamente deshabilitada en producción
+### 🔒 Seguridada
+- **Solo disponible en desarrollo**: La funcionalidad está completamente deshabilitada en produccióna
 - **Confirmación doble**: Requiere escribir "BORRAR" para confirmar la acción
 - **Logs detallados**: Todas las eliminaciones se registran en el sistema de logs
 
