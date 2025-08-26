@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import GeneralModal from "../../../components/forms/GeneralModal";
-import CsvImportModal from "../../../components/forms/CsvImportModal";
+
 import MassiveCsvImportModal from "../../../components/forms/MassiveCsvImportModal";
 import { generalService } from "../../../lib/services/generalService";
 import { useAuth } from "../../../context/AuthContext";
@@ -15,7 +15,7 @@ export default function GeneralesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
+
   const [isMassiveImportModalOpen, setIsMassiveImportModalOpen] = useState(false);
   const [editingGeneral, setEditingGeneral] = useState(null);
   const [filter, setFilter] = useState("all"); // all, entrada, salida
@@ -77,9 +77,7 @@ export default function GeneralesPage() {
     await loadGenerals(); // Reload the list
   };
 
-  const handleCsvImportSuccess = async () => {
-    await loadGenerals(); // Reload the list after CSV import
-  };
+
 
   const handleMassiveImportSuccess = async () => {
     await loadGenerals(); // Reload the list after massive import
@@ -121,25 +119,7 @@ export default function GeneralesPage() {
             </p>
           </div>
           <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row gap-2">
-            <button
-              onClick={() => setIsCsvModalOpen(true)}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-            >
-              <svg
-                className="-ml-1 mr-2 h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
-                />
-              </svg>
-              Importar CSV
-            </button>
+
             <button
               onClick={() => setIsMassiveImportModalOpen(true)}
               className="inline-flex items-center px-4 py-2 border border-purple-300 rounded-md shadow-sm text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
@@ -370,11 +350,7 @@ export default function GeneralesPage() {
         initialData={editingGeneral}
       />
       
-      <CsvImportModal
-        isOpen={isCsvModalOpen}
-        onClose={() => setIsCsvModalOpen(false)}
-        onSuccess={handleCsvImportSuccess}
-      />
+
       
       <MassiveCsvImportModal
         isOpen={isMassiveImportModalOpen}
