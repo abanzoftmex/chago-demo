@@ -11,6 +11,7 @@ import {
   limit,
   startAfter,
   serverTimestamp,
+  Timestamp,
 } from "firebase/firestore";
 import { db } from "../firebase/firebaseConfig";
 
@@ -63,6 +64,17 @@ export const logService = {
         q = query(q, where("transactionType", "==", filters.transactionType));
       }
 
+      // Apply date filters
+      if (filters.startDate) {
+        const startTimestamp = Timestamp.fromDate(new Date(filters.startDate));
+        q = query(q, where("timestamp", ">=", startTimestamp));
+      }
+
+      if (filters.endDate) {
+        const endTimestamp = Timestamp.fromDate(new Date(filters.endDate + " 23:59:59"));
+        q = query(q, where("timestamp", "<=", endTimestamp));
+      }
+
       // Apply ordering by timestamp (newest first)
       q = query(q, orderBy("timestamp", "desc"));
 
@@ -84,6 +96,22 @@ export const logService = {
       querySnapshot.forEach((doc) => {
         logs.push({ id: doc.id, ...doc.data() });
       });
+
+      // Apply text search filter if provided (client-side filtering)
+      if (filters.searchText && filters.searchText.trim()) {
+        const searchText = filters.searchText.toLowerCase().trim();
+        logs = logs.filter(log => {
+          const searchableFields = [
+            log.details || '',
+            log.userName || '',
+            log.entityType || '',
+            log.action || '',
+            log.entityId || ''
+          ].join(' ').toLowerCase();
+
+          return searchableFields.includes(searchText);
+        });
+      }
 
       return logs;
     } catch (error) {

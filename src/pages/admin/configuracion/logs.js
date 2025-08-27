@@ -12,13 +12,15 @@ import {
   Plus,
   Search,
   Filter,
-  RefreshCw,
   AlertCircle,
   CheckCircle,
   Calendar,
   User,
   Tag,
   Trash,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
 } from "lucide-react";
 
 const LogsPage = () => {
@@ -31,7 +33,17 @@ const LogsPage = () => {
   const [filters, setFilters] = useState({
     action: "",
     transactionType: "",
-    limit: 50,
+    searchText: "",
+    startDate: "",
+    endDate: "",
+    limit: 20,
+  });
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    hasMore: true,
+    lastDoc: null,
+    totalLoaded: 0,
+    docHistory: [], // Historial de documentos para navegación hacia atrás
   });
 
   // Check if user can manage settings
@@ -46,12 +58,35 @@ const LogsPage = () => {
     loadLogs();
   }, [canManageSettings, router]);
 
-  const loadLogs = async () => {
+  const loadLogs = async (page = 1, append = false) => {
     try {
       setLoading(true);
       setError("");
-      const logsData = await logService.getAll(filters);
-      setLogs(logsData);
+
+      const paginationFilters = {
+        ...filters,
+        startAfter: page > 1 ? pagination.lastDoc : null,
+      };
+
+      const logsData = await logService.getAll(paginationFilters);
+
+      if (append) {
+        setLogs(prevLogs => [...prevLogs, ...logsData]);
+      } else {
+        setLogs(logsData);
+      }
+
+      // Update pagination state
+      const hasMore = logsData.length === parseInt(filters.limit);
+      const lastDoc = logsData.length > 0 ? logsData[logsData.length - 1] : null;
+
+      setPagination(prev => ({
+        currentPage: page,
+        hasMore,
+        lastDoc,
+        totalLoaded: append ? prev.totalLoaded + logsData.length : logsData.length,
+        docHistory: append ? [...prev.docHistory, prev.lastDoc] : [],
+      }));
     } catch (err) {
       console.error("Error loading logs:", err);
       setError("Error al cargar los registros de actividad");
@@ -68,21 +103,81 @@ const LogsPage = () => {
       ...prev,
       [name]: value,
     }));
+
+    // If changing limit, reset pagination
+    if (name === 'limit') {
+      setPagination({
+        currentPage: 1,
+        hasMore: true,
+        lastDoc: null,
+        totalLoaded: 0,
+        docHistory: [],
+      });
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      applyFilters();
+    }
   };
 
   const applyFilters = () => {
-    loadLogs();
+    // Reset pagination when applying filters
+    setPagination({
+      currentPage: 1,
+      hasMore: true,
+      lastDoc: null,
+      totalLoaded: 0,
+      docHistory: [],
+    });
+    loadLogs(1, false);
   };
 
   const resetFilters = () => {
     setFilters({
       action: "",
       transactionType: "",
-      limit: 50,
+      searchText: "",
+      startDate: "",
+      endDate: "",
+      limit: 20,
+    });
+    setPagination({
+      currentPage: 1,
+      hasMore: true,
+      lastDoc: null,
+      totalLoaded: 0,
+      docHistory: [],
     });
     setTimeout(() => {
-      loadLogs();
+      loadLogs(1, false);
     }, 0);
+  };
+
+  const loadNextPage = () => {
+    if (pagination.hasMore && !loading) {
+      loadLogs(pagination.currentPage + 1, true);
+    }
+  };
+
+  const loadPreviousPage = () => {
+    if (pagination.currentPage > 1 && !loading) {
+      const previousDoc = pagination.docHistory[pagination.docHistory.length - 1];
+      const newDocHistory = pagination.docHistory.slice(0, -1);
+
+      setPagination(prev => ({
+        ...prev,
+        currentPage: prev.currentPage - 1,
+        lastDoc: previousDoc,
+        docHistory: newDocHistory,
+        totalLoaded: prev.totalLoaded - parseInt(filters.limit),
+      }));
+
+      // Remove the last page of logs from the display
+      setLogs(prevLogs => prevLogs.slice(0, -parseInt(filters.limit)));
+    }
   };
 
   const formatDate = (timestamp) => {
@@ -160,7 +255,21 @@ const LogsPage = () => {
           <h2 className="text-lg font-semibold mb-4 flex items-center">
             <Filter className="h-5 w-5 mr-2" /> Filtros
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Buscar
+              </label>
+              <input
+                type="text"
+                name="searchText"
+                value={filters.searchText}
+                onChange={handleFilterChange}
+                onKeyDown={handleKeyDown}
+                placeholder="Buscar en detalles, usuario, acción..."
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Acción
@@ -194,7 +303,33 @@ const LogsPage = () => {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Límite
+                Fecha Desde
+              </label>
+              <input
+                type="date"
+                name="startDate"
+                value={filters.startDate}
+                onChange={handleFilterChange}
+                onKeyDown={handleKeyDown}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Fecha Hasta
+              </label>
+              <input
+                type="date"
+                name="endDate"
+                value={filters.endDate}
+                onChange={handleFilterChange}
+                onKeyDown={handleKeyDown}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Registros por página
               </label>
               <select
                 name="limit"
@@ -202,26 +337,30 @@ const LogsPage = () => {
                 onChange={handleFilterChange}
                 className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="25">25 registros</option>
+                <option value="20">20 registros</option>
                 <option value="50">50 registros</option>
                 <option value="100">100 registros</option>
-                <option value="200">200 registros</option>
               </select>
             </div>
           </div>
-          <div className="mt-4 flex justify-end space-x-2">
-            <button
-              onClick={resetFilters}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 flex items-center"
-            >
-              <RefreshCw className="h-4 w-4 mr-1" /> Reiniciar
-            </button>
-            <button
-              onClick={applyFilters}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
-            >
-              <Search className="h-4 w-4 mr-1" /> Aplicar Filtros
-            </button>
+          <div className="mt-4 flex justify-between items-center">
+            <div className="text-xs text-gray-500">
+              💡 Presiona Enter en cualquier campo para aplicar filtros
+            </div>
+            <div className="flex space-x-2">
+              <button
+                onClick={resetFilters}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 flex items-center"
+              >
+                <RotateCcw className="h-4 w-4 mr-1" /> Reiniciar
+              </button>
+              <button
+                onClick={applyFilters}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
+              >
+                <Search className="h-4 w-4 mr-1" /> Aplicar Filtros
+              </button>
+            </div>
           </div>
         </div>
 
@@ -324,6 +463,35 @@ const LogsPage = () => {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* Pagination */}
+          {logs.length > 0 && (
+            <div className="flex items-center justify-between px-6 py-3 bg-gray-50 border-t border-gray-200">
+              <div className="flex items-center text-sm text-gray-700">
+                <span>
+                  Página {pagination.currentPage} • {pagination.totalLoaded} registros cargados
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={loadPreviousPage}
+                  disabled={pagination.currentPage === 1 || loading}
+                  className="px-3 py-1 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Anterior
+                </button>
+                <button
+                  onClick={loadNextPage}
+                  disabled={!pagination.hasMore || loading}
+                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                >
+                  Siguiente
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </button>
+              </div>
             </div>
           )}
         </div>
