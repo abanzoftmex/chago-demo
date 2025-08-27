@@ -209,6 +209,7 @@ const LogsPage = () => {
   const getActionIcon = (action) => {
     switch (action) {
       case "delete":
+      case "delete_reason":
         return <Trash className="h-4 w-4 text-red-500" />;
       case "create":
         return <Plus className="h-4 w-4 text-green-500" />;
@@ -222,6 +223,7 @@ const LogsPage = () => {
   const getActionText = (action) => {
     switch (action) {
       case "delete":
+      case "delete_reason":
         return "Eliminación";
       case "create":
         return "Creación";
