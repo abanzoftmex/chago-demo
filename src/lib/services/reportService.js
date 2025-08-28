@@ -16,12 +16,14 @@ export const reportService = {
       if (filters.startDate && filters.endDate) {
         // Get transactions for the selected period
         transactions = await transactionService.getByDateRange(
-          filters.startDate, 
+          filters.startDate,
           filters.endDate,
           {
             type: filters.type,
             providerId: filters.providerId,
-            generalId: filters.generalId
+            generalId: filters.generalId,
+            conceptId: filters.conceptId,
+            subconceptId: filters.subconceptId
           }
         );
 
@@ -56,7 +58,9 @@ export const reportService = {
         transactions = await transactionService.getAll({
           type: filters.type,
           providerId: filters.providerId,
-          generalId: filters.generalId
+          generalId: filters.generalId,
+          conceptId: filters.conceptId,
+          subconceptId: filters.subconceptId
         });
       }
       

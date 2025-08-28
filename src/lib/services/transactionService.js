@@ -85,6 +85,14 @@ export const transactionService = {
         q = query(q, where("generalId", "==", filters.generalId));
       }
 
+      if (filters.conceptId) {
+        q = query(q, where("conceptId", "==", filters.conceptId));
+      }
+
+      if (filters.subconceptId) {
+        q = query(q, where("subconceptId", "==", filters.subconceptId));
+      }
+
       if (filters.status) {
         q = query(q, where("status", "==", filters.status));
       }
@@ -279,6 +287,14 @@ export const transactionService = {
 
       if (filters.generalId) {
         q = query(q, where("generalId", "==", filters.generalId));
+      }
+
+      if (filters.conceptId) {
+        q = query(q, where("conceptId", "==", filters.conceptId));
+      }
+
+      if (filters.subconceptId) {
+        q = query(q, where("subconceptId", "==", filters.subconceptId));
       }
 
       q = query(q, orderBy("date", "desc"));

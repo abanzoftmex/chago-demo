@@ -6,6 +6,8 @@ import AdvancedDateSelector from "../../components/dashboard/AdvancedDateSelecto
 import { reportService } from "../../lib/services/reportService";
 import { dashboardService } from "../../lib/services/dashboardService";
 import { generalService } from "../../lib/services/generalService";
+import { conceptService } from "../../lib/services/conceptService";
+import { subconceptService } from "../../lib/services/subconceptService";
 import {
   CalendarIcon,
   DocumentArrowDownIcon,
@@ -28,9 +30,13 @@ const Reportes = () => {
     endDate: "",
     type: "",
     generalId: "",
+    conceptId: "",
+    subconceptId: "",
   });
   const [currentMonthName, setCurrentMonthName] = useState("");
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [concepts, setConcepts] = useState([]);
+  const [subconcepts, setSubconcepts] = useState([]);
 
   useEffect(() => {
     loadReferenceData();
@@ -71,8 +77,14 @@ const Reportes = () => {
 
   const loadReferenceData = async () => {
     try {
-      const generalsData = await generalService.getAll();
+      const [generalsData, conceptsData, subconceptsData] = await Promise.all([
+        generalService.getAll(),
+        conceptService.getAll(),
+        subconceptService.getAll()
+      ]);
       setGenerals(generalsData);
+      setConcepts(conceptsData);
+      setSubconcepts(subconceptsData);
     } catch (err) {
       console.error("Error loading reference data:", err);
       error("Error al cargar datos de referencia");
@@ -87,6 +99,8 @@ const Reportes = () => {
         ...filters,
         startDate: filters.startDate ? new Date(filters.startDate) : null,
         endDate: filters.endDate ? new Date(filters.endDate) : null,
+        conceptId: filters.conceptId || null,
+        subconceptId: filters.subconceptId || null,
       };
 
       const transactionsData =
@@ -107,10 +121,28 @@ const Reportes = () => {
   };
 
   const handleFilterChange = (field, value) => {
-    setFilters((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setFilters((prev) => {
+      const newFilters = { ...prev, [field]: value };
+
+      // If changing concept, clear subconcept if it doesn't belong to the new concept
+      if (field === 'conceptId') {
+        if (value && prev.subconceptId) {
+          const selectedSubconcept = subconcepts.find(sc => sc.id === prev.subconceptId);
+          if (selectedSubconcept && selectedSubconcept.conceptId !== value) {
+            newFilters.subconceptId = "";
+          }
+        }
+      }
+
+      return newFilters;
+    });
+  };
+
+  const getFilteredSubconcepts = () => {
+    if (!filters.conceptId) {
+      return subconcepts;
+    }
+    return subconcepts.filter(subconcept => subconcept.conceptId === filters.conceptId);
   };
 
   const exportToExcel = async () => {
@@ -178,7 +210,7 @@ const Reportes = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             {/* Date Range */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
@@ -222,8 +254,6 @@ const Reportes = () => {
               </select>
             </div>
 
-
-
             {/* General Filter */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
@@ -240,6 +270,44 @@ const Reportes = () => {
                 {generals.map((general) => (
                   <option key={general.id} value={general.id}>
                     {general.name} ({general.type})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Concept Filter */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                Concepto
+              </label>
+              <select
+                value={filters.conceptId}
+                onChange={(e) => handleFilterChange("conceptId", e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              >
+                <option value="">Todos</option>
+                {concepts.map((concept) => (
+                  <option key={concept.id} value={concept.id}>
+                    {concept.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Subconcept Filter */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                Sub-concepto
+              </label>
+              <select
+                value={filters.subconceptId}
+                onChange={(e) => handleFilterChange("subconceptId", e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              >
+                <option value="">Todos</option>
+                {getFilteredSubconcepts().map((subconcept) => (
+                  <option key={subconcept.id} value={subconcept.id}>
+                    {subconcept.name}
                   </option>
                 ))}
               </select>
