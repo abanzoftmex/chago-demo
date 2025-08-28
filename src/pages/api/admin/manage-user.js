@@ -1,4 +1,5 @@
 import admin from "firebase-admin";
+import { logService } from "../../../lib/services/logService";
 import {
   updateUserStatus,
   deleteUser,
@@ -80,6 +81,9 @@ export default async function handler(req, res) {
     switch (req.method) {
       case "POST":
         if (action === "disable") {
+          // Get user data before disabling for logging
+          const userDataBefore = await getUserInfo(userId);
+
           // Disable user in Firebase Auth
           await admin.auth().updateUser(userId, { disabled: true });
 
@@ -92,10 +96,28 @@ export default async function handler(req, res) {
             });
           }
 
+          // Log the user status change
+          if (userDataBefore) {
+            await logService.logUserStatusChange({
+              user: {
+                uid: currentUser.uid,
+                displayName: currentUserData.displayName,
+                email: currentUserData.email
+              },
+              userId: userId,
+              userData: { ...userDataBefore, isActive: false },
+              action: "disable",
+              previousStatus: true
+            });
+          }
+
           res
             .status(200)
             .json({ message: "Usuario deshabilitado exitosamente" });
         } else if (action === "enable") {
+          // Get user data before enabling for logging
+          const userDataBefore = await getUserInfo(userId);
+
           // Enable user in Firebase Auth
           await admin.auth().updateUser(userId, { disabled: false });
 
@@ -108,6 +130,21 @@ export default async function handler(req, res) {
             });
           }
 
+          // Log the user status change
+          if (userDataBefore) {
+            await logService.logUserStatusChange({
+              user: {
+                uid: currentUser.uid,
+                displayName: currentUserData.displayName,
+                email: currentUserData.email
+              },
+              userId: userId,
+              userData: { ...userDataBefore, isActive: true },
+              action: "enable",
+              previousStatus: false
+            });
+          }
+
           res.status(200).json({ message: "Usuario habilitado exitosamente" });
         } else {
           res.status(400).json({ message: "Acción inválida" });
@@ -115,6 +152,9 @@ export default async function handler(req, res) {
         break;
 
       case "DELETE":
+        // Get user data before deleting for logging
+        const userDataBeforeDelete = await getUserInfo(userId);
+
         // Delete user from Firebase Auth
         await admin.auth().deleteUser(userId);
 
@@ -126,6 +166,19 @@ export default async function handler(req, res) {
             deleteResult.error
           );
           // Continue anyway since user was deleted from Auth
+        }
+
+        // Log the user deletion
+        if (userDataBeforeDelete) {
+          await logService.logUserDeletion({
+            user: {
+              uid: currentUser.uid,
+              displayName: currentUserData.displayName,
+              email: currentUserData.email
+            },
+            userId: userId,
+            userData: userDataBeforeDelete
+          });
         }
 
         res.status(200).json({ message: "Usuario eliminado exitosamente" });

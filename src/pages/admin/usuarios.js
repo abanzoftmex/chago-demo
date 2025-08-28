@@ -68,6 +68,42 @@ const UsersPage = () => {
     });
   };
 
+  // Función para probar el sistema de logging
+  const testLogging = async () => {
+    try {
+      console.log("=== PRUEBA DE LOGGING DESDE FRONTEND ===");
+
+      const response = await fetch('/api/admin/test-logging', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      console.log("Respuesta del servidor:", result);
+
+      if (response.ok) {
+        setToast({
+          type: "success",
+          message: "Log de prueba creado exitosamente - revisa la consola y los logs",
+        });
+      } else {
+        setToast({
+          type: "error",
+          message: "Error en prueba de logging: " + result.message,
+        });
+      }
+    } catch (error) {
+      console.error("Error en prueba de logging:", error);
+      setToast({
+        type: "error",
+        message: "Error al probar logging",
+      });
+    }
+  };
+
 
 
   // Función temporal para diagnosticar y solucionar problemas de permisos
@@ -193,6 +229,12 @@ const UsersPage = () => {
                 </p>
               </div>
               <div className="mt-4 flex md:mt-0 md:ml-4 space-x-3">
+                <button
+                  onClick={testLogging}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                >
+                  🧪 Probar Logging
+                </button>
                 <button
                   onClick={() => setShowPermissionsModal(true)}
                   className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"

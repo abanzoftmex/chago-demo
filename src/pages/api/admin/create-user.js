@@ -1,5 +1,6 @@
 import admin from "firebase-admin";
 import { setUserRole, ROLES } from "../../../lib/services/roleService";
+import { logService } from "../../../lib/services/logService";
 
 // Initialize Firebase Admin SDK (only if not already initialized)
 if (!admin.apps.length) {
@@ -106,6 +107,24 @@ export default async function handler(req, res) {
         error: roleResult.error,
       });
     }
+
+    // Log the user creation
+    await logService.logUserCreation({
+      user: {
+        uid: currentUser.uid,
+        displayName: currentUserData.displayName,
+        email: currentUserData.email
+      },
+      userId: userRecord.uid,
+      userData: {
+        email: userRecord.email,
+        displayName: userRecord.displayName,
+        role: role,
+        isActive: true,
+        createdAt: new Date(),
+        createdBy: currentUser.uid
+      }
+    });
 
     res.status(201).json({
       message: "Usuario creado exitosamente",

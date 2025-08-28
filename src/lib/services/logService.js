@@ -18,21 +18,73 @@ import { db } from "../firebase/firebaseConfig";
 const COLLECTION_NAME = "logs";
 
 export const logService = {
+  // Función auxiliar para sanitizar datos complejos
+  sanitizeData(obj) {
+    if (obj === null || obj === undefined) {
+      return obj;
+    }
+
+    if (typeof obj === 'string' || typeof obj === 'number' || typeof obj === 'boolean') {
+      return obj;
+    }
+
+    if (obj instanceof Date) {
+      return obj.toISOString();
+    }
+
+    // Manejar objetos Timestamp de Firebase
+    if (obj && typeof obj === 'object' && obj._seconds !== undefined) {
+      return new Date(obj._seconds * 1000 + (obj._nanoseconds || 0) / 1000000).toISOString();
+    }
+
+    // Manejar objetos Timestamp de Firestore Admin SDK
+    if (obj && typeof obj === 'object' && obj.toDate && typeof obj.toDate === 'function') {
+      try {
+        return obj.toDate().toISOString();
+      } catch (error) {
+        return obj.toString();
+      }
+    }
+
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.sanitizeData(item));
+    }
+
+    if (typeof obj === 'object') {
+      const sanitized = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (value !== undefined) {
+          sanitized[key] = this.sanitizeData(value);
+        }
+      }
+      return sanitized;
+    }
+
+    // Para cualquier otro tipo, intentar convertir a string
+    try {
+      return String(obj);
+    } catch (error) {
+      return null;
+    }
+  },
+
   // Create a new log entry
   async create(logData) {
     try {
-      // Remove undefined values to avoid Firestore errors
-      const sanitized = Object.fromEntries(
-        Object.entries(logData || {}).filter(([_, v]) => v !== undefined)
-      );
-      const docRef = await addDoc(collection(db, COLLECTION_NAME), {
+      // Sanitize complex data to avoid Firestore errors
+      const sanitized = this.sanitizeData(logData || {});
+
+      const finalData = {
         ...sanitized,
         timestamp: serverTimestamp(),
-      });
+      };
+
+      const docRef = await addDoc(collection(db, COLLECTION_NAME), finalData);
 
       return { id: docRef.id, ...logData };
     } catch (error) {
       console.error("Error creating log:", error);
+      console.error("Error details:", error.message);
       throw new Error("Error al crear el registro de log");
     }
   },
@@ -150,6 +202,139 @@ export const logService = {
     } catch (error) {
       console.error("Error logging transaction deletion:", error);
       // Don't throw error to avoid blocking the main operation
+      return null;
+    }
+  },
+
+  // Log user creation
+  async logUserCreation({ user, userId, userData }) {
+    try {
+      const currentUserId = user.uid;
+      const currentUserName = user.displayName || user.email || "Usuario desconocido";
+
+      return await this.create({
+        action: "create",
+        entityType: "user",
+        entityId: userId,
+        entityData: userData,
+        userId: currentUserId,
+        userName: currentUserName,
+        details: `Usuario ${currentUserName} creó la cuenta de ${userData.displayName || userData.email}`
+      });
+    } catch (error) {
+      console.error("Error logging user creation:", error);
+      return null;
+    }
+  },
+
+  // Log user update
+  async logUserUpdate({ user, userId, userData, previousData }) {
+    try {
+      console.log("=== LOG USER UPDATE DEBUG ===");
+      console.log("User performing action:", user);
+      console.log("Target userId:", userId);
+      console.log("Updated userData:", userData);
+      console.log("Previous userData:", previousData);
+
+      const currentUserId = user.uid;
+      const currentUserName = user.displayName || user.email || "Usuario desconocido";
+      const targetUserName = userData?.displayName || userData?.email || previousData?.displayName || "Usuario sin nombre";
+
+      let details = `Usuario ${currentUserName} actualizó el perfil de ${targetUserName}`;
+
+      // Si es auto-edición
+      if (currentUserId === userId) {
+        details = `Usuario ${currentUserName} actualizó su propio perfil`;
+      }
+
+      console.log("Action details:", details);
+
+      // Preparar datos limpios para el log
+      const cleanUserData = userData ? {
+        displayName: userData.displayName || "Sin nombre",
+        role: userData.role || "Sin rol",
+        email: userData.email || "Sin email",
+        isActive: userData.isActive ?? true,
+        updatedAt: userData.updatedAt || new Date().toISOString()
+      } : null;
+
+      const cleanPreviousData = previousData ? {
+        displayName: previousData.displayName || "Sin nombre",
+        role: previousData.role || "Sin rol",
+        email: previousData.email || "Sin email",
+        isActive: previousData.isActive ?? true,
+        createdAt: previousData.createdAt || null,
+        updatedAt: previousData.updatedAt || null
+      } : null;
+
+      const logData = {
+        action: "update",
+        entityType: "user",
+        entityId: userId,
+        entityData: cleanUserData,
+        previousData: cleanPreviousData,
+        userId: currentUserId,
+        userName: currentUserName,
+        details: details
+      };
+
+      console.log("Final log data:", logData);
+
+      const result = await this.create(logData);
+      console.log("Log creation result:", result);
+      console.log("=== END LOG USER UPDATE DEBUG ===");
+
+      return result;
+    } catch (error) {
+      console.error("Error logging user update:", error);
+      return null;
+    }
+  },
+
+  // Log user status change (enable/disable)
+  async logUserStatusChange({ user, userId, userData, action, previousStatus }) {
+    try {
+      const currentUserId = user.uid;
+      const currentUserName = user.displayName || user.email || "Usuario desconocido";
+      const targetUserName = userData.displayName || userData.email;
+
+      const actionText = action === "disable" ? "desactivó" : "activó";
+      const details = `Usuario ${currentUserName} ${actionText} la cuenta de ${targetUserName}`;
+
+      return await this.create({
+        action: action,
+        entityType: "user",
+        entityId: userId,
+        entityData: userData,
+        previousData: { isActive: previousStatus },
+        userId: currentUserId,
+        userName: currentUserName,
+        details: details
+      });
+    } catch (error) {
+      console.error("Error logging user status change:", error);
+      return null;
+    }
+  },
+
+  // Log user deletion
+  async logUserDeletion({ user, userId, userData }) {
+    try {
+      const currentUserId = user.uid;
+      const currentUserName = user.displayName || user.email || "Usuario desconocido";
+      const targetUserName = userData.displayName || userData.email;
+
+      return await this.create({
+        action: "delete",
+        entityType: "user",
+        entityId: userId,
+        entityData: userData,
+        userId: currentUserId,
+        userName: currentUserName,
+        details: `Usuario ${currentUserName} eliminó la cuenta de ${targetUserName}`
+      });
+    } catch (error) {
+      console.error("Error logging user deletion:", error);
       return null;
     }
   },

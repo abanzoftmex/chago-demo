@@ -1,4 +1,5 @@
 import admin from "firebase-admin";
+import { logService } from "../../../lib/services/logService";
 
 // Initialize Firebase Admin SDK (only if not already initialized)
 if (!admin.apps.length) {
@@ -79,6 +80,21 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: "Rol requerido" });
     }
 
+    // Get target user data before updating (for logging)
+    let targetUserData = null;
+    try {
+      const targetUserDoc = await admin.firestore().collection('users').doc(userId).get();
+      if (targetUserDoc.exists) {
+        targetUserData = targetUserDoc.data();
+        console.log("Target user data from Firestore:", targetUserData);
+      } else {
+        console.log("Target user document does not exist in Firestore");
+      }
+    } catch (error) {
+      console.error("Error getting target user data:", error);
+      // Continue without previous data
+    }
+
     // Prepare update data
     const updateData = {
       displayName: displayName.trim(),
@@ -113,6 +129,38 @@ export default async function handler(req, res) {
         role: role,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+
+      // Prepare target user data for logging (after successful update)
+      const updatedUserData = {
+        displayName: displayName.trim(),
+        role: role,
+        email: targetUserData?.email || "email-no-disponible",
+        isActive: targetUserData?.isActive ?? true,
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Prepare current user info for logging (the one performing the action)
+      const currentUserInfo = {
+        uid: currentUser.uid,
+        displayName: currentUserData.displayName || currentUser.name || "Usuario sin nombre",
+        email: currentUserData.email || currentUser.email || "email-no-disponible"
+      };
+
+      console.log("=== DEBUG LOGGING DATA ===");
+      console.log("Target user data (before):", targetUserData);
+      console.log("Updated user data:", updatedUserData);
+      console.log("Current user (performing action):", currentUserInfo);
+
+      // Log the user update
+      const logResult = await logService.logUserUpdate({
+        user: currentUserInfo,
+        userId: userId,
+        userData: updatedUserData,
+        previousData: targetUserData
+      });
+
+      console.log("Log result:", logResult);
+      console.log("=== END DEBUG LOGGING DATA ===");
 
       res.status(200).json({
         message: "Usuario actualizado exitosamente",

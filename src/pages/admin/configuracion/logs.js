@@ -47,19 +47,37 @@ const LogsPage = () => {
   };
 
   // Función para comparar datos y obtener cambios
-  const getChanges = (previousData, currentData) => {
+  const getChanges = (previousData, currentData, entityType) => {
     const changes = [];
-    const fieldsToCompare = [
-      { key: 'amount', label: 'Monto', format: (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val) },
-      { key: 'description', label: 'Descripción' },
-      { key: 'date', label: 'Fecha', format: (val) => formatDate(val) },
-      { key: 'generalId', label: 'General', format: (val) => getGeneralName(val) },
-      { key: 'conceptId', label: 'Concepto', format: (val) => getConceptName(val) },
-      { key: 'subconceptId', label: 'Sub-concepto', format: (val) => getSubconceptName(val) },
-      { key: 'providerId', label: 'Proveedor', format: (val) => getProviderName(val) },
-      { key: 'division', label: 'División' },
-      { key: 'status', label: 'Estado', format: (val) => formatStatus(val) }
-    ];
+    let fieldsToCompare = [];
+
+    if (entityType === 'transaction') {
+      fieldsToCompare = [
+        { key: 'amount', label: 'Monto', format: (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val) },
+        { key: 'description', label: 'Descripción' },
+        { key: 'date', label: 'Fecha', format: (val) => formatDate(val) },
+        { key: 'generalId', label: 'General', format: (val) => getGeneralName(val) },
+        { key: 'conceptId', label: 'Concepto', format: (val) => getConceptName(val) },
+        { key: 'subconceptId', label: 'Sub-concepto', format: (val) => getSubconceptName(val) },
+        { key: 'providerId', label: 'Proveedor', format: (val) => getProviderName(val) },
+        { key: 'division', label: 'División' },
+        { key: 'status', label: 'Estado', format: (val) => formatStatus(val) }
+      ];
+    } else if (entityType === 'user') {
+      fieldsToCompare = [
+        { key: 'displayName', label: 'Nombre de usuario' },
+        { key: 'role', label: 'Rol', format: (val) => {
+          switch (val) {
+            case 'administrativo': return 'Administrativo';
+            case 'contador': return 'Contador';
+            case 'usuario': return 'Usuario';
+            default: return val || 'No definido';
+          }
+        }},
+        { key: 'email', label: 'Correo electrónico' },
+        { key: 'isActive', label: 'Estado', format: (val) => val ? 'Activo' : 'Inactivo' }
+      ];
+    }
 
     fieldsToCompare.forEach(({ key, label, format }) => {
       const prevVal = previousData?.[key];
@@ -71,6 +89,10 @@ const LogsPage = () => {
           if (key === 'status') return formatStatus('pendiente');
           if (key === 'description') return 'Sin descripción';
           if (key === 'amount') return '$0.00';
+          if (key === 'displayName') return 'Sin nombre';
+          if (key === 'email') return 'Sin email';
+          if (key === 'role') return 'Sin rol';
+          if (key === 'isActive') return 'Inactivo';
           return 'No definido';
         }
         return format ? format(val) : val;
@@ -97,6 +119,16 @@ const LogsPage = () => {
         const prevAmount = parseFloat(prevVal || 0);
         const currAmount = parseFloat(currVal || 0);
         hasChanged = prevAmount !== currAmount;
+      } else if (hasChanged && key === 'isActive') {
+        // Verificar que realmente sea un cambio de estado
+        const prevActive = Boolean(prevVal);
+        const currActive = Boolean(currVal);
+        hasChanged = prevActive !== currActive;
+      } else if (hasChanged && key === 'role') {
+        // Verificar que realmente sea un cambio de rol
+        const prevRole = String(prevVal || '').toLowerCase();
+        const currRole = String(currVal || '').toLowerCase();
+        hasChanged = prevRole !== currRole;
       }
 
       if (hasChanged) {
@@ -126,6 +158,25 @@ const LogsPage = () => {
       default:
         return status;
     }
+  };
+
+  // Función para detectar logs con datos erróneos
+  const hasInvalidData = (log) => {
+    return (
+      log.userName === "Usuario desconocido" ||
+      !log.details ||
+      (log.entityType === "user" && (!log.entityData || !log.previousData))
+    );
+  };
+
+  // Función para resolver nombres de usuarios
+  const getUserDisplayName = (userId, userName) => {
+    if (userName && userName !== "Usuario desconocido") {
+      return userName;
+    }
+    // Si no tenemos el nombre, intentar buscar en la lista de usuarios
+    // Nota: Esta función necesitaría acceso a la lista de usuarios
+    return userName || "Usuario desconocido";
   };
 
   // Funciones auxiliares para obtener nombres
@@ -223,6 +274,16 @@ const LogsPage = () => {
       };
 
       const logsData = await logService.getAll(paginationFilters);
+
+      // Debug: mostrar datos de logs
+      console.log("=== LOGS DATA DEBUG ===");
+      console.log("Raw logs data:", logsData);
+      if (logsData.length > 0) {
+        console.log("First log example:", logsData[0]);
+        console.log("First log entityData:", logsData[0].entityData);
+        console.log("First log previousData:", logsData[0].previousData);
+      }
+      console.log("=== END LOGS DATA DEBUG ===");
 
       if (append) {
         setLogs(prevLogs => [...prevLogs, ...logsData]);
@@ -595,7 +656,11 @@ const LogsPage = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {logs.map((log) => (
-                    <tr key={log.id} className="hover:bg-gray-50">
+                    <tr
+                      key={log.id}
+                      className={`hover:bg-gray-50 ${hasInvalidData(log) ? 'bg-red-50 border-l-4 border-red-500' : ''}`}
+                      title={hasInvalidData(log) ? 'Este log contiene datos erróneos o incompletos' : ''}
+                    >
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatDate(log.timestamp)}
                       </td>
@@ -639,7 +704,12 @@ const LogsPage = () => {
                         {log.entityId}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {log.userName}
+                        <span className={log.userName === "Usuario desconocido" ? "text-red-600" : ""}>
+                          {getUserDisplayName(log.userId, log.userName)}
+                        </span>
+                        {log.userName === "Usuario desconocido" && (
+                          <span className="text-xs text-red-500 ml-1">(ID: {log.userId})</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs">
                         <div className="truncate" title={log.details}>
@@ -652,7 +722,8 @@ const LogsPage = () => {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {log.entityType === "transaction" && (log.action === "delete" || log.action === "update") && (
+                        {((log.entityType === "transaction" && (log.action === "delete" || log.action === "update")) ||
+                          (log.entityType === "user" && log.action === "update")) && (
                           <button
                             onClick={() => handleViewDetails(log)}
                             className="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
@@ -708,7 +779,7 @@ const LogsPage = () => {
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                     <Eye className="w-5 h-5 mr-2 text-blue-600" />
-                    Detalles de {selectedLog.action === 'update' ? 'Actualización' : selectedLog.action === 'delete' ? 'Eliminación' : 'Transacción'}
+                    Detalles de {selectedLog.action === 'update' ? 'Actualización' : selectedLog.action === 'delete' ? 'Eliminación' : 'Operación'}
                   </h3>
                   <button
                     onClick={() => setShowDetailsModal(false)}
@@ -720,11 +791,56 @@ const LogsPage = () => {
                   </button>
                 </div>
                 <p className="text-sm text-gray-600 mt-1">
-                  ID de Transacción: <span className="font-mono text-xs bg-gray-100 px-1 rounded">{selectedLog.entityId}</span>
+                  ID de {selectedLog.entityType === 'transaction' ? 'Transacción' : selectedLog.entityType === 'user' ? 'Usuario' : 'Entidad'}: <span className="font-mono text-xs bg-gray-100 px-1 rounded">{selectedLog.entityId}</span>
                 </p>
               </div>
 
               <div className="p-6 space-y-6">
+                {/* Usuario que Realizó los Cambios */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                    <User className="w-4 h-4 mr-2 text-green-600" />
+                    Usuario que Realizó los Cambios
+                  </h4>
+                  <div className="bg-green-50 rounded-lg p-4 border-l-4 border-green-500">
+                    <div className="flex items-center space-x-3">
+                      <div className="flex-shrink-0">
+                        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                          <User className="w-5 h-5 text-green-600" />
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <h5 className="text-sm font-semibold text-gray-900">{selectedLog.userName}</h5>
+                          {selectedLog.entityType === 'user' && selectedLog.action === 'update' && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              Editor de Usuarios
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1 space-y-1">
+                          <p className="text-xs text-gray-500">
+                            Realizó: <span className="font-medium">{getActionText(selectedLog.action).toLowerCase()}</span>
+                            {selectedLog.entityType === 'user' && (
+                              <span className="ml-1">
+                                de <span className="font-medium">usuario</span>
+                              </span>
+                            )}
+                            {selectedLog.entityType === 'transaction' && (
+                              <span className="ml-1">
+                                de <span className="font-medium">transacción</span>
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            Fecha: {formatDate(selectedLog.timestamp)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Información General */}
                 <div>
                   <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
@@ -734,22 +850,20 @@ const LogsPage = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <div>
-                        <span className="text-xs text-gray-500">Fecha de Eliminación:</span>
-                        <p className="text-sm font-medium">{formatDate(selectedLog.timestamp)}</p>
-                      </div>
-                      <div>
-                        <span className="text-xs text-gray-500">Usuario:</span>
-                        <p className="text-sm font-medium">{selectedLog.userName}</p>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div>
                         <span className="text-xs text-gray-500">Tipo de Acción:</span>
                         <p className="text-sm font-medium">{getActionText(selectedLog.action)}</p>
                       </div>
                       <div>
                         <span className="text-xs text-gray-500">Tipo de Entidad:</span>
                         <p className="text-sm font-medium">{getEntityTypeText(selectedLog.entityType)}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div>
+                        <span className="text-xs text-gray-500">ID de {selectedLog.entityType === 'transaction' ? 'Transacción' : selectedLog.entityType === 'user' ? 'Usuario' : 'Entidad'}:</span>
+                        <p className="text-sm font-medium font-mono text-xs bg-gray-100 px-2 py-1 rounded inline-block">
+                          {selectedLog.entityId}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -764,7 +878,7 @@ const LogsPage = () => {
                     </h4>
                     <div className="bg-orange-50 rounded-lg p-4">
                       {(() => {
-                        const changes = getChanges(selectedLog.previousData, selectedLog.entityData);
+                        const changes = getChanges(selectedLog.previousData, selectedLog.entityData, selectedLog.entityType);
                         return changes.length > 0 ? (
                           <div className="space-y-3">
                             {changes.map((change, index) => (
@@ -877,12 +991,88 @@ const LogsPage = () => {
                   </div>
                 )}
 
+                {/* Información del Usuario (solo para logs de usuarios) */}
+                {selectedLog.entityType === 'user' && selectedLog.entityData && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                      <User className="w-4 h-4 mr-2 text-purple-600" />
+                      Información del Usuario
+                    </h4>
+                    <div className="bg-purple-50 rounded-lg p-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <div>
+                            <span className="text-xs text-gray-500">Nombre de Usuario:</span>
+                            <p className="text-sm font-medium">{selectedLog.entityData.displayName || 'Sin nombre'}</p>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500">Correo Electrónico:</span>
+                            <p className="text-sm font-medium">{selectedLog.entityData.email || 'Sin email'}</p>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div>
+                            <span className="text-xs text-gray-500">Rol:</span>
+                            <p className="text-sm font-medium">
+                              {selectedLog.entityData.role === 'administrativo' ? 'Administrativo' :
+                               selectedLog.entityData.role === 'contador' ? 'Contador' :
+                               selectedLog.entityData.role === 'usuario' ? 'Usuario' :
+                               selectedLog.entityData.role || 'Sin rol'}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500">Estado:</span>
+                            <p className="text-sm font-medium">
+                              {selectedLog.entityData.isActive ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  Activo
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                  <AlertCircle className="w-3 h-3 mr-1" />
+                                  Inactivo
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      {selectedLog.entityData.updatedAt && (
+                        <div className="mt-4 pt-4 border-t border-purple-200">
+                          <div>
+                            <span className="text-xs text-gray-500">Última Actualización:</span>
+                            <p className="text-sm font-medium">
+                              {selectedLog.entityData.updatedAt?.toDate
+                                ? new Intl.DateTimeFormat('es-MX', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  }).format(selectedLog.entityData.updatedAt.toDate())
+                                : new Intl.DateTimeFormat('es-MX', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  }).format(new Date(selectedLog.entityData.updatedAt))
+                              }
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Datos Anteriores (solo para actualizaciones) */}
                 {selectedLog.action === 'update' && selectedLog.previousData && (
                   <div>
                     <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
                       <BarChart3 className="w-4 h-4 mr-2 text-red-600" />
-                      Datos Anteriores de la Transacción
+                      Datos Anteriores {selectedLog.entityType === 'user' ? 'del Usuario' : 'de la Transacción'}
                     </h4>
                     <div className="bg-red-50 rounded-lg p-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -959,6 +1149,82 @@ const LogsPage = () => {
                           )}
                         </div>
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Información Anterior del Usuario (solo para logs de usuarios) */}
+                {selectedLog.entityType === 'user' && selectedLog.action === 'update' && selectedLog.previousData && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                      <User className="w-4 h-4 mr-2 text-red-600" />
+                      Información Anterior del Usuario
+                    </h4>
+                    <div className="bg-red-50 rounded-lg p-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <div>
+                            <span className="text-xs text-gray-500">Nombre de Usuario Anterior:</span>
+                            <p className="text-sm font-medium">{selectedLog.previousData.displayName || 'Sin nombre'}</p>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500">Correo Electrónico Anterior:</span>
+                            <p className="text-sm font-medium">{selectedLog.previousData.email || 'Sin email'}</p>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div>
+                            <span className="text-xs text-gray-500">Rol Anterior:</span>
+                            <p className="text-sm font-medium">
+                              {selectedLog.previousData.role === 'administrativo' ? 'Administrativo' :
+                               selectedLog.previousData.role === 'contador' ? 'Contador' :
+                               selectedLog.previousData.role === 'usuario' ? 'Usuario' :
+                               selectedLog.previousData.role || 'Sin rol'}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500">Estado Anterior:</span>
+                            <p className="text-sm font-medium">
+                              {selectedLog.previousData.isActive ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  Activo
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                  <AlertCircle className="w-3 h-3 mr-1" />
+                                  Inactivo
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      {selectedLog.previousData.createdAt && (
+                        <div className="mt-4 pt-4 border-t border-red-200">
+                          <div>
+                            <span className="text-xs text-gray-500">Fecha de Creación Original:</span>
+                            <p className="text-sm font-medium">
+                              {selectedLog.previousData.createdAt?.toDate
+                                ? new Intl.DateTimeFormat('es-MX', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  }).format(selectedLog.previousData.createdAt.toDate())
+                                : new Intl.DateTimeFormat('es-MX', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  }).format(new Date(selectedLog.previousData.createdAt))
+                              }
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
