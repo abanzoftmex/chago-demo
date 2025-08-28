@@ -3,9 +3,10 @@ import { useAuth } from "../../context/AuthContext";
 import {
   TrashIcon,
   UserIcon,
+  PencilIcon,
 } from "@heroicons/react/24/outline";
 
-const UserList = ({ users, currentUserId, onUserUpdated }) => {
+const UserList = ({ users, currentUserId, onUserUpdated, onEditUser }) => {
   const { user, ROLES } = useAuth();
   const [loading, setLoading] = useState({});
 
@@ -134,6 +135,14 @@ const UserList = ({ users, currentUserId, onUserUpdated }) => {
 
                   {userData.id !== currentUserId && (
                     <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => onEditUser(userData)}
+                        className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                        title="Editar usuario"
+                      >
+                        <PencilIcon className="h-5 w-5" />
+                      </button>
+
                       <button
                         onClick={() =>
                           confirmAction(

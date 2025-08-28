@@ -2,13 +2,23 @@ import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { XMarkIcon, EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 
-const CreateUserModal = ({ onClose, onUserCreated }) => {
+const CreateUserModal = ({ onClose, onUserCreated, editingUser = null }) => {
   const { user, ROLES } = useAuth();
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-    displayName: "",
-    role: ROLES.ADMINISTRATIVO,
+  const [formData, setFormData] = useState(() => {
+    if (editingUser) {
+      return {
+        email: editingUser.email || "",
+        password: "", // No mostrar la contraseña existente
+        displayName: editingUser.displayName || "",
+        role: editingUser.role || ROLES.ADMINISTRATIVO,
+      };
+    }
+    return {
+      email: "",
+      password: "",
+      displayName: "",
+      role: ROLES.ADMINISTRATIVO,
+    };
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -23,13 +33,17 @@ const CreateUserModal = ({ onClose, onUserCreated }) => {
       // Get current user token
       const token = await user.getIdToken();
 
-      const response = await fetch("/api/admin/create-user", {
-        method: "POST",
+      const endpoint = editingUser ? "/api/admin/update-user" : "/api/admin/create-user";
+      const method = editingUser ? "PUT" : "POST";
+
+      const response = await fetch(endpoint, {
+        method,
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           ...formData,
+          userId: editingUser?.id,
           currentUserToken: token,
         }),
       });
@@ -39,7 +53,7 @@ const CreateUserModal = ({ onClose, onUserCreated }) => {
       if (response.ok) {
         onUserCreated();
       } else {
-        setError(data.message || "Error creando usuario");
+        setError(data.message || `Error ${editingUser ? 'actualizando' : 'creando'} usuario`);
       }
     } catch (error) {
       setError("Error de conexión");
@@ -61,7 +75,7 @@ const CreateUserModal = ({ onClose, onUserCreated }) => {
       <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-medium text-gray-900">
-            Crear Nuevo Usuario
+            {editingUser ? "Editar Usuario" : "Crear Nuevo Usuario"}
           </h3>
           <button
             onClick={onClose}
@@ -83,7 +97,7 @@ const CreateUserModal = ({ onClose, onUserCreated }) => {
               htmlFor="email"
               className="block text-sm font-medium text-gray-700"
             >
-              Email *
+              Email {editingUser ? "(no editable)" : "*"}
             </label>
             <input
               type="email"
@@ -92,9 +106,15 @@ const CreateUserModal = ({ onClose, onUserCreated }) => {
               required
               value={formData.email}
               onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+              disabled={editingUser}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary disabled:bg-gray-100 disabled:cursor-not-allowed"
               placeholder="usuario@ejemplo.com"
             />
+            {editingUser && (
+              <p className="mt-1 text-xs text-gray-500">
+                El email no se puede cambiar por motivos de seguridad
+              </p>
+            )}
           </div>
 
           <div>
@@ -120,19 +140,19 @@ const CreateUserModal = ({ onClose, onUserCreated }) => {
               htmlFor="password"
               className="block text-sm font-medium text-gray-700"
             >
-              Contraseña *
+              Contraseña {editingUser ? "(opcional)" : "*"}
             </label>
             <div className="mt-1 relative">
               <input
                 type={showPassword ? "text" : "password"}
                 id="password"
                 name="password"
-                required
-                minLength={6}
+                required={!editingUser}
+                minLength={editingUser ? 0 : 6}
                 value={formData.password}
                 onChange={handleChange}
                 className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary pr-10"
-                placeholder="Mínimo 6 caracteres"
+                placeholder={editingUser ? "Dejar vacío para mantener la actual" : "Mínimo 6 caracteres"}
               />
               <button
                 type="button"
@@ -182,7 +202,7 @@ const CreateUserModal = ({ onClose, onUserCreated }) => {
               disabled={loading}
               className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
             >
-              {loading ? "Creando..." : "Crear Usuario"}
+              {loading ? (editingUser ? "Actualizando..." : "Creando...") : (editingUser ? "Actualizar Usuario" : "Crear Usuario")}
             </button>
           </div>
         </form>

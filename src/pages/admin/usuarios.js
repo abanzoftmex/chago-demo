@@ -15,6 +15,7 @@ const UsersPage = () => {
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
   const [toast, setToast] = useState(null);
 
   // Check if user can manage users
@@ -42,26 +43,23 @@ const UsersPage = () => {
     }
   };
 
+  const handleEditUser = (userData) => {
+    setEditingUser(userData);
+  };
+
   useEffect(() => {
     if (canManageUsers) {
       loadUsers();
     }
   }, [canManageUsers]);
 
-  const handleUserCreated = () => {
-    setShowCreateModal(false);
-    loadUsers();
-    setToast({
-      type: "success",
-      message: "Usuario creado exitosamente",
-    });
-  };
-
   const handleUserUpdated = () => {
     loadUsers();
+    setShowCreateModal(false);
+    setEditingUser(null);
     setToast({
       type: "success",
-      message: "Usuario actualizado exitosamente",
+      message: editingUser ? "Usuario actualizado exitosamente" : "Usuario creado exitosamente",
     });
   };
 
@@ -130,17 +128,22 @@ const UsersPage = () => {
                   users={users}
                   currentUserId={user?.uid}
                   onUserUpdated={handleUserUpdated}
+                  onEditUser={handleEditUser}
                 />
               )}
             </div>
           </div>
         </div>
 
-        {/* Create User Modal */}
-        {showCreateModal && (
+        {/* Create/Edit User Modal */}
+        {(showCreateModal || editingUser) && (
           <CreateUserModal
-            onClose={() => setShowCreateModal(false)}
-            onUserCreated={handleUserCreated}
+            editingUser={editingUser}
+            onClose={() => {
+              setShowCreateModal(false);
+              setEditingUser(null);
+            }}
+            onUserCreated={handleUserUpdated}
           />
         )}
 
