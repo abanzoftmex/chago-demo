@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { useToast } from "../../components/ui/Toast";
 import { Button } from "../../components/ui/Button";
+import AdvancedDateSelector from "../../components/dashboard/AdvancedDateSelector";
 import { reportService } from "../../lib/services/reportService";
-
+import { dashboardService } from "../../lib/services/dashboardService";
 import { generalService } from "../../lib/services/generalService";
 import {
   CalendarIcon,
@@ -34,17 +35,18 @@ const Reportes = () => {
   useEffect(() => {
     loadReferenceData();
     // Load initial report with current month
-    setMonthRange(currentDate);
+    handleDateChange(currentDate);
   }, []);
 
-  const setMonthRange = (date) => {
-    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-    const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  const handleDateChange = (newDate) => {
+    setCurrentDate(newDate);
+    const startOfMonth = new Date(newDate.getFullYear(), newDate.getMonth(), 1);
+    const endOfMonth = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0);
 
-    // Set month name
-    const monthName = date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-    setCurrentMonthName(monthName.charAt(0).toUpperCase() + monthName.slice(1));
+    // Update month name
+    updateMonthName(newDate);
 
+    // Update filters
     setFilters((prev) => ({
       ...prev,
       startDate: startOfMonth.toISOString().split("T")[0],
@@ -52,11 +54,9 @@ const Reportes = () => {
     }));
   };
 
-  const navigateMonth = (direction) => {
-    const newDate = new Date(currentDate);
-    newDate.setMonth(newDate.getMonth() + direction);
-    setCurrentDate(newDate);
-    setMonthRange(newDate);
+  const updateMonthName = (date) => {
+    const monthName = date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    setCurrentMonthName(monthName.charAt(0).toUpperCase() + monthName.slice(1));
   };
 
   useEffect(() => {
@@ -64,6 +64,10 @@ const Reportes = () => {
       generateReport();
     }
   }, [filters]);
+
+  useEffect(() => {
+    updateMonthName(currentDate);
+  }, [currentDate]);
 
   const loadReferenceData = async () => {
     try {
@@ -166,31 +170,12 @@ const Reportes = () => {
               <ChartBarIcon className="h-5 w-5 mr-2" />
               Filtros de Reporte
             </h2>
-            <div className="flex items-center space-x-2">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => navigateMonth(-1)}
-                className="p-1"
-                aria-label="Mes anterior"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </Button>
-              <span className="text-foreground font-medium">{currentMonthName}</span>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => navigateMonth(1)}
-                className="p-1"
-                aria-label="Mes siguiente"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </Button>
-            </div>
+            <AdvancedDateSelector
+              currentDate={currentDate}
+              onDateChange={handleDateChange}
+              onSuccess={success}
+              onError={error}
+            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
