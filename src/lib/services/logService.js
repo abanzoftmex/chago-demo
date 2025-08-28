@@ -121,25 +121,20 @@ export const logService = {
   },
 
   // Log a transaction deletion
-  async logTransactionDeletion({ user, transactionId, transactionData }) {
+  async logTransactionDeletion({ user, transactionId, transactionData, deletionReason = null }) {
     try {
       const userId = user.uid;
       const userName = user.displayName || user.email || "Usuario desconocido";
-
-      console.log('LogTransactionDeletion - TransactionData:', {
-        id: transactionData?.id,
-        type: transactionData?.type,
-        hasType: !!transactionData?.type
-      });
 
       // Determinar si es ingreso o gasto
       const transactionType = transactionData?.type || 'desconocido';
       const transactionTypeLabel = transactionType === "entrada" ? "ingreso" : (transactionType === "salida" ? "gasto" : transactionType);
 
-      console.log('LogTransactionDeletion - Final data:', {
-        transactionType,
-        transactionTypeLabel
-      });
+      // Construir el mensaje de detalles
+      let details = `Usuario ${userName} eliminó un ${transactionTypeLabel} (${transactionId})`;
+      if (deletionReason && deletionReason.trim()) {
+        details += ` - Motivo: ${deletionReason.trim()}`;
+      }
 
       return await this.create({
         action: "delete",
@@ -149,7 +144,8 @@ export const logService = {
         userId,
         userName,
         transactionType: transactionType, // Guardar el tipo de transacción original
-        details: `Usuario ${userName} eliminó un ${transactionTypeLabel} (${transactionId})`
+        deletionReason: deletionReason || null, // Guardar el motivo si existe
+        details: details
       });
     } catch (error) {
       console.error("Error logging transaction deletion:", error);

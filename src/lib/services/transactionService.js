@@ -212,30 +212,31 @@ export const transactionService = {
   },
 
   // Delete transaction
-  async delete(id, user) {
+  async delete(id, user, deletionReason = null) {
     try {
       // Get the transaction data before deleting it
       const docRef = doc(db, COLLECTION_NAME, id);
       const docSnap = await getDoc(docRef);
-      
+
       if (!docSnap.exists()) {
         throw new Error("Transacción no encontrada");
       }
-      
+
       const transactionData = { id: docSnap.id, ...docSnap.data() };
-      
+
       // Delete the transaction
       await deleteDoc(docRef);
-      
+
       // Log the transaction deletion
       if (user) {
         await logService.logTransactionDeletion({
           user,
           transactionId: id,
-          transactionData
+          transactionData,
+          deletionReason // Pasar el motivo de eliminación
         });
       }
-      
+
       return true;
     } catch (error) {
       console.error("Error deleting transaction:", error);

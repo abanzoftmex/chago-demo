@@ -21,6 +21,9 @@ import {
   ChevronLeft,
   ChevronRight,
   RotateCcw,
+  Eye,
+  BarChart3,
+  StickyNote,
 } from "lucide-react";
 
 const LogsPage = () => {
@@ -31,6 +34,12 @@ const LogsPage = () => {
   // Función para obtener el tipo de transacción desde diferentes fuentes
   const getTransactionType = (log) => {
     return logService.extractTransactionType(log);
+  };
+
+  // Función para abrir el modal de detalles
+  const handleViewDetails = (log) => {
+    setSelectedLog(log);
+    setShowDetailsModal(true);
   };
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -43,6 +52,8 @@ const LogsPage = () => {
     endDate: "",
     limit: 20,
   });
+  const [selectedLog, setSelectedLog] = useState(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [pagination, setPagination] = useState({
     currentPage: 1,
     hasMore: true,
@@ -436,6 +447,12 @@ const LogsPage = () => {
                     >
                       Detalles
                     </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Acciones
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -486,8 +503,27 @@ const LogsPage = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {log.userName}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {log.details}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs">
+                        <div className="truncate" title={log.details}>
+                          {log.details}
+                        </div>
+                        {log.deletionReason && (
+                          <div className="text-xs text-blue-600 mt-1 truncate" title={`Motivo: ${log.deletionReason}`}>
+                            📝 {log.deletionReason}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {log.entityType === "transaction" && log.action === "delete" && (
+                          <button
+                            onClick={() => handleViewDetails(log)}
+                            className="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
+                            title="Ver detalles de la transacción eliminada"
+                          >
+                            <Eye className="w-3 h-3 mr-1" />
+                            Ver detalles
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -525,6 +561,194 @@ const LogsPage = () => {
             </div>
           )}
         </div>
+
+        {/* Details Modal */}
+        {showDetailsModal && selectedLog && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <Eye className="w-5 h-5 mr-2 text-blue-600" />
+                    Detalles de Transacción Eliminada
+                  </h3>
+                  <button
+                    onClick={() => setShowDetailsModal(false)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <p className="text-sm text-gray-600 mt-1">
+                  ID de Transacción: <span className="font-mono text-xs bg-gray-100 px-1 rounded">{selectedLog.entityId}</span>
+                </p>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {/* Información General */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                    <FileText className="w-4 h-4 mr-2 text-blue-600" />
+                    Información General
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div>
+                        <span className="text-xs text-gray-500">Fecha de Eliminación:</span>
+                        <p className="text-sm font-medium">{formatDate(selectedLog.timestamp)}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-500">Usuario:</span>
+                        <p className="text-sm font-medium">{selectedLog.userName}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div>
+                        <span className="text-xs text-gray-500">Tipo de Acción:</span>
+                        <p className="text-sm font-medium">{getActionText(selectedLog.action)}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-500">Tipo de Entidad:</span>
+                        <p className="text-sm font-medium">{getEntityTypeText(selectedLog.entityType)}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Datos de la Transacción Original */}
+                {selectedLog.entityData && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                      <BarChart3 className="w-4 h-4 mr-2 text-green-600" />
+                      Datos de la Transacción Original
+                    </h4>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          {selectedLog.entityData.type && (
+                            <div>
+                              <span className="text-xs text-gray-500">Tipo:</span>
+                              <p className="text-sm font-medium">
+                                {selectedLog.entityData.type === "entrada" ? (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    <CheckCircle className="w-3 h-3 mr-1" />
+                                    Ingreso
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                    <AlertCircle className="w-3 h-3 mr-1" />
+                                    Gasto
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                          )}
+                          {selectedLog.entityData.amount && (
+                            <div>
+                              <span className="text-xs text-gray-500">Monto:</span>
+                              <p className="text-sm font-medium">
+                                {new Intl.NumberFormat('es-MX', {
+                                  style: 'currency',
+                                  currency: 'MXN'
+                                }).format(selectedLog.entityData.amount)}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          {selectedLog.entityData.date && (
+                            <div>
+                              <span className="text-xs text-gray-500">Fecha Original:</span>
+                              <p className="text-sm font-medium">
+                                {selectedLog.entityData.date?.toDate
+                                  ? new Intl.DateTimeFormat('es-MX').format(selectedLog.entityData.date.toDate())
+                                  : new Intl.DateTimeFormat('es-MX').format(new Date(selectedLog.entityData.date))
+                                }
+                              </p>
+                            </div>
+                          )}
+                          {selectedLog.entityData.reference && (
+                            <div>
+                              <span className="text-xs text-gray-500">Referencia:</span>
+                              <p className="text-sm font-medium">{selectedLog.entityData.reference}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Información adicional si existe */}
+                      <div className="mt-4 space-y-2">
+                        {selectedLog.entityData.description && (
+                          <div>
+                            <span className="text-xs text-gray-500">Descripción:</span>
+                            <p className="text-sm font-medium">{selectedLog.entityData.description}</p>
+                          </div>
+                        )}
+                        {selectedLog.entityData.notes && (
+                          <div>
+                            <span className="text-xs text-gray-500">Notas:</span>
+                            <p className="text-sm font-medium">{selectedLog.entityData.notes}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Motivo de Eliminación */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                    <StickyNote className="w-4 h-4 mr-2 text-orange-600" />
+                    Motivo de Eliminación
+                  </h4>
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                    {selectedLog.deletionReason ? (
+                      <p className="text-sm text-orange-800">{selectedLog.deletionReason}</p>
+                    ) : (
+                      <p className="text-sm text-orange-600 italic">No se especificó motivo de eliminación</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Detalles Técnicos */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                    <BarChart3 className="w-4 h-4 mr-2 text-gray-600" />
+                    Información Técnica
+                  </h4>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="space-y-2">
+                      <div>
+                        <span className="text-xs text-gray-500">ID del Log:</span>
+                        <p className="text-xs font-mono bg-white px-2 py-1 rounded border mt-1">{selectedLog.id}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-500">Timestamp:</span>
+                        <p className="text-xs font-mono bg-white px-2 py-1 rounded border mt-1">
+                          {selectedLog.timestamp?.toDate
+                            ? selectedLog.timestamp.toDate().toISOString()
+                            : new Date(selectedLog.timestamp).toISOString()
+                          }
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 border-t bg-gray-50 flex justify-end">
+                <button
+                  onClick={() => setShowDetailsModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:ring-2 focus:ring-gray-500"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AdminLayout>
   );
