@@ -58,39 +58,74 @@ const LogsPage = () => {
       { key: 'subconceptId', label: 'Sub-concepto', format: (val) => getSubconceptName(val) },
       { key: 'providerId', label: 'Proveedor', format: (val) => getProviderName(val) },
       { key: 'division', label: 'División' },
-      { key: 'status', label: 'Estado' }
+      { key: 'status', label: 'Estado', format: (val) => formatStatus(val) }
     ];
 
     fieldsToCompare.forEach(({ key, label, format }) => {
-      const prevVal = previousData[key];
-      const currVal = currentData[key];
+      const prevVal = previousData?.[key];
+      const currVal = currentData?.[key];
 
-      // Comparar valores considerando diferentes tipos de datos
-      let hasChanged = false;
-      if (prevVal !== currVal) {
-        if (key === 'date') {
-          // Para fechas, comparar timestamps
+      // Formatear valores primero para comparar representaciones finales
+      const formatValue = (val) => {
+        if (val === null || val === undefined || val === '') {
+          if (key === 'status') return formatStatus('pendiente');
+          if (key === 'description') return 'Sin descripción';
+          if (key === 'amount') return '$0.00';
+          return 'No definido';
+        }
+        return format ? format(val) : val;
+      };
+
+      const formattedPrev = formatValue(prevVal);
+      const formattedCurr = formatValue(currVal);
+
+      // Solo considerar cambio si las representaciones finales son diferentes
+      let hasChanged = formattedPrev !== formattedCurr;
+
+      // Para campos específicos, hacer comparaciones adicionales
+      if (hasChanged && key === 'date') {
+        // Verificar que realmente sea una fecha diferente
+        try {
           const prevDate = prevVal?.toDate ? prevVal.toDate().getTime() : new Date(prevVal).getTime();
           const currDate = currVal?.toDate ? currVal.toDate().getTime() : new Date(currVal).getTime();
           hasChanged = prevDate !== currDate;
-        } else if (key === 'amount') {
-          // Para montos, comparar como números
-          hasChanged = parseFloat(prevVal) !== parseFloat(currVal);
-        } else {
-          hasChanged = prevVal !== currVal;
+        } catch (error) {
+          // Si hay error en el parseo de fecha, mantener hasChanged como true
         }
+      } else if (hasChanged && key === 'amount') {
+        // Verificar que realmente sea un monto diferente
+        const prevAmount = parseFloat(prevVal || 0);
+        const currAmount = parseFloat(currVal || 0);
+        hasChanged = prevAmount !== currAmount;
       }
 
       if (hasChanged) {
         changes.push({
           field: label,
-          from: format ? format(prevVal) : (prevVal || 'No definido'),
-          to: format ? format(currVal) : (currVal || 'No definido')
+          from: formattedPrev,
+          to: formattedCurr
         });
       }
     });
 
     return changes;
+  };
+
+  // Función para formatear el status de manera legible
+  const formatStatus = (status) => {
+    if (!status) return 'pendiente';
+    switch (status.toLowerCase()) {
+      case 'pendiente':
+        return 'Pendiente';
+      case 'parcial':
+        return 'Parcial';
+      case 'pagado':
+        return 'Pagado';
+      case 'cancelado':
+        return 'Cancelado';
+      default:
+        return status;
+    }
   };
 
   // Funciones auxiliares para obtener nombres
@@ -795,6 +830,12 @@ const LogsPage = () => {
                               </p>
                             </div>
                           )}
+                          {selectedLog.entityData.status && (
+                            <div>
+                              <span className="text-xs text-gray-500">Estado:</span>
+                              <p className="text-sm font-medium">{formatStatus(selectedLog.entityData.status)}</p>
+                            </div>
+                          )}
                         </div>
                         <div className="space-y-2">
                           {selectedLog.entityData.date && (
@@ -892,7 +933,7 @@ const LogsPage = () => {
                           {selectedLog.previousData.status && (
                             <div>
                               <span className="text-xs text-gray-500">Estado:</span>
-                              <p className="text-sm font-medium">{selectedLog.previousData.status}</p>
+                              <p className="text-sm font-medium">{formatStatus(selectedLog.previousData.status)}</p>
                             </div>
                           )}
                           {selectedLog.previousData.generalId && (
