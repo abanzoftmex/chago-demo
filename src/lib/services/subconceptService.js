@@ -111,8 +111,13 @@ export const subconceptService = {
   },
 
   // Soft delete subconcept (set isActive to false)
-  async delete(id) {
+  async delete(id, user = null) {
     try {
+      // Check if user has permission to delete (contador and director_general roles cannot delete)
+      const userRole = user?.role || user?.userRole;
+      if (user && ['contador', 'director_general'].includes(userRole)) {
+        throw new Error("No tienes permisos para eliminar subconceptos");
+      }
       // Check if subconcept has associated transactions
       const hasTransactions = await this.hasAssociatedTransactions(id);
       

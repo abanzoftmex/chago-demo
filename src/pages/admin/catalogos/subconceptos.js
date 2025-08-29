@@ -79,7 +79,7 @@ export default function SubconceptosPage() {
     }
 
     try {
-      await subconceptService.delete(subconcept.id);
+      await subconceptService.delete(subconcept.id, { role: userRole });
       await loadData(); // Reload the list
     } catch (error) {
       alert(`Error al eliminar el subconcepto: ${error.message}`);
