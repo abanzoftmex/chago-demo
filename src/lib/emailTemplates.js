@@ -34,7 +34,7 @@ export const createEmailTemplate = ({ title, content, footerText }) => {
       : '');
   const baseUrl = resolvedBase ? resolvedBase.replace(/\/$/, '') : '';
   // Use the absolute URL to the logo in the public directory
-  const logoUrl = `${baseUrl}/logo.webp`;
+  const logoUrl = `${baseUrl}/logo-santi.png`;
   
   // Default footer text if not provided
   const defaultFooter = 'Este es un correo automático. Por favor no responda a este mensaje.';
