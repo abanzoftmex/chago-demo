@@ -606,7 +606,8 @@ const TransactionForm = ({
               onChange={handleConceptChange}
               onCreateNew={() => setShowConceptModal(true)}
               required
-              disabled={loading}
+              disabled={loading || !formData.generalId}
+              placeholder={!formData.generalId ? "Primero selecciona una categoría general" : "Seleccionar concepto..."}
             />
             {errors.conceptId && (
               <p className="mt-1 text-sm text-red-600">{errors.conceptId}</p>
@@ -624,7 +625,8 @@ const TransactionForm = ({
               onChange={handleSubconceptChange}
               onCreateNew={() => setShowSubconceptModal(true)}
               required
-              disabled={loading}
+              disabled={loading || !formData.conceptId}
+              placeholder={!formData.conceptId ? "Primero selecciona un concepto" : "Seleccionar subconcepto..."}
             />
             {errors.subconceptId && (
               <p className="mt-1 text-sm text-red-600">{errors.subconceptId}</p>

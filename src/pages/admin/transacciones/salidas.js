@@ -103,7 +103,7 @@ const SolicitudesPago = () => {
   };
 
   const handleNewTransaction = () => {
-    setShowForm(true);
+    router.push('/admin/transacciones/nueva-salida');
   };
 
   const handleCancelForm = () => {

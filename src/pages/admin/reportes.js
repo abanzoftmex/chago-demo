@@ -530,25 +530,7 @@ const Reportes = () => {
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                 <div className="flex justify-between items-start">
                   <h4 className="font-medium text-red-800">Pendientes</h4>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="text-xs text-red-700 hover:bg-red-100 -mt-1 -mr-1"
-                    onClick={() => {
-                      if (window.confirm('¿Estás seguro de reiniciar el contador de pendientes? Esto no afectará los datos históricos.')) {
-                        setStats(prev => ({
-                          ...prev,
-                          paymentStatus: {
-                            ...prev.paymentStatus,
-                            pendiente: { count: 0, amount: 0, carryover: 0 }
-                          }
-                        }));
-                        success('Contador de pendientes reiniciado');
-                      }
-                    }}
-                  >
-                    Reiniciar
-                  </Button>
+                  
                 </div>
                 <p className="text-2xl font-bold text-red-600">
                   {stats.paymentStatus.pendiente.count}
