@@ -8,7 +8,7 @@ Mantener colores consistentes entre todas las visualizaciones (gráfico de paste
 ### Colores Principales (20 colores únicos)s
 ```javascript
 const COLOR_PALETTE = [
-  '#3B82F6', // Azul brillante
+  '#3B82F6', // Azul brillantea
   '#10B981', // Verde esmeralda
   '#F59E0B', // Ámbar
   '#EF4444', // Rojo (Gastos regulares)
