@@ -2,6 +2,7 @@ import { transactionService } from './transactionService';
 import { providerService } from './providerService';
 import { conceptService } from './conceptService';
 import { descriptionService } from './descriptionService';
+import { generalService } from './generalService';
 import { createEnhancedPDFReport } from './pdfTemplates';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
@@ -91,15 +92,17 @@ export const reportService = {
           pagado: { count: 0, amount: 0, carryover: 0 }
         },
         conceptBreakdown: {},
+        generalBreakdown: {},
         providerBreakdown: {},
         monthlyBreakdown: {}
       };
 
       // Get reference data
-      const [concepts, providers, descriptions] = await Promise.all([
+      const [concepts, providers, descriptions, generals] = await Promise.all([
         conceptService.getAll(),
         providerService.getAll(),
-        descriptionService.getAll()
+        descriptionService.getAll(),
+        generalService.getAll()
       ]);
 
       const conceptMap = {};
@@ -117,6 +120,11 @@ export const reportService = {
         descriptionMap[description.id] = description.name;
       });
 
+      const generalMap = {};
+      generals.forEach(general => {
+        generalMap[general.id] = general.name;
+      });
+
       // Determine if we're filtering by date range
       const hasDateFilter = filters.startDate && filters.endDate;
       const startDate = hasDateFilter ? new Date(filters.startDate) : null;
@@ -127,6 +135,7 @@ export const reportService = {
         const amount = transaction.amount || 0;
         const conceptName = conceptMap[transaction.conceptId] || 'Sin concepto';
         const providerName = providerMap[transaction.providerId] || 'Sin proveedor';
+        const generalName = generalMap[transaction.generalId] || 'Sin categoría general';
         const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
         const month = transactionDate.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
 
@@ -179,6 +188,24 @@ export const reportService = {
         }
         stats.conceptBreakdown[conceptName].total += amount;
         stats.conceptBreakdown[conceptName].count++;
+
+        // General breakdown
+        if (!stats.generalBreakdown[generalName]) {
+          stats.generalBreakdown[generalName] = {
+            entradas: 0,
+            salidas: 0,
+            total: 0,
+            count: 0
+          };
+        }
+        
+        if (transaction.type === 'entrada') {
+          stats.generalBreakdown[generalName].entradas += amount;
+        } else {
+          stats.generalBreakdown[generalName].salidas += amount;
+        }
+        stats.generalBreakdown[generalName].total += amount;
+        stats.generalBreakdown[generalName].count++;
 
         // Provider breakdown (only for salidas)
         if (transaction.type === 'salida' && transaction.providerId) {

@@ -8,6 +8,7 @@ import { dashboardService } from "../../lib/services/dashboardService";
 import { generalService } from "../../lib/services/generalService";
 import { conceptService } from "../../lib/services/conceptService";
 import { subconceptService } from "../../lib/services/subconceptService";
+import useReportStore from "../../lib/stores/reportStore";
 import {
   CalendarIcon,
   DocumentArrowDownIcon,
@@ -19,6 +20,7 @@ import {
 
 const Reportes = () => {
   const { success, error } = useToast();
+  const { showIncomeInBreakdown, toggleShowIncomeInBreakdown } = useReportStore();
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [transactions, setTransactions] = useState([]);
@@ -47,7 +49,11 @@ const Reportes = () => {
   const handleDateChange = (newDate) => {
     setCurrentDate(newDate);
     const startOfMonth = new Date(newDate.getFullYear(), newDate.getMonth(), 1);
-    const endOfMonth = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0);
+    const endOfMonth = new Date(
+      newDate.getFullYear(),
+      newDate.getMonth() + 1,
+      0
+    );
 
     // Update month name
     updateMonthName(newDate);
@@ -61,7 +67,10 @@ const Reportes = () => {
   };
 
   const updateMonthName = (date) => {
-    const monthName = date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    const monthName = date.toLocaleDateString("es-ES", {
+      month: "long",
+      year: "numeric",
+    });
     setCurrentMonthName(monthName.charAt(0).toUpperCase() + monthName.slice(1));
   };
 
@@ -80,7 +89,7 @@ const Reportes = () => {
       const [generalsData, conceptsData, subconceptsData] = await Promise.all([
         generalService.getAll(),
         conceptService.getAll(),
-        subconceptService.getAll()
+        subconceptService.getAll(),
       ]);
       setGenerals(generalsData);
       setConcepts(conceptsData);
@@ -105,8 +114,10 @@ const Reportes = () => {
 
       const transactionsData =
         await reportService.getFilteredTransactions(filterData);
-      const statsData =
-        await reportService.generateReportStats(transactionsData, filterData);
+      const statsData = await reportService.generateReportStats(
+        transactionsData,
+        filterData
+      );
 
       setTransactions(transactionsData);
       setStats(statsData);
@@ -125,9 +136,11 @@ const Reportes = () => {
       const newFilters = { ...prev, [field]: value };
 
       // If changing concept, clear subconcept if it doesn't belong to the new concept
-      if (field === 'conceptId') {
+      if (field === "conceptId") {
         if (value && prev.subconceptId) {
-          const selectedSubconcept = subconcepts.find(sc => sc.id === prev.subconceptId);
+          const selectedSubconcept = subconcepts.find(
+            (sc) => sc.id === prev.subconceptId
+          );
           if (selectedSubconcept && selectedSubconcept.conceptId !== value) {
             newFilters.subconceptId = "";
           }
@@ -142,7 +155,9 @@ const Reportes = () => {
     if (!filters.conceptId) {
       return subconcepts;
     }
-    return subconcepts.filter(subconcept => subconcept.conceptId === filters.conceptId);
+    return subconcepts.filter(
+      (subconcept) => subconcept.conceptId === filters.conceptId
+    );
   };
 
   const exportToExcel = async () => {
@@ -184,6 +199,12 @@ const Reportes = () => {
       style: "currency",
       currency: "MXN",
     }).format(amount);
+  };
+
+  const formatPercentage = (amount, total) => {
+    if (total === 0) return "0%";
+    const percentage = (amount / total) * 100;
+    return `${percentage.toFixed(1)}%`;
   };
 
   return (
@@ -282,7 +303,9 @@ const Reportes = () => {
               </label>
               <select
                 value={filters.conceptId}
-                onChange={(e) => handleFilterChange("conceptId", e.target.value)}
+                onChange={(e) =>
+                  handleFilterChange("conceptId", e.target.value)
+                }
                 className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
               >
                 <option value="">Todos</option>
@@ -301,7 +324,9 @@ const Reportes = () => {
               </label>
               <select
                 value={filters.subconceptId}
-                onChange={(e) => handleFilterChange("subconceptId", e.target.value)}
+                onChange={(e) =>
+                  handleFilterChange("subconceptId", e.target.value)
+                }
                 className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
               >
                 <option value="">Todos</option>
@@ -315,15 +340,37 @@ const Reportes = () => {
           </div>
 
           <div className="flex justify-between items-center mt-4">
-            <Button
-              onClick={generateReport}
-              disabled={loading}
-              variant="primary"
-              size="md"
-              className="inline-flex items-center"
-            >
-              {loading ? "Generando..." : "Generar Reporte"}
-            </Button>
+            <div className="flex items-center space-x-4">
+              <Button
+                onClick={generateReport}
+                disabled={loading}
+                variant="primary"
+                size="md"
+                className="inline-flex items-center"
+              >
+                {loading ? "Generando..." : "Generar Reporte"}
+              </Button>
+              
+              {/* Switch para mostrar/ocultar ingresos */}
+              <div className="flex items-center space-x-2">
+                <label className="text-sm font-medium text-foreground">
+                  Incluir Ingresos en Desgloses
+                </label>
+                <button
+                  type="button"
+                  onClick={toggleShowIncomeInBreakdown}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                    showIncomeInBreakdown ? 'bg-blue-600' : 'bg-gray-200'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      showIncomeInBreakdown ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
 
             <div className="flex space-x-2">
               <Button
@@ -419,7 +466,9 @@ const Reportes = () => {
                     <p className="text-2xl font-bold text-primary">
                       {stats.totalTransactions}
                     </p>
-                    <p className="text-sm text-muted-foreground">En el período</p>
+                    <p className="text-sm text-muted-foreground">
+                      En el período
+                    </p>
                   </div>
                   <DocumentTextIcon className="h-8 w-8 text-primary" />
                 </div>
@@ -427,7 +476,8 @@ const Reportes = () => {
             </div>
 
             {/* Balance Breakdown */}
-            {(stats.carryoverBalance !== 0 || stats.currentPeriodBalance !== 0) && (
+            {(stats.carryoverBalance !== 0 ||
+              stats.currentPeriodBalance !== 0) && (
               <div className="bg-background rounded-lg border border-border p-6">
                 <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center">
                   <ChartBarIcon className="h-5 w-5 mr-2" />
@@ -435,24 +485,38 @@ const Reportes = () => {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-medium text-blue-800">Balance del Período</h4>
-                    <p className={`text-2xl font-bold ${stats.currentPeriodBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    <h4 className="font-medium text-blue-800">
+                      Balance del Período
+                    </h4>
+                    <p
+                      className={`text-2xl font-bold ${stats.currentPeriodBalance >= 0 ? "text-green-600" : "text-red-600"}`}
+                    >
                       {formatCurrency(stats.currentPeriodBalance)}
                     </p>
-                    <p className="text-sm text-blue-600">Solo transacciones actuales</p>
+                    <p className="text-sm text-blue-600">
+                      Solo transacciones actuales
+                    </p>
                   </div>
 
                   <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                    <h4 className="font-medium text-orange-800">Balance Arrastrado</h4>
-                    <p className={`text-2xl font-bold ${stats.carryoverBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    <h4 className="font-medium text-orange-800">
+                      Balance Arrastrado
+                    </h4>
+                    <p
+                      className={`text-2xl font-bold ${stats.carryoverBalance >= 0 ? "text-green-600" : "text-red-600"}`}
+                    >
                       {formatCurrency(stats.carryoverBalance)}
                     </p>
-                    <p className="text-sm text-orange-600">Pendientes anteriores</p>
+                    <p className="text-sm text-orange-600">
+                      Pendientes anteriores
+                    </p>
                   </div>
 
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                     <h4 className="font-medium text-gray-800">Balance Total</h4>
-                    <p className={`text-2xl font-bold ${stats.totalBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    <p
+                      className={`text-2xl font-bold ${stats.totalBalance >= 0 ? "text-green-600" : "text-red-600"}`}
+                    >
                       {formatCurrency(stats.totalBalance)}
                     </p>
                     <p className="text-sm text-gray-600">Período + Arrastre</p>
@@ -475,20 +539,24 @@ const Reportes = () => {
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <div className="flex justify-between items-start">
                   <h4 className="font-medium text-green-800">Pagados</h4>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="text-xs text-green-700 hover:bg-green-100 -mt-1 -mr-1"
                     onClick={() => {
-                      if (window.confirm('¿Estás seguro de reiniciar el contador de pagados? Esto no afectará los datos históricos.')) {
-                        setStats(prev => ({
+                      if (
+                        window.confirm(
+                          "¿Estás seguro de reiniciar el contador de pagados? Esto no afectará los datos históricos."
+                        )
+                      ) {
+                        setStats((prev) => ({
                           ...prev,
                           paymentStatus: {
                             ...prev.paymentStatus,
-                            pagado: { count: 0, amount: 0, carryover: 0 }
-                          }
+                            pagado: { count: 0, amount: 0, carryover: 0 },
+                          },
                         }));
-                        success('Contador de pagados reiniciado');
+                        success("Contador de pagados reiniciado");
                       }
                     }}
                   >
@@ -504,7 +572,8 @@ const Reportes = () => {
                   </p>
                   {stats.paymentStatus.pagado.carryover > 0 && (
                     <p className="text-xs text-green-500">
-                      Arrastre: {formatCurrency(stats.paymentStatus.pagado.carryover)}
+                      Arrastre:{" "}
+                      {formatCurrency(stats.paymentStatus.pagado.carryover)}
                     </p>
                   )}
                 </div>
@@ -517,11 +586,13 @@ const Reportes = () => {
                 </p>
                 <div className="space-y-1">
                   <p className="text-sm text-yellow-600">
-                    Período: {formatCurrency(stats.paymentStatus.parcial.amount)}
+                    Período:{" "}
+                    {formatCurrency(stats.paymentStatus.parcial.amount)}
                   </p>
                   {stats.paymentStatus.parcial.carryover > 0 && (
                     <p className="text-xs text-yellow-500">
-                      Arrastre: {formatCurrency(stats.paymentStatus.parcial.carryover)}
+                      Arrastre:{" "}
+                      {formatCurrency(stats.paymentStatus.parcial.carryover)}
                     </p>
                   )}
                 </div>
@@ -530,18 +601,19 @@ const Reportes = () => {
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                 <div className="flex justify-between items-start">
                   <h4 className="font-medium text-red-800">Pendientes</h4>
-                  
                 </div>
                 <p className="text-2xl font-bold text-red-600">
                   {stats.paymentStatus.pendiente.count}
                 </p>
                 <div className="space-y-1">
                   <p className="text-sm text-red-600">
-                    Período: {formatCurrency(stats.paymentStatus.pendiente.amount)}
+                    Período:{" "}
+                    {formatCurrency(stats.paymentStatus.pendiente.amount)}
                   </p>
                   {stats.paymentStatus.pendiente.carryover > 0 && (
                     <p className="text-xs text-red-500">
-                      Arrastre: {formatCurrency(stats.paymentStatus.pendiente.carryover)}
+                      Arrastre:{" "}
+                      {formatCurrency(stats.paymentStatus.pendiente.carryover)}
                     </p>
                   )}
                 </div>
@@ -549,9 +621,76 @@ const Reportes = () => {
             </div>
           </div>
         )}
+        {/* General Breakdown */}
+        {stats && Object.keys(stats.generalBreakdown).length > 0 && 
+         Object.entries(stats.generalBreakdown).some(([general, data]) => showIncomeInBreakdown || data.salidas > 0) && (
+          <div className="bg-background rounded-lg border border-border p-6">
+            <h3 className="text-lg font-semibold text-foreground mb-4">
+              Desglose por Categoría General
+            </h3>
 
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-border">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Categoría General
+                    </th>
+                    {showIncomeInBreakdown && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Ingreso
+                      </th>
+                    )}
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Solicitudes
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Total
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Cantidad
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      % de Gastos
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-background divide-y divide-border">
+                  {Object.entries(stats.generalBreakdown)
+                    .filter(([general, data]) => showIncomeInBreakdown || data.salidas > 0)
+                    .map(([general, data]) => (
+                      <tr key={general}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
+                          {general}
+                        </td>
+                        {showIncomeInBreakdown && (
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">
+                            {formatCurrency(data.entradas)}
+                          </td>
+                        )}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
+                          {formatCurrency(data.salidas)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
+                          {formatCurrency(showIncomeInBreakdown ? data.total : data.salidas)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                          {data.count}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">
+                          {formatPercentage(data.salidas, stats.totalSalidas)}
+                        </td>
+                      </tr>
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
         {/* Concept Breakdown */}
-        {stats && Object.keys(stats.conceptBreakdown).length > 0 && (
+        {stats && Object.keys(stats.conceptBreakdown).length > 0 && 
+         Object.entries(stats.conceptBreakdown).some(([concept, data]) => showIncomeInBreakdown || data.salidas > 0) && (
           <div className="bg-background rounded-lg border border-border p-6">
             <h3 className="text-lg font-semibold text-foreground mb-4">
               Desglose por Concepto
@@ -564,9 +703,11 @@ const Reportes = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Concepto
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Ingreso
-                    </th>
+                    {showIncomeInBreakdown && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Ingreso
+                      </th>
+                    )}
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Solicitudes
                     </th>
@@ -576,26 +717,35 @@ const Reportes = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Cantidad
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      % de Gastos
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-background divide-y divide-border">
-                  {Object.entries(stats.conceptBreakdown).map(
-                    ([concept, data]) => (
+                  {Object.entries(stats.conceptBreakdown)
+                    .filter(([concept, data]) => showIncomeInBreakdown || data.salidas > 0)
+                    .map(([concept, data]) => (
                       <tr key={concept}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
                           {concept}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">
-                          {formatCurrency(data.entradas)}
-                        </td>
+                        {showIncomeInBreakdown && (
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">
+                            {formatCurrency(data.entradas)}
+                          </td>
+                        )}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
                           {formatCurrency(data.salidas)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
-                          {formatCurrency(data.total)}
+                          {formatCurrency(showIncomeInBreakdown ? data.total : data.salidas)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                           {data.count}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">
+                          {formatPercentage(data.salidas, stats.totalSalidas)}
                         </td>
                       </tr>
                     )
@@ -629,6 +779,9 @@ const Reportes = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Transacciones
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      % de Gastos
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-background divide-y divide-border">
@@ -646,6 +799,9 @@ const Reportes = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                           {data.count}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">
+                          {formatPercentage(data.amount, stats.totalSalidas)}
                         </td>
                       </tr>
                     )
