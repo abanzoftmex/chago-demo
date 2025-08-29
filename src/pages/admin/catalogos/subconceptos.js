@@ -10,7 +10,7 @@ import { generalService } from "../../../lib/services/generalService";
 import { useAuth } from "../../../context/AuthContext";
 
 export default function SubconceptosPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, userRole, loading: authLoading } = useAuth();
   const router = useRouter();
 
   const [subconcepts, setSubconcepts] = useState([]);
@@ -360,12 +360,14 @@ export default function SubconceptosPage() {
                             >
                               Editar
                             </button>
-                            <button
-                              onClick={() => handleDeleteSubconcept(subconcept)}
-                              className="text-red-600 hover:text-red-900"
-                            >
-                              Eliminar
-                            </button>
+                            {userRole !== 'contador' && userRole !== 'director_general' && (
+                              <button
+                                onClick={() => handleDeleteSubconcept(subconcept)}
+                                className="text-red-600 hover:text-red-900"
+                              >
+                                Eliminar
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
