@@ -4,6 +4,7 @@ import ProviderForm from '../../../components/forms/ProviderForm';
 import ProviderCsvImportModal from '../../../components/admin/ProviderCsvImportModal';
 import { providerService } from '../../../lib/services/providerService';
 import { useToast } from '../../../components/ui/Toast';
+import { useAuth } from '../../../context/AuthContext';
 import { 
   PlusIcon, 
   MagnifyingGlassIcon,
@@ -27,6 +28,7 @@ const Proveedores = () => {
   const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
   
   const { success, error } = useToast();
+  const { user, userRole } = useAuth();
   const itemsPerPage = 10;
 
   // Load providers
@@ -70,7 +72,8 @@ const Proveedores = () => {
     
     try {
       setDeleting(true);
-      await providerService.delete(selectedProvider.id);
+      // Pass the user with the role property that matches what the service expects
+      await providerService.delete(selectedProvider.id, { role: user?.userRole });
       success('Proveedor eliminado exitosamente');
       setShowDeleteModal(false);
       setSelectedProvider(null);
@@ -282,16 +285,18 @@ const Proveedores = () => {
                         >
                           <PencilIcon className="h-4 w-4" />
                         </button>
-                        <button
-                          onClick={() => {
-                            setSelectedProvider(provider);
-                            setShowDeleteModal(true);
-                          }}
-                          className="text-red-600 hover:text-red-900 p-1"
-                          title="Eliminar"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
+                        {!['contador', 'director_general'].includes(userRole) && (
+                          <button
+                            onClick={() => {
+                              setSelectedProvider(provider);
+                              setShowDeleteModal(true);
+                            }}
+                            className="text-red-600 hover:text-red-900 p-1"
+                            title="Eliminar"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

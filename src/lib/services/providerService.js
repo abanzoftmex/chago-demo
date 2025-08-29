@@ -96,8 +96,12 @@ export const providerService = {
   },
 
   // Delete provider
-  async delete(id) {
+  async delete(id, user = null) {
     try {
+      // Check if user has permission to delete (contador and director_general roles cannot delete)
+      if (user && ['contador', 'director_general'].includes(user.role)) {
+        throw new Error("No tienes permisos para eliminar proveedores");
+      }
       // First check if provider has associated transactions
       const hasTransactions = await this.hasAssociatedTransactions(id);
       
