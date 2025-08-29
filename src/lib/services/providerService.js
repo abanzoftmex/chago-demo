@@ -118,11 +118,15 @@ export const providerService = {
     }
   },
 
-  // Check if provider has associated transactions
+  // Check if provider has active (non-deleted) associated transactions
   async hasAssociatedTransactions(providerId) {
     try {
       const transactionsRef = collection(db, 'transactions');
-      const q = query(transactionsRef, where('providerId', '==', providerId));
+      const q = query(
+        transactionsRef, 
+        where('providerId', '==', providerId),
+        where('isDeleted', '!=', true)  // Only consider non-deleted transactions
+      );
       const querySnapshot = await getDocs(q);
       
       return !querySnapshot.empty;
