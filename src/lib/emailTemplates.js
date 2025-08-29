@@ -4,6 +4,19 @@
  */
 
 /**
+ * Formats a number as currency with thousand separators and 2 decimal places
+ * @param {number|string} amount - The amount to format
+ * @returns {string} Formatted currency string
+ */
+const formatCurrency = (amount) => {
+  const number = typeof amount === 'string' ? parseFloat(amount) : amount;
+  return number.toLocaleString('es-MX', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
+
+/**
  * Creates a modern, premium email template with logo and styling
  * @param {Object} options - Template options
  * @param {string} options.title - Email title
@@ -198,13 +211,13 @@ export const createPaymentReceiptContent = ({
     
     <div class="data-container">
       <ul class="data-list">
-        <li><strong>Monto del pago:</strong> $${parseFloat(amount).toFixed(2)}</li>
+        <li><strong>Monto del pago:</strong> $${formatCurrency(amount)}</li>
         <li><strong>Fecha del pago:</strong> ${date}</li>
         <li><strong>Concepto:</strong> ${conceptName}</li>
         ${providerDetails || ''}
-        <li><strong>Monto total:</strong> $${parseFloat(totalAmount).toFixed(2)}</li>
-        <li><strong>Total pagado:</strong> $${parseFloat(totalPaid).toFixed(2)}</li>
-        <li><strong>Saldo restante:</strong> $${parseFloat(remainingBalance).toFixed(2)}</li>
+        <li><strong>Monto total:</strong> $${formatCurrency(totalAmount)}</li>
+        <li><strong>Total pagado:</strong> $${formatCurrency(totalPaid)}</li>
+        <li><strong>Saldo restante:</strong> $${formatCurrency(remainingBalance)}</li>
         ${txId ? `<li><strong>ID de Transacción:</strong> ${txId}</li>` : ""}
       </ul>
     </div>
@@ -241,7 +254,7 @@ export const createExpenseNotificationContent = ({
     
     <div class="data-container">
       <ul class="data-list">
-        <li><strong>Monto:</strong> $${parseFloat(amount).toFixed(2)}</li>
+        <li><strong>Monto:</strong> $${formatCurrency(amount)}</li>
         <li><strong>Fecha:</strong> ${date}</li>
         ${generalName ? `<li><strong>General:</strong> ${generalName}</li>` : ""}
         <li><strong>Concepto:</strong> ${conceptName}</li>
@@ -279,13 +292,13 @@ export const createAdminPaymentNotificationContent = ({
     
     <div class="data-container">
       <ul class="data-list">
-        <li><strong>Monto del pago:</strong> $${parseFloat(amount).toFixed(2)}</li>
+        <li><strong>Monto del pago:</strong> $${formatCurrency(amount)}</li>
         <li><strong>Fecha del pago:</strong> ${date}</li>
         <li><strong>Concepto:</strong> ${conceptName}</li>
         ${providerDetails || ''}
-        <li><strong>Monto total:</strong> $${parseFloat(totalAmount).toFixed(2)}</li>
-        <li><strong>Total pagado:</strong> $${parseFloat(totalPaid).toFixed(2)}</li>
-        <li><strong>Saldo restante:</strong> $${parseFloat(remainingBalance).toFixed(2)}</li>
+        <li><strong>Monto total:</strong> $${formatCurrency(totalAmount)}</li>
+        <li><strong>Total pagado:</strong> $${formatCurrency(totalPaid)}</li>
+        <li><strong>Saldo restante:</strong> $${formatCurrency(remainingBalance)}</li>
         ${txId ? `<li><strong>ID de Transacción:</strong> ${txId}</li>` : ""}
       </ul>
     </div>
