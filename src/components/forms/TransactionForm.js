@@ -81,16 +81,66 @@ const TransactionForm = ({
   const toast = useToast();
   const { user } = useAuth();
 
+  const formatNumberWithCommas = (value) => {
+    // Remove non-numeric characters except decimal point
+    const numericValue = value.replace(/[^0-9.]/g, '');
+    
+    // Split into integer and decimal parts
+    const parts = numericValue.split('.');
+    let integerPart = parts[0];
+    const decimalPart = parts.length > 1 ? `.${parts[1]}` : '';
+    
+    // Add thousand separators to integer part
+    if (integerPart) {
+      integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+    
+    return integerPart + decimalPart;
+  };
+
+  const parseFormattedNumber = (value) => {
+    // Remove all non-numeric characters except decimal point
+    return value.replace(/[^0-9.]/g, '');
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    
+    // Special handling for amount field
+    if (name === 'amount') {
+      // If empty, set empty string
+      if (value === '') {
+        setFormData(prev => ({
+          ...prev,
+          [name]: ''
+        }));
+        return;
+      }
+      
+      // Format the number with commas
+      const formattedValue = formatNumberWithCommas(value);
+      
+      // Update the display value with formatting
+      e.target.value = formattedValue;
+      
+      // Store the raw numeric value in form state (without commas)
+      const rawValue = parseFormattedNumber(formattedValue);
+      
+      setFormData(prev => ({
+        ...prev,
+        [name]: rawValue
+      }));
+    } else {
+      // For all other fields, update normally
+      setFormData(prev => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
 
     // Clear error when user starts typing
     if (errors[name]) {
-      setErrors((prev) => ({
+      setErrors(prev => ({
         ...prev,
         [name]: null,
       }));
@@ -606,13 +656,12 @@ const TransactionForm = ({
                 $
               </span>
               <input
-                type="number"
+                type="text"
                 id="amount"
                 name="amount"
-                value={formData.amount}
+                value={formData.amount ? formatNumberWithCommas(formData.amount) : ''}
                 onChange={handleInputChange}
-                step="0.01"
-                min="0"
+                inputMode="decimal"
                 className={`w-full pl-8 pr-3 py-2 border rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500 ${
                   errors.amount ? "border-red-300" : "border-gray-300"
                 }`}
