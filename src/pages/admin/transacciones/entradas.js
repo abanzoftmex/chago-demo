@@ -58,15 +58,15 @@ const Ingresos = () => {
     }
   }, [toast, currentDate]);
 
+  const updateMonthName = useCallback(() => {
+    const monthName = currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    setCurrentMonthName(monthName.charAt(0).toUpperCase() + monthName.slice(1));
+  }, [currentDate]);
+
   useEffect(() => {
     loadTransactions();
     updateMonthName();
-  }, [loadTransactions, currentDate]);
-
-  const updateMonthName = () => {
-    const monthName = currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-    setCurrentMonthName(monthName.charAt(0).toUpperCase() + monthName.slice(1));
-  };
+  }, [loadTransactions, currentDate, updateMonthName]);
 
   const handleDateChange = (newDate) => {
     setCurrentDate(newDate);
@@ -98,8 +98,7 @@ const Ingresos = () => {
   };
 
   const handleEditTransaction = (transaction) => {
-    setEditingTransaction(transaction);
-    setShowForm(true);
+    router.push(`/admin/transacciones/editar/${transaction.id}`);
   };
 
   const getConceptName = (conceptId) => {

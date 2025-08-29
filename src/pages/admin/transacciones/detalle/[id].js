@@ -406,7 +406,7 @@ const TransactionDetail = () => {
 
   return (
     <AdminLayout>
-      <div className="max-w-4xl mx-auto">
+      <div className="px-5">
         {/* Transaction Header - Compact */}
          <div className="flex items-center justify-between mb-6 bg-background rounded-lg border border-border p-4">
            <div className="flex items-center space-x-3">

@@ -107,7 +107,7 @@ export const paymentService = {
           
           // Calculate remaining balance using the total paid amount
           const totalAmount = transaction ? transaction.amount : 0;
-          const paymentSummary = await this.getPaymentSummary(transactionId);
+          const paymentSummary = await this.getPaymentSummary(paymentData.transactionId);
           const totalPaid = paymentSummary.totalPaid; // This includes all payments including current one
           const remainingBalance = paymentSummary.balance; // This is already calculated in getPaymentSummary
           

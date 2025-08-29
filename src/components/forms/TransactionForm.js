@@ -82,8 +82,15 @@ const TransactionForm = ({
   const { user } = useAuth();
 
   const formatNumberWithCommas = (value) => {
+    // Ensure value is a string and handle null/undefined
+    if (value === null || value === undefined || value === '') {
+      return '';
+    }
+    
+    const stringValue = String(value);
+    
     // Remove non-numeric characters except decimal point
-    const numericValue = value.replace(/[^0-9.]/g, '');
+    const numericValue = stringValue.replace(/[^0-9.]/g, '');
     
     // Split into integer and decimal parts
     const parts = numericValue.split('.');
@@ -99,8 +106,15 @@ const TransactionForm = ({
   };
 
   const parseFormattedNumber = (value) => {
+    // Ensure value is a string and handle null/undefined
+    if (value === null || value === undefined || value === '') {
+      return '';
+    }
+    
+    const stringValue = String(value);
+    
     // Remove all non-numeric characters except decimal point
-    return value.replace(/[^0-9.]/g, '');
+    return stringValue.replace(/[^0-9.]/g, '');
   };
 
   const handleInputChange = (e) => {
