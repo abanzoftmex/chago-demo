@@ -214,8 +214,8 @@ export const transactionService = {
   // Delete transaction
   async delete(id, user, deletionReason = null) {
     try {
-      // Check if user has permission to delete (contador role cannot delete)
-      if (user && user.role === 'contador') {
+      // Check if user has permission to delete (contador and director_general roles cannot delete)
+      if (user && ['contador', 'director_general'].includes(user.role)) {
         throw new Error("No tienes permisos para eliminar transacciones");
       }
 

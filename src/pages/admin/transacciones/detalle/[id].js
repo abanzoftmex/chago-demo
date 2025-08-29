@@ -740,7 +740,7 @@ const TransactionDetail = () => {
             <span>Volver</span>
           </button>
 
-          {userRole !== 'contador' && (
+          {!['contador', 'director_general'].includes(userRole) && (
             <button
               onClick={() => {
                 setDeleteReasonError(""); // Limpiar errores previos
