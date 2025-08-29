@@ -4,7 +4,7 @@
 
 Se ha agregado una nueva funcionalidad para eliminar todas las transacciones de un mes específico. Esta herramienta es útil durante el desarrollo y testing para limpiar datos de prueba o resetear un mes completo.
 
-## Características
+## Característicasa
 
 ### 🔒 Seguridada
 - **Solo disponible en desarrollo**: La funcionalidad está completamente deshabilitada en produccióna
