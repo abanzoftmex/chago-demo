@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import GeneralModal from "../../../components/forms/GeneralModal";
-
+import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import MassiveCsvImportModal from "../../../components/forms/MassiveCsvImportModal";
 import { generalService } from "../../../lib/services/generalService";
 import { useAuth } from "../../../context/AuthContext";
@@ -329,16 +329,18 @@ export default function GeneralesPage() {
                           <div className="flex items-center justify-end space-x-2">
                             <button
                               onClick={() => handleEditGeneral(general)}
-                              className="text-primary hover:text-blue-900"
+                              className="text-primary hover:text-blue-900 p-1"
+                              title="Editar"
                             >
-                              Editar
+                              <PencilIcon className="h-4 w-4" />
                             </button>
                             {userRole !== 'contador' && userRole !== 'director_general' && (
                               <button
                                 onClick={() => handleDeleteGeneral(general)}
-                                className="text-red-600 hover:text-red-900"
+                                className="text-red-600 hover:text-red-900 p-1"
+                                title="Eliminar"
                               >
-                                Eliminar
+                                <TrashIcon className="h-4 w-4" />
                               </button>
                             )}
                           </div>
