@@ -33,7 +33,8 @@ export const createEmailTemplate = ({ title, content, footerText }) => {
       ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
       : '');
   const baseUrl = resolvedBase ? resolvedBase.replace(/\/$/, '') : '';
-  const logoUrl = `https://santiago-fc.vercel.app/logo.jpeg`;
+  // Use the absolute URL to the logo in the public directory
+  const logoUrl = `${baseUrl}/logo.jpg`;
   
   // Default footer text if not provided
   const defaultFooter = 'Este es un correo automático. Por favor no responda a este mensaje.';
@@ -76,6 +77,8 @@ export const createEmailTemplate = ({ title, content, footerText }) => {
         .email-header img {
           max-height: 60px;
           width: auto;
+          display: block;
+          margin: 0 auto;
         }
         
         /* Content */
@@ -171,7 +174,7 @@ export const createEmailTemplate = ({ title, content, footerText }) => {
     <body>
       <div class="email-container">
         <div class="email-header">
-          <img src="${logoUrl}" alt="Santiago FC Logo" />
+          <img src="${logoUrl}" alt="Logo" style="max-height: 60px; width: auto; display: block; margin: 0 auto;">
         </div>
         
         <div class="email-content">
