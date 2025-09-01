@@ -26,7 +26,7 @@ export const recurringExpenseService = {
         updatedAt: serverTimestamp(),
         isActive: true,
         lastGenerated: null,
-        generatedMonths: [], // Array to track months where transactions were generated
+        generatedMonths: expenseData.generatedMonths || [], // Use provided array or empty array
       });
 
       return { id: docRef.id, ...expenseData };

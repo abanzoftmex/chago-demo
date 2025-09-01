@@ -316,7 +316,21 @@ const TransactionForm = ({
             division: formData.division,
           };
           
-          await recurringExpenseService.create(recurringData, user);
+          // Create the recurring expense and mark current month as already generated
+          const currentMonth = new Date(year, month, 1);
+          const currentMonthKey = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth()).padStart(2, '0')}`;
+          recurringData.generatedMonths = [currentMonthKey]; // Mark current month as generated
+          
+          const recurringExpense = await recurringExpenseService.create(recurringData, user);
+          
+          // Update the manual transaction to mark it as coming from a recurring expense
+          // and update its description to include "(Recurrente)"
+          await transactionService.update(result.id, {
+            description: `${formData.description} (Recurrente)`,
+            isRecurring: true,
+            recurringExpenseId: recurringExpense.id
+          }, user);
+          
           toast.success("Gasto recurrente configurado exitosamente");
         }
         // Upload optional attachments and save on transaction
