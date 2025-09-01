@@ -60,6 +60,7 @@ export const ToastProvider = ({ children }) => {
   return (
     <ToastContext.Provider value={value}>
       {children}
+      <Toast />
     </ToastContext.Provider>
   );
 };

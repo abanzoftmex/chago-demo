@@ -330,16 +330,69 @@ const TransactionDetail = () => {
 
   // File handling
   const handleDownloadFile = (url, fileName) => {
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    console.log("Attempting to download file:", { url, fileName });
+    
+    // Validate URL
+    if (!url || typeof url !== 'string') {
+      console.error("Invalid URL provided for download:", url);
+      setError("URL de archivo inválida");
+      return;
+    }
+    
+    try {
+      // Test if URL is accessible by creating an image element for images
+      if (fileName && (fileName.toLowerCase().includes('.jpg') || 
+          fileName.toLowerCase().includes('.jpeg') || 
+          fileName.toLowerCase().includes('.png') || 
+          fileName.toLowerCase().includes('.gif'))) {
+        const testImg = new Image();
+        testImg.onload = () => {
+          console.log("Image URL is accessible, proceeding with download");
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        };
+        testImg.onerror = () => {
+          console.error("Image URL is not accessible:", url);
+          setError("No se puede acceder al archivo. Puede estar dañado o haber expirado.");
+        };
+        testImg.src = url;
+      } else {
+        // For non-images, proceed directly
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        console.log("Download initiated successfully");
+      }
+    } catch (error) {
+      console.error("Error downloading file:", error);
+      setError("Error al descargar el archivo");
+    }
   };
 
   const handleViewFile = (url) => {
-    window.open(url, "_blank");
+    console.log("Attempting to view file:", url);
+    
+    // Validate URL
+    if (!url || typeof url !== 'string') {
+      console.error("Invalid URL provided for viewing:", url);
+      setError("URL de archivo inválida");
+      return;
+    }
+    
+    try {
+      window.open(url, "_blank");
+      console.log("File view opened successfully");
+    } catch (error) {
+      console.error("Error viewing file:", error);
+      setError("Error al abrir el archivo");
+    }
   };
 
   if (loading) {
@@ -535,18 +588,12 @@ const TransactionDetail = () => {
                         <div className="flex space-x-2">
                           <button
                             onClick={() => handleViewFile(attachment.fileUrl)}
-                            className="p-1 text-xs bg-primary/10 text-primary hover:bg-primary/20 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary flex items-center rounded-sm"
+                            className="py-1 px-3 text-xs bg-primary/10 text-primary hover:bg-primary/20 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary flex items-center rounded-sm"
                             title="Ver archivo"
                           >
                             <Eye className="w-3 h-3 mr-1" /> Ver
                           </button>
-                          <button
-                            onClick={() => handleDownloadFile(attachment.fileUrl, attachment.fileName)}
-                            className="p-1 text-xs bg-gray-200 text-gray-700 hover:bg-gray-300 hover:text-gray-900 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-muted flex items-center rounded-sm"
-                            title="Descargar archivo"
-                          >
-                            <Download className="w-3 h-3 mr-1" /> Descargar
-                          </button>
+                         
                         </div>
                       </div>
                     ))}
@@ -706,25 +753,13 @@ const TransactionDetail = () => {
                               onClick={() =>
                                 handleViewFile(attachment.fileUrl)
                               }
-                              className="p-1 text-xs bg-primary/10 text-primary hover:bg-primary/20 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary flex items-center rounded-sm"
+                              className="py-1 px-3 text-xs bg-primary/10 text-primary hover:bg-primary/20 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary flex items-center rounded-sm"
                               title="Ver archivo"
                             >
                               <Eye className="w-3 h-3 mr-1" />
                               Ver
                             </button>
-                            <button
-                              onClick={() =>
-                                handleDownloadFile(
-                                  attachment.fileUrl,
-                                  attachment.fileName
-                                )
-                              }
-                              className="p-1 text-xs bg-gray-200 text-gray-700 hover:bg-gray-300 hover:text-gray-900 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-muted flex items-center rounded-sm"
-                              title="Descargar archivo"
-                            >
-                              <Download className="w-3 h-3 mr-1" />
-                              Descargar
-                            </button>
+                           
                             </div>
                           </div>
                         ))}

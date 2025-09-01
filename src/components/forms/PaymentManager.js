@@ -74,13 +74,78 @@ const PaymentManager = ({
     }
   }, [loadPaymentData, transactionId]);
 
+  // Format number with commas helper function
+  const formatNumberWithCommas = (value) => {
+    // Ensure value is a string and handle null/undefined
+    if (value === null || value === undefined || value === '') {
+      return '';
+    }
+    
+    const stringValue = String(value);
+    
+    // Remove non-numeric characters except decimal point
+    const numericValue = stringValue.replace(/[^0-9.]/g, '');
+    
+    // Split into integer and decimal parts
+    const parts = numericValue.split('.');
+    let integerPart = parts[0];
+    const decimalPart = parts.length > 1 ? `.${parts[1]}` : '';
+    
+    // Add thousand separators to integer part
+    if (integerPart) {
+      integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+    
+    return integerPart + decimalPart;
+  };
+
+  const parseFormattedNumber = (value) => {
+    // Ensure value is a string and handle null/undefined
+    if (value === null || value === undefined || value === '') {
+      return '';
+    }
+    
+    const stringValue = String(value);
+    
+    // Remove all non-numeric characters except decimal point
+    return stringValue.replace(/[^0-9.]/g, '');
+  };
+
   // Handle form input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    
+    // Special handling for amount field
+    if (name === 'amount') {
+      // If empty, set empty string
+      if (value === '') {
+        setFormData(prev => ({
+          ...prev,
+          [name]: ''
+        }));
+        return;
+      }
+      
+      // Format the number with commas
+      const formattedValue = formatNumberWithCommas(value);
+      
+      // Update the display value with formatting
+      e.target.value = formattedValue;
+      
+      // Store the raw numeric value in form state (without commas)
+      const rawValue = parseFormattedNumber(formattedValue);
+      
+      setFormData(prev => ({
+        ...prev,
+        [name]: rawValue
+      }));
+    } else {
+      // For all other fields, update normally
+      setFormData(prev => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
 
     // Clear error when user starts typing
     if (formErrors[name]) {
@@ -111,22 +176,23 @@ const PaymentManager = ({
       files.map(async (file) => {
         console.log("Processing file:", file.name, file.type, file.size);
 
-        // Ensure we preserve all file properties
-        const fileWithProperties = {
+        // Create a wrapper object that contains the original File + metadata
+        // WITHOUT modifying the original File object
+        const fileWrapper = {
+          file: file, // Original File object, completely untouched
           name: file.name,
           type: file.type,
           size: file.size,
-          lastModified: file.lastModified,
-          // Preserve the original File object properties
-          ...file,
+          lastModified: file.lastModified
         };
 
         if (file.type && file.type.startsWith("image/")) {
           const preview = await createImagePreview(file);
           console.log("Preview created for:", file.name);
-          return { ...fileWithProperties, preview };
+          fileWrapper.preview = preview; // Add preview to wrapper, not to File
         }
-        return fileWithProperties;
+
+        return fileWrapper;
       })
     );
 
@@ -213,7 +279,20 @@ const PaymentManager = ({
         notes: formData.notes,
       };
 
-      const created = await paymentService.create(paymentData, formFiles);
+      // Debug: Log files before sending to service
+      console.log("PaymentManager - Submitting files:", formFiles.map(fileWrapper => ({
+        name: fileWrapper.name,
+        type: fileWrapper.type,
+        size: fileWrapper.size,
+        isFileInstance: fileWrapper.file instanceof File,
+        constructor: fileWrapper.file.constructor.name,
+        hasPreview: !!fileWrapper.preview
+      })));
+
+      // Extract original File objects from wrappers
+      const originalFiles = formFiles.map(fileWrapper => fileWrapper.file);
+
+      const created = await paymentService.create(paymentData, originalFiles);
 
       // Reset form
       setFormData({
@@ -223,9 +302,9 @@ const PaymentManager = ({
       });
 
       // Clean up previews before clearing files
-      formFiles.forEach((file) => {
-        if (file.preview && file.preview.startsWith("blob:")) {
-          URL.revokeObjectURL(file.preview);
+      formFiles.forEach((fileWrapper) => {
+        if (fileWrapper.preview && fileWrapper.preview.startsWith("blob:")) {
+          URL.revokeObjectURL(fileWrapper.preview);
         }
       });
 
@@ -415,13 +494,10 @@ const PaymentManager = ({
                   Monto *
                 </label>
                 <input
-                  type="number"
+                  type="text"
                   id="amount"
                   name="amount"
-                  step="0.01"
-                  min="0.01"
-                  max={paymentSummary?.balance || totalAmount}
-                  value={formData.amount}
+                  value={formatNumberWithCommas(formData.amount)}
                   onChange={handleInputChange}
                   className={`mt-1 block w-full p-2 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-orange-500 ${
                     formErrors.amount ? "border-red-300" : ""
@@ -483,12 +559,12 @@ const PaymentManager = ({
               <FileUpload
                 onUpload={handleFileUpload}
                 onRemove={handleFileRemove}
-                existingFiles={formFiles.map((file) => ({
-                  fileName: file.name || "Archivo sin nombre",
-                  fileType: file.type || "application/octet-stream",
-                  fileSize: file.size || 0,
+                existingFiles={formFiles.map((fileWrapper) => ({
+                  fileName: fileWrapper.name || "Archivo sin nombre",
+                  fileType: fileWrapper.type || "application/octet-stream",
+                  fileSize: fileWrapper.size || 0,
                   fileUrl: null, // No URL for files that haven't been uploaded yet
-                  preview: file.preview || null, // Include preview if available
+                  preview: fileWrapper.preview || null, // Include preview if available
                 }))}
                 disabled={submitting}
               />
@@ -499,9 +575,9 @@ const PaymentManager = ({
                 type="button"
                 onClick={() => {
                   // Clean up previews when canceling
-                  formFiles.forEach((file) => {
-                    if (file.preview && file.preview.startsWith("blob:")) {
-                      URL.revokeObjectURL(file.preview);
+                  formFiles.forEach((fileWrapper) => {
+                    if (fileWrapper.preview && fileWrapper.preview.startsWith("blob:")) {
+                      URL.revokeObjectURL(fileWrapper.preview);
                     }
                   });
                   setFormFiles([]);
@@ -575,7 +651,8 @@ const PaymentManager = ({
                               href={attachment.fileUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200"
+                              className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 no-underline"
+                              title={`Ver ${attachment.fileName}`}
                             >
                               <svg
                                 className="w-3 h-3 mr-1"

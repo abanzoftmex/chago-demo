@@ -263,6 +263,15 @@ export const paymentService = {
   // Upload file to Firebase Storage
   async uploadFile(file, transactionId) {
     try {
+      console.log("PaymentService - Starting file upload:", {
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        lastModified: file.lastModified,
+        isFileInstance: file instanceof File,
+        constructor: file.constructor.name
+      });
+
       // Validate file
       const validation = this.validateFile(file);
       if (!validation.isValid) {
@@ -274,10 +283,30 @@ export const paymentService = {
       const fileName = `${timestamp}_${file.name}`;
       const filePath = `${STORAGE_PATH}/${transactionId}/${fileName}`;
 
-      // Upload file
+      console.log("PaymentService - Uploading to path:", filePath);
+
+      // Upload file with explicit metadata to ensure proper content type
       const storageRef = ref(storage, filePath);
-      const snapshot = await uploadBytes(storageRef, file);
+      const metadata = {
+        contentType: file.type || 'application/octet-stream',
+        customMetadata: {
+          originalFileName: file.name,
+          uploadedAt: new Date().toISOString()
+        }
+      };
+      
+      console.log("PaymentService - Upload metadata:", metadata);
+      
+      const snapshot = await uploadBytes(storageRef, file, metadata);
       const downloadURL = await getDownloadURL(snapshot.ref);
+
+      console.log("PaymentService - Upload successful:", {
+        fileName,
+        downloadURL,
+        fileType: file.type,
+        fileSize: file.size,
+        contentType: metadata.contentType
+      });
 
       return {
         fileName,
@@ -287,7 +316,7 @@ export const paymentService = {
         uploadedAt: new Date(),
       };
     } catch (error) {
-      console.error("Error uploading file:", error);
+      console.error("PaymentService - Error uploading file:", error);
       throw new Error("Error al subir el archivo");
     }
   },
