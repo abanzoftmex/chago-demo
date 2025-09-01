@@ -1,7 +1,7 @@
 # 🎨 Sistema de Colores Consistente para Gráficas
 
 ## 🎯 Objetivo
-Mantener colores consistentes entre todas las visualizaciones (gráfico de pastel, barras de progreso, leyendas) para evitar confusión y mejorar la experiencia del usuario.
+Mantener colores consistentes entre todas las visualizaciones (gráfico de pastel, barras de progreso, leyendas) para evitar confusión y mejorar la experiencia del usuario.s
 
 ## 🌈 Paleta de Colores Definida
 
