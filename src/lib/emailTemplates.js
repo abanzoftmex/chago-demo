@@ -227,7 +227,6 @@ export const createPaymentReceiptContent = ({
     
     ${notesHtml || ''}
     
-    ${detailUrl ? `<p><a href="${detailUrl}" class="button">Ver detalle de la transacción</a></p>` : ""}
     
     ${linksHtml || ''}
   `;
@@ -269,7 +268,6 @@ export const createExpenseNotificationContent = ({
       </ul>
     </div>
     
-    ${detailUrl ? `<p><a href="${detailUrl}" class="button">Ver detalle de la transacción</a></p>` : ""}
   `;
 };
 
@@ -308,6 +306,5 @@ export const createAdminPaymentNotificationContent = ({
     
     ${notesHtml || ''}
     
-    ${detailUrl ? `<p><a href="${detailUrl}" class="button">Ver detalle de la transacción</a></p>` : ""}
   `;
 };

@@ -18,6 +18,7 @@ import {
   deleteObject,
 } from "firebase/storage";
 import { db, storage } from "../firebase/firebaseConfig";
+import { sendEmailWithRateLimit } from "../utils";
 import { transactionService } from "./transactionService";
 import { settingsService } from "./settingsService";
 import { conceptService } from "./conceptService";
@@ -143,11 +144,7 @@ export const paymentService = {
           });
           for (const to of recipients) {
             try {
-              await fetch("/api/email/send", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ to, subject, html }),
-              });
+              await sendEmailWithRateLimit(to, subject, html);
             } catch (e) {
               console.error('Error sending to recipient', to, e);
             }

@@ -85,3 +85,46 @@ export const debounce = (func, wait) => {
     timeout = setTimeout(later, wait);
   };
 };
+
+/**
+ * Sleep/delay function
+ * @param {number} ms - milliseconds to wait
+ * @returns {Promise}
+ */
+export const sleep = (ms) => {
+  return new Promise(resolve => setTimeout(resolve, ms));
+};
+
+/**
+ * Send email with rate limiting (max 2 emails per second)
+ * @param {string} to - recipient email
+ * @param {string} subject - email subject
+ * @param {string} html - email HTML content
+ * @returns {Promise}
+ */
+export const sendEmailWithRateLimit = async (to, subject, html) => {
+  // Wait 500ms between emails to ensure max 2 per second
+  if (sendEmailWithRateLimit.lastSent) {
+    const timeSinceLastSent = Date.now() - sendEmailWithRateLimit.lastSent;
+    if (timeSinceLastSent < 500) {
+      await sleep(500 - timeSinceLastSent);
+    }
+  }
+  
+  try {
+    const response = await fetch("/api/email/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to, subject, html }),
+    });
+    
+    sendEmailWithRateLimit.lastSent = Date.now();
+    return response;
+  } catch (error) {
+    sendEmailWithRateLimit.lastSent = Date.now();
+    throw error;
+  }
+};
+
+// Initialize lastSent timestamp
+sendEmailWithRateLimit.lastSent = null;

@@ -3,6 +3,7 @@ import { paymentService } from "../../lib/services/paymentService";
 import { useAuth } from "../../context/AuthContext";
 import FileUpload from "../ui/FileUpload";
 import Toast from "../ui/Toast";
+import { sendEmailWithRateLimit } from "../../lib/utils";
 
 const PaymentManager = ({
   transactionId,
@@ -1018,11 +1019,7 @@ const PaymentManager = ({
                       title: 'Comprobante de Pago',
                       content: emailContent
                     });
-                    await fetch("/api/email/send", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ to: email, subject, html }),
-                    });
+                    await sendEmailWithRateLimit(email, subject, html);
                     setShowEmailModal(false);
                     setToast({ type: "success", message: "Correo enviado" });
                   } catch (err) {

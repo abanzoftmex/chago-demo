@@ -14,6 +14,7 @@ import { conceptService } from "../../lib/services/conceptService";
 import { subconceptService } from "../../lib/services/subconceptService";
 import { paymentService } from "../../lib/services/paymentService";
 import { recurringExpenseService } from "../../lib/services/recurringExpenseService";
+import { sendEmailWithRateLimit } from "../../lib/utils";
 
 const TransactionForm = ({
   type,
@@ -487,11 +488,7 @@ const TransactionForm = ({
                   });
                   for (const to of recipients) {
                     try {
-                      await fetch("/api/email/send", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ to, subject, html }),
-                      });
+                      await sendEmailWithRateLimit(to, subject, html);
                     } catch (e) {
                       console.error("Error sending to recipient", to, e);
                     }
