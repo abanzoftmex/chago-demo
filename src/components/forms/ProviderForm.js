@@ -223,7 +223,7 @@ const ProviderForm = ({ provider = null, onSubmit, onCancel, isOpen }) => {
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  RFC <span className="text-red-500">*</span>
+                  RFC
                 </label>
                 <input
                   type="text"
@@ -232,7 +232,7 @@ const ProviderForm = ({ provider = null, onSubmit, onCancel, isOpen }) => {
                   className={`w-full px-3 py-2 border rounded-md bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent ${
                     errors.rfc ? 'border-red-500' : 'border-border'
                   }`}
-                  placeholder="RFC del proveedor"
+                  placeholder="RFC del proveedor (opcional)"
                   maxLength="13"
                 />
                 {errors.rfc && (
@@ -242,7 +242,7 @@ const ProviderForm = ({ provider = null, onSubmit, onCancel, isOpen }) => {
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Teléfono <span className="text-red-500">*</span>
+                  Teléfono
                 </label>
                 <input
                   type="tel"
@@ -251,7 +251,7 @@ const ProviderForm = ({ provider = null, onSubmit, onCancel, isOpen }) => {
                   className={`w-full px-3 py-2 border rounded-md bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent ${
                     errors.phone ? 'border-red-500' : 'border-border'
                   }`}
-                  placeholder="Teléfono del proveedor"
+                  placeholder="Teléfono del proveedor (opcional)"
                 />
                 {errors.phone && (
                   <p className="text-red-500 text-xs mt-1">{errors.phone}</p>
@@ -260,7 +260,7 @@ const ProviderForm = ({ provider = null, onSubmit, onCancel, isOpen }) => {
 
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Dirección <span className="text-red-500">*</span>
+                  Dirección
                 </label>
                 <textarea
                   value={formData.address}
@@ -269,7 +269,7 @@ const ProviderForm = ({ provider = null, onSubmit, onCancel, isOpen }) => {
                   className={`w-full px-3 py-2 border rounded-md bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent ${
                     errors.address ? 'border-red-500' : 'border-border'
                   }`}
-                  placeholder="Dirección completa del proveedor"
+                  placeholder="Dirección completa del proveedor (opcional)"
                 />
                 {errors.address && (
                   <p className="text-red-500 text-xs mt-1">{errors.address}</p>

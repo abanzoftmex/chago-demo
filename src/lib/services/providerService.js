@@ -67,8 +67,8 @@ export const providerService = {
         const searchLower = searchTerm.toLowerCase();
         providers = providers.filter(provider => 
           provider.name.toLowerCase().includes(searchLower) ||
-          provider.rfc.toLowerCase().includes(searchLower) ||
-          provider.phone.includes(searchTerm)
+          (provider.rfc && provider.rfc.toLowerCase().includes(searchLower)) ||
+          (provider.phone && provider.phone.includes(searchTerm))
         );
       }
       
@@ -140,22 +140,14 @@ export const providerService = {
   validateProviderData(providerData) {
     const errors = {};
     
+    // Only name is required
     if (!providerData.name || providerData.name.trim() === '') {
       errors.name = 'El nombre es requerido';
     }
     
-    if (!providerData.rfc || providerData.rfc.trim() === '') {
-      errors.rfc = 'El RFC es requerido';
-    } else if (!/^[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}$/.test(providerData.rfc)) {
+    // RFC is optional, but if provided, validate format
+    if (providerData.rfc && providerData.rfc.trim() !== '' && !/^[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}$/.test(providerData.rfc)) {
       errors.rfc = 'El RFC no tiene un formato válido';
-    }
-    
-    if (!providerData.phone || providerData.phone.trim() === '') {
-      errors.phone = 'El teléfono es requerido';
-    }
-    
-    if (!providerData.address || providerData.address.trim() === '') {
-      errors.address = 'La dirección es requerida';
     }
     
     // Validate contacts

@@ -30,14 +30,7 @@ const Sidebar = ({
   const router = useRouter();
   const { checkPermission, userRole } = useAuth();
   
-  // Debug permissions
-  useEffect(() => {
-    console.log("Current user role:", userRole);
-    // Log a few key permissions to debug
-    console.log("Permission check - canViewDashboard:", checkPermission("canViewDashboard"));
-    console.log("Permission check - canManageUsers:", checkPermission("canManageUsers"));
-    console.log("Permission check - canViewEntradas:", checkPermission("canViewEntradas"));
-  }, [userRole, checkPermission]);
+
   
   // Usar el store de Zustand para el estado de los menús
   const { expandedSections, toggleSection, autoExpandFromPath } = useSidebarStore();

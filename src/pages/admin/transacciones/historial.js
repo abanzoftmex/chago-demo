@@ -223,7 +223,7 @@ const Historial = () => {
       title="Historial"
       breadcrumbs={[
         { name: "Dashboard", href: "/admin/dashboard" },
-        { name: "Transacciones" },
+        { name: "Transacciones", href: "/admin/transacciones/entradas" },
         { name: "Historial" },
       ]}
     >

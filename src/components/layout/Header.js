@@ -52,34 +52,11 @@ const Header = ({ title, breadcrumbs = [], onMenuClick, onToggleCollapse, sideba
     setUserMenuOpen(false);
   };
 
-  const Breadcrumbs = () => {
-    if (breadcrumbs.length === 0) return null;
-
-    return (
-      <nav className="flex" aria-label="Breadcrumb">
-        <ol className="flex items-center space-x-2">
-          {breadcrumbs.map((crumb, index) => (
-            <li key={index} className="flex items-center">
-              {index > 0 && (
-                <ChevronRightIcon className="h-4 w-4 text-gray-400 mx-2" />
-              )}
-              {crumb.href ? (
-                <a
-                  href={crumb.href}
-                  className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-                >
-                  {crumb.name}
-                </a>
-              ) : (
-                <span className="text-sm text-gray-900 font-medium">
-                  {crumb.name}
-                </span>
-              )}
-            </li>
-          ))}
-        </ol>
-      </nav>
-    );
+  const handleBreadcrumbClick = (href) => {
+    console.log("Breadcrumb clicked:", href);
+    router.push(href)
+      .then(() => console.log("Breadcrumb navigation successful"))
+      .catch(err => console.error("Breadcrumb navigation error:", err));
   };
 
   return (
@@ -111,8 +88,32 @@ const Header = ({ title, breadcrumbs = [], onMenuClick, onToggleCollapse, sideba
 
           {/* Title and breadcrumbs */}
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
-            <Breadcrumbs />
+            <h1 className="text-xl font-semibold text-gray-900 pb-1">{title}</h1>
+            
+            {/* Breadcrumb simple construido desde cero */}
+            {breadcrumbs && breadcrumbs.length > 0 && (
+              <div className="flex items-center space-x-2 text-sm">
+                {breadcrumbs.map((crumb, index) => (
+                  <div key={index} className="flex items-center">
+                    {index > 0 && (
+                      <ChevronRightIcon className="h-4 w-4 text-gray-400 mx-2" />
+                    )}
+                    {crumb.href ? (
+                      <button 
+                        onClick={() => handleBreadcrumbClick(crumb.href)}
+                        className="text-gray-500 hover:text-gray-700 transition-colors underline-offset-2 hover:underline"
+                      >
+                        {crumb.name}
+                      </button>
+                    ) : (
+                      <span className="text-gray-900 font-medium">
+                        {crumb.name}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

@@ -44,9 +44,9 @@ const Proveedores = () => {
       const searchLower = searchTerm.toLowerCase();
       const filtered = providers.filter(provider => 
         provider.name.toLowerCase().includes(searchLower) ||
-        provider.rfc.toLowerCase().includes(searchLower) ||
-        provider.phone.includes(searchTerm) ||
-        provider.address.toLowerCase().includes(searchLower)
+        (provider.rfc && provider.rfc.toLowerCase().includes(searchLower)) ||
+        (provider.phone && provider.phone.includes(searchTerm)) ||
+        (provider.address && provider.address.toLowerCase().includes(searchLower))
       );
       setFilteredProviders(filtered);
     }
@@ -253,17 +253,17 @@ const Proveedores = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-foreground">
-                        {provider.rfc}
+                        {provider.rfc || 'No especificado'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-foreground">
-                        {provider.phone}
+                        {provider.phone || 'No especificado'}
                       </div>
                     </td>
                     <td className="px-6 py-4 hidden md:table-cell">
                       <div className="text-sm text-foreground max-w-xs truncate">
-                        {provider.address}
+                        {provider.address || 'No especificada'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -431,15 +431,15 @@ const Proveedores = () => {
                   </div>
                   <div>
                     <label className="text-xs text-muted-foreground">RFC</label>
-                    <p className="text-sm text-foreground">{selectedProvider.rfc}</p>
+                    <p className="text-sm text-foreground">{selectedProvider.rfc || 'No especificado'}</p>
                   </div>
                   <div>
                     <label className="text-xs text-muted-foreground">Teléfono</label>
-                    <p className="text-sm text-foreground">{selectedProvider.phone}</p>
+                    <p className="text-sm text-foreground">{selectedProvider.phone || 'No especificado'}</p>
                   </div>
                   <div className="md:col-span-2">
                     <label className="text-xs text-muted-foreground">Dirección</label>
-                    <p className="text-sm text-foreground">{selectedProvider.address}</p>
+                    <p className="text-sm text-foreground">{selectedProvider.address || 'No especificada'}</p>
                   </div>
                 </div>
               </div>
