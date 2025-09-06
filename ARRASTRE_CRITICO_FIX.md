@@ -9,7 +9,7 @@
 
 ### Impacto:
 - **Los pendientes de meses anteriores NO se incluyen en el arrastre**
-- **Las estadísticas están incorrectas**
+- **Las estadísticas están incorrectas**a
 - **Afectará el uso de reportes los siguientes meses**
 
 ## Causa Raíz del Problema
