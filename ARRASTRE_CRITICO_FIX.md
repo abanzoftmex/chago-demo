@@ -5,7 +5,7 @@
 ### Evidencia del Bug:
 1. **Septiembre solo**: Balance Arrastrado = $63,033.60
 2. **Agosto + Septiembre**: Balance Arrastrado = $63,033.60 (¡IGUAL!)
-3. **Gasto inicial de agosto**: No aparece en el arrastre de septiembre
+3. **Gasto inicial de agosto**: No aparece en el arrastre de septiembrea
 
 ### Impacto:
 - **Los pendientes de meses anteriores NO se incluyen en el arrastre**
