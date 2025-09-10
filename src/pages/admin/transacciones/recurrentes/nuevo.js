@@ -91,7 +91,7 @@ const CreateRecurringExpense = () => {
               <div>
                 <h4 className="font-medium text-gray-800">📅 Quincenal</h4>
                 <p className="text-sm text-gray-600">
-                  Se genera una transacción el día 15 y el último día de cada mes a medianoche.
+                  Se genera una transacción el día 15 y el penúltimo día de cada mes a medianoche.
                 </p>
               </div>
               <div>

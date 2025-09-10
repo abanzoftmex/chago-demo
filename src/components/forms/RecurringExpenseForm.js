@@ -16,7 +16,7 @@ import SubconceptModal from "./SubconceptModal";
 const FREQUENCIES = {
   daily: { label: "Diario", value: "daily" },
   weekly: { label: "Semanal (cada lunes)", value: "weekly" },
-  biweekly: { label: "Quincenal (día 15 y 30/último)", value: "biweekly" },
+  biweekly: { label: "Quincenal (día 15 y penúltimo)", value: "biweekly" },
   monthly: { label: "Mensual (día 1)", value: "monthly" }
 };
 
@@ -293,7 +293,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
     const descriptions = {
       daily: "Se generará una nueva transacción todos los días a la medianoche.",
       weekly: "Se generará una nueva transacción todos los lunes a la medianoche.",
-      biweekly: "Se generará una nueva transacción el día 15 y el último día de cada mes a la medianoche.",
+      biweekly: "Se generará una nueva transacción el día 15 y el penúltimo día de cada mes a la medianoche.",
       monthly: "Se generará una nueva transacción el primer día de cada mes a la medianoche."
     };
     return descriptions[frequency] || "";

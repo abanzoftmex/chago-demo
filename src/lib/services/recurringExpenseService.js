@@ -193,10 +193,11 @@ export const recurringExpenseService = {
         return currentDate.getDay() === 1;
         
       case 'biweekly':
-        // Generate on 15th and last day of month
+        // Generate on 15th and day before last day of month
         const day = currentDate.getDate();
         const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
-        return day === 15 || day === lastDayOfMonth;
+        const dayBeforeLast = lastDayOfMonth - 1;
+        return day === 15 || day === dayBeforeLast;
         
       case 'monthly':
         // Generate on 1st of month (backward compatibility)
