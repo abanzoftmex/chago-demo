@@ -3,7 +3,7 @@
 ## Problema Identificado
 
 El sistema de "arrastre" no estaba considerando correctamente los pendientes de todos los meses. La lógica anterior:
-
+a
 1. Solo consideraba como "arrastre" las transacciones pendientes que estaban fuera del período de filtro
 2. No incluía los pendientes del período actual en el arrastre
 3. La separación entre balance del período y balance de arrastre no era clara
