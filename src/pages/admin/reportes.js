@@ -23,6 +23,8 @@ import {
   EyeIcon,
   ArrowPathIcon,
   CheckCircleIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
 } from "@heroicons/react/24/outline";
 
 const Reportes = () => {
@@ -342,6 +344,32 @@ const Reportes = () => {
     if (total === 0) return "0%";
     const percentage = (amount / total) * 100;
     return `${percentage.toFixed(1)}%`;
+  };
+
+  // Función para determinar si una categoría/concepto es principalmente ingreso
+  const isMainlyIncome = (data) => {
+    return data.entradas > 0 && data.salidas === 0;
+  };
+
+  // Función para formatear el porcentaje según si es ingreso o gasto
+  const formatSmartPercentage = (data, totalSalidas, totalEntradas) => {
+    if (isMainlyIncome(data)) {
+      // Es un ingreso, calcular porcentaje del total de ingresos
+      return (
+        <span className="flex items-center">
+          <ArrowUpIcon className="h-4 w-4 mr-1" />
+          {formatPercentage(data.entradas, totalEntradas)}
+        </span>
+      );
+    } else {
+      // Es un gasto, calcular porcentaje del total de gastos
+      return (
+        <span className="flex items-center">
+          <ArrowDownIcon className="h-4 w-4 mr-1" />
+          {formatPercentage(data.salidas, totalSalidas)}
+        </span>
+      );
+    }
   };
 
   return (
@@ -886,6 +914,35 @@ const Reportes = () => {
             </div>
           </div>
         )}
+
+        {/* Leyenda para porcentajes cuando se incluyen ingresos */}
+        {showIncomeInBreakdown && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start space-x-3">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <h4 className="text-sm font-medium text-blue-800">
+                  Interpretación de porcentajes
+                </h4>
+                <div className="mt-2 text-sm text-blue-700">
+                  <p className="flex items-center">
+                    • Los porcentajes en <span className="text-red-600 font-semibold mx-1">rojo</span> 
+                    con <ArrowDownIcon className="h-4 w-4 mx-1 text-red-600" /> representan el % del total de gastos
+                  </p>
+                  <p className="flex items-center mt-1">
+                    • Los porcentajes en <span className="text-green-600 font-semibold mx-1">verde</span> 
+                    con <ArrowUpIcon className="h-4 w-4 mx-1 text-green-600" /> representan el % del total de ingresos
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* General Breakdown */}
         {stats && Object.keys(stats.generalBreakdown).length > 0 && 
          Object.entries(stats.generalBreakdown).some(([general, data]) => showIncomeInBreakdown || data.salidas > 0) && (
@@ -912,16 +969,13 @@ const Reportes = () => {
                       </th>
                     )}
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Solicitudes
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Total
+                      Gastos
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Cantidad
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      % de Gastos
+                      {showIncomeInBreakdown ? "% de Gastos/Ingresos" : "% de Gastos"}
                     </th>
                   </tr>
                 </thead>
@@ -934,21 +988,29 @@ const Reportes = () => {
                           {general}
                         </td>
                         {showIncomeInBreakdown && (
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">
+                          <td className={`px-6 py-4 whitespace-nowrap text-sm ${
+                            data.entradas === 0 ? 'text-foreground' : 'text-green-600'
+                          }`}>
                             {formatCurrency(data.entradas)}
                           </td>
                         )}
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
+                        <td className={`px-6 py-4 whitespace-nowrap text-sm ${
+                          data.salidas === 0 ? 'text-foreground' : 'text-red-600'
+                        }`}>
                           {formatCurrency(data.salidas)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
-                          {formatCurrency(showIncomeInBreakdown ? data.total : data.salidas)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                           {data.count}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">
-                          {formatPercentage(data.salidas, stats.totalSalidas)}
+                        <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${
+                          showIncomeInBreakdown && isMainlyIncome(data) 
+                            ? 'text-green-600' 
+                            : 'text-red-600'
+                        }`}>
+                          {showIncomeInBreakdown 
+                            ? formatSmartPercentage(data, stats.totalSalidas, stats.totalEntradas)
+                            : formatPercentage(data.salidas, stats.totalSalidas)
+                          }
                         </td>
                       </tr>
                     )
@@ -984,16 +1046,13 @@ const Reportes = () => {
                       </th>
                     )}
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Solicitudes
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Total
+                      Gastos
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Cantidad
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      % de Gastos
+                      {showIncomeInBreakdown ? "% de Gastos/Ingresos" : "% de Gastos"}
                     </th>
                   </tr>
                 </thead>
@@ -1006,21 +1065,29 @@ const Reportes = () => {
                           {concept}
                         </td>
                         {showIncomeInBreakdown && (
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">
+                          <td className={`px-6 py-4 whitespace-nowrap text-sm ${
+                            data.entradas === 0 ? 'text-foreground' : 'text-green-600'
+                          }`}>
                             {formatCurrency(data.entradas)}
                           </td>
                         )}
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
+                        <td className={`px-6 py-4 whitespace-nowrap text-sm ${
+                          data.salidas === 0 ? 'text-foreground' : 'text-red-600'
+                        }`}>
                           {formatCurrency(data.salidas)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
-                          {formatCurrency(showIncomeInBreakdown ? data.total : data.salidas)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                           {data.count}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">
-                          {formatPercentage(data.salidas, stats.totalSalidas)}
+                        <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${
+                          showIncomeInBreakdown && isMainlyIncome(data) 
+                            ? 'text-green-600' 
+                            : 'text-red-600'
+                        }`}>
+                          {showIncomeInBreakdown 
+                            ? formatSmartPercentage(data, stats.totalSalidas, stats.totalEntradas)
+                            : formatPercentage(data.salidas, stats.totalSalidas)
+                          }
                         </td>
                       </tr>
                     )
@@ -1080,7 +1147,7 @@ const Reportes = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                           {data.count}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">
                           {formatPercentage(data.amount, stats.totalSalidas)}
                         </td>
                       </tr>
