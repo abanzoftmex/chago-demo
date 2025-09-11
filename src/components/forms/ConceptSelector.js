@@ -3,6 +3,7 @@ import { conceptService } from '../../lib/services/conceptService';
 
 const ConceptSelector = forwardRef(({ 
   type, 
+  generalId,
   value, 
   onChange, 
   onCreateNew,
@@ -19,20 +20,30 @@ const ConceptSelector = forwardRef(({
     try {
       setLoading(true);
       setError(null);
-      // Fetch all concepts by type - no general filtering needed anymore
-      const conceptsData = await conceptService.getByType(type);
-      setConcepts(conceptsData);
+      
+      if (!generalId) {
+        // If no general is selected, show empty list
+        setConcepts([]);
+        return;
+      }
+      
+      // Fetch all concepts and filter by general and type
+      const allConcepts = await conceptService.getAll();
+      const filteredConcepts = allConcepts.filter(concept => 
+        concept.generalId === generalId && concept.type === type
+      );
+      setConcepts(filteredConcepts);
     } catch (err) {
       setError(err.message);
       console.error('Error loading concepts:', err);
     } finally {
       setLoading(false);
     }
-  }, [type]);
+  }, [type, generalId]);
 
   useEffect(() => {
     loadConcepts();
-  }, [type, loadConcepts]);
+  }, [type, generalId, loadConcepts]);
 
   const handleSelectChange = (e) => {
     const selectedValue = e.target.value;
@@ -93,10 +104,12 @@ const ConceptSelector = forwardRef(({
         value={value || ''}
         onChange={handleSelectChange}
         required={required}
-        disabled={disabled}
+        disabled={disabled || !generalId}
         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
       >
-        <option value="">{placeholder}</option>
+        <option value="">
+          {!generalId ? "Primero selecciona una categoría general" : placeholder}
+        </option>
         {concepts.map((concept) => (
           <option key={concept.id} value={concept.id}>
             {concept.name}

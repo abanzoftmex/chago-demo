@@ -5,6 +5,7 @@ import ConceptModal from "../../../components/forms/ConceptModal";
 import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import MassiveCsvImportModal from "../../../components/forms/MassiveCsvImportModal";
 import { conceptService } from "../../../lib/services/conceptService";
+import { generalService } from "../../../lib/services/generalService";
 import { useAuth } from "../../../context/AuthContext";
 
 export default function ConceptosPage() {
@@ -15,13 +16,15 @@ export default function ConceptosPage() {
   const canDeleteCatalogItems = checkPermission("canDeleteCatalogItems");
 
   const [concepts, setConcepts] = useState([]);
+  const [generals, setGenerals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [isMassiveImportModalOpen, setIsMassiveImportModalOpen] = useState(false);
   const [editingConcept, setEditingConcept] = useState(null);
-  const [filterType, setFilterType] = useState("all"); // Changed from filterGeneral
+  const [filterGeneral, setFilterGeneral] = useState("all");
+  const [filterType, setFilterType] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
@@ -40,10 +43,14 @@ export default function ConceptosPage() {
       setLoading(true);
       setError(null);
 
-      // Load concepts only - no need for generals anymore
-      const conceptsData = await conceptService.getAll();
+      // Load both concepts and generals
+      const [conceptsData, generalsData] = await Promise.all([
+        conceptService.getAll(),
+        generalService.getAll()
+      ]);
 
       setConcepts(conceptsData);
+      setGenerals(generalsData);
     } catch (err) {
       setError(err.message);
       console.error("Error loading data:", err);
@@ -90,9 +97,10 @@ export default function ConceptosPage() {
   };
 
   const filteredConcepts = concepts.filter((concept) => {
+    const matchesGeneralFilter = filterGeneral === "all" || concept.generalId === filterGeneral;
     const matchesTypeFilter = filterType === "all" || concept.type === filterType;
     const matchesSearch = concept.name.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesTypeFilter && matchesSearch;
+    return matchesGeneralFilter && matchesTypeFilter && matchesSearch;
   });
 
   const breadcrumbs = [
@@ -169,6 +177,27 @@ export default function ConceptosPage() {
         <div className="bg-white p-4 rounded-lg shadow">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
             <div className="flex space-x-4">
+              <div>
+                <label
+                  htmlFor="filterGeneral"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Filtrar por general
+                </label>
+                <select
+                  id="filterGeneral"
+                  value={filterGeneral}
+                  onChange={(e) => setFilterGeneral(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500"
+                >
+                  <option value="all">Todos los generales</option>
+                  {generals.map((general) => (
+                    <option key={general.id} value={general.id}>
+                      {general.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label
                   htmlFor="filterType"
@@ -255,6 +284,9 @@ export default function ConceptosPage() {
                       Nombre
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      General
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Tipo
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -268,7 +300,7 @@ export default function ConceptosPage() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredConcepts.length === 0 ? (
                     <tr>
-                      <td colSpan="4" className="px-6 py-12 text-center">
+                      <td colSpan="5" className="px-6 py-12 text-center">
                         <div className="text-gray-500">
                           <svg
                             className="mx-auto h-12 w-12 mb-4"
@@ -287,7 +319,7 @@ export default function ConceptosPage() {
                             No hay conceptos
                           </p>
                           <p className="text-sm">
-                            {searchTerm || filterType !== "all"
+                            {searchTerm || filterType !== "all" || filterGeneral !== "all"
                               ? "No se encontraron conceptos con los filtros aplicados"
                               : "Comienza creando tu primer concepto"}
                           </p>
@@ -295,53 +327,61 @@ export default function ConceptosPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredConcepts.map((concept) => (
-                      <tr key={concept.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {concept.name}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              concept.type === "entrada"
-                                ? "bg-green-100 text-green-800"
-                                : "bg-red-100 text-red-800"
-                            }`}
-                          >
-                            {concept.type === "entrada" ? "Ingreso" : "Gasto"}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {concept.createdAt?.toDate
-                            ? concept.createdAt
-                                .toDate()
-                                .toLocaleDateString("es-ES")
-                            : "N/A"}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex items-center justify-end space-x-2">
-                            <button
-                              onClick={() => handleEditConcept(concept)}
-                              className="text-primary hover:text-blue-900 p-1"
-                              title="Editar"
+                    filteredConcepts.map((concept) => {
+                      const general = generals.find(g => g.id === concept.generalId);
+                      return (
+                        <tr key={concept.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {concept.name}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {general ? general.name : 'Sin asignar'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span
+                              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                concept.type === "entrada"
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-red-100 text-red-800"
+                              }`}
                             >
-                              <PencilIcon className="h-4 w-4" />
-                            </button>
-                            {canDeleteCatalogItems && (
+                              {concept.type === "entrada" ? "Ingreso" : "Gasto"}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {concept.createdAt?.toDate
+                              ? concept.createdAt
+                                  .toDate()
+                                  .toLocaleDateString("es-ES")
+                              : "N/A"}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <div className="flex items-center justify-end space-x-2">
                               <button
-                                onClick={() => handleDeleteConcept(concept)}
-                                className="text-red-600 hover:text-red-900 p-1"
-                                title="Eliminar"
+                                onClick={() => handleEditConcept(concept)}
+                                className="text-primary hover:text-blue-900 p-1"
+                                title="Editar"
                               >
-                                <TrashIcon className="h-4 w-4" />
+                                <PencilIcon className="h-4 w-4" />
                               </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                              {canDeleteCatalogItems && (
+                                <button
+                                  onClick={() => handleDeleteConcept(concept)}
+                                  className="text-red-600 hover:text-red-900 p-1"
+                                  title="Eliminar"
+                                >
+                                  <TrashIcon className="h-4 w-4" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -356,6 +396,7 @@ export default function ConceptosPage() {
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleModalSuccess}
         initialData={editingConcept}
+        generals={generals}
       />
 
 

@@ -62,6 +62,7 @@ const TransactionForm = ({
   const [showSubconceptModal, setShowSubconceptModal] = useState(false);
   const [showGeneralModal, setShowGeneralModal] = useState(false);
   const [generals, setGenerals] = useState([]);
+  const [concepts, setConcepts] = useState([]);
   const [loadingGenerals, setLoadingGenerals] = useState(false);
   const [generalsError, setGeneralsError] = useState(null);
   const [files, setFiles] = useState([]);
@@ -220,9 +221,8 @@ const TransactionForm = ({
       newErrors.subconceptId = "El subconcepto es requerido";
     }
 
-    if (!formData.description || formData.description.trim() === "") {
-      newErrors.description = "La descripción es requerida";
-    }
+    // Description is not required
+    // Provider is not required for any transaction type
 
     if (!formData.amount || parseFloat(formData.amount) <= 0) {
       newErrors.amount = "El monto debe ser mayor a 0";
@@ -230,11 +230,6 @@ const TransactionForm = ({
 
     if (!formData.date) {
       newErrors.date = "La fecha es requerida";
-    }
-
-    // For salidas, provider is required
-    if (formData.type === "salida" && !formData.providerId) {
-      newErrors.providerId = "El proveedor es requerido para salidas";
     }
 
     return newErrors;
@@ -258,6 +253,19 @@ const TransactionForm = ({
     };
     loadGenerals();
   }, [formData.type]);
+
+  // Load concepts when needed for SubconceptModal
+  React.useEffect(() => {
+    const loadConcepts = async () => {
+      try {
+        const allConcepts = await conceptService.getAll();
+        setConcepts(allConcepts);
+      } catch (err) {
+        console.error('Error loading concepts:', err);
+      }
+    };
+    loadConcepts();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -622,6 +630,7 @@ const TransactionForm = ({
             <ConceptSelector
               ref={conceptSelectorRef}
               type={formData.type}
+              generalId={formData.generalId}
               value={formData.conceptId}
               onChange={handleConceptChange}
               onCreateNew={() => setShowConceptModal(true)}
@@ -640,6 +649,7 @@ const TransactionForm = ({
             </label>
             <SubconceptSelector
               ref={subconceptSelectorRef}
+              conceptId={formData.conceptId}
               value={formData.subconceptId}
               onChange={handleSubconceptChange}
               onCreateNew={() => setShowSubconceptModal(true)}
@@ -716,7 +726,7 @@ const TransactionForm = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Proveedor *
+                Proveedor
               </label>
               <ProviderSelector
                 ref={providerSelectorRef}
@@ -727,7 +737,6 @@ const TransactionForm = ({
                     "Funcionalidad de crear proveedor será implementada próximamente"
                   )
                 }
-                required
                 disabled={loading}
               />
               {errors.providerId && (
@@ -762,7 +771,7 @@ const TransactionForm = ({
         {/* Descripción - Ancho completo */}
         <div>
           <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-            Descripción *
+            Descripción
           </label>
           <textarea
             id="description"
@@ -775,7 +784,6 @@ const TransactionForm = ({
             }`}
             placeholder="Describe el gasto o transacción..."
             disabled={loading}
-            required
           />
           {errors.description && (
             <p className="mt-1 text-sm text-red-600">{errors.description}</p>
@@ -903,6 +911,7 @@ const TransactionForm = ({
         onClose={() => setShowConceptModal(false)}
         onSuccess={handleConceptCreated}
         type={formData.type}
+        generals={generals}
       />
 
       {/* Subconcept Modal */}
@@ -910,6 +919,7 @@ const TransactionForm = ({
         isOpen={showSubconceptModal}
         onClose={() => setShowSubconceptModal(false)}
         onSuccess={handleSubconceptCreated}
+        concepts={concepts.filter(c => c.type === formData.type)}
       />
     </div>
   );

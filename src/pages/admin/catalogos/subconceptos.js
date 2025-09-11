@@ -4,6 +4,7 @@ import AdminLayout from "../../../components/layout/AdminLayout";
 import SubconceptModal from "../../../components/forms/SubconceptModal";
 import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { subconceptService } from "../../../lib/services/subconceptService";
+import { conceptService } from "../../../lib/services/conceptService";
 import { useAuth } from "../..//..//context/AuthContext";
 
 export default function SubconceptosPage() {
@@ -11,11 +12,13 @@ export default function SubconceptosPage() {
   const router = useRouter();
 
   const [subconcepts, setSubconcepts] = useState([]);
+  const [concepts, setConcepts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [editingSubconcept, setEditingSubconcept] = useState(null);
+  const [filterConcept, setFilterConcept] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
@@ -34,10 +37,14 @@ export default function SubconceptosPage() {
       setLoading(true);
       setError(null);
 
-      // Load subconcepts only - no need for concepts and generals anymore
-      const subconceptsData = await subconceptService.getAll();
+      // Load both subconcepts and concepts
+      const [subconceptsData, conceptsData] = await Promise.all([
+        subconceptService.getAll(),
+        conceptService.getAll()
+      ]);
 
       setSubconcepts(subconceptsData);
+      setConcepts(conceptsData);
     } catch (err) {
       setError(err.message);
       console.error("Error loading data:", err);
@@ -78,8 +85,9 @@ export default function SubconceptosPage() {
   };
 
   const filteredSubconcepts = subconcepts.filter((subconcept) => {
+    const matchesConceptFilter = filterConcept === "all" || subconcept.conceptId === filterConcept;
     const matchesSearch = subconcept.name.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
+    return matchesConceptFilter && matchesSearch;
   });
 
   const breadcrumbs = [
@@ -137,6 +145,30 @@ export default function SubconceptosPage() {
         {/* Filters */}
         <div className="bg-white p-4 rounded-lg shadow">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+            <div className="flex space-x-4">
+              <div>
+                <label
+                  htmlFor="filterConcept"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Filtrar por concepto
+                </label>
+                <select
+                  id="filterConcept"
+                  value={filterConcept}
+                  onChange={(e) => setFilterConcept(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500"
+                >
+                  <option value="all">Todos los conceptos</option>
+                  {concepts.map((concept) => (
+                    <option key={concept.id} value={concept.id}>
+                      {concept.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            
             <div className="flex-1 max-w-md">
               <label
                 htmlFor="search"
@@ -203,6 +235,9 @@ export default function SubconceptosPage() {
                       Nombre
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Concepto
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Fecha de Creación
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -213,7 +248,7 @@ export default function SubconceptosPage() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredSubconcepts.length === 0 ? (
                     <tr>
-                      <td colSpan="3" className="px-6 py-12 text-center">
+                      <td colSpan="4" className="px-6 py-12 text-center">
                         <div className="text-gray-500">
                           <svg
                             className="mx-auto h-12 w-12 mb-4"
@@ -232,50 +267,58 @@ export default function SubconceptosPage() {
                             No hay subconceptos
                           </p>
                           <p className="text-sm">
-                            {searchTerm
-                              ? "No se encontraron subconceptos con el término de búsqueda"
+                            {searchTerm || filterConcept !== "all"
+                              ? "No se encontraron subconceptos con los filtros aplicados"
                               : "Comienza creando tu primer subconcepto"}
                           </p>
                         </div>
                       </td>
                     </tr>
                   ) : (
-                    filteredSubconcepts.map((subconcept) => (
-                      <tr key={subconcept.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {subconcept.name}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {subconcept.createdAt?.toDate
-                            ? subconcept.createdAt
-                                .toDate()
-                                .toLocaleDateString("es-ES")
-                            : "N/A"}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex items-center justify-end space-x-2">
-                            <button
-                              onClick={() => handleEditSubconcept(subconcept)}
-                              className="text-primary hover:text-blue-900 p-1"
-                              title="Editar"
-                            >
-                              <PencilIcon className="h-4 w-4" />
-                            </button>
-                            {userRole !== 'contador' && userRole !== 'director_general' && (
+                    filteredSubconcepts.map((subconcept) => {
+                      const concept = concepts.find(c => c.id === subconcept.conceptId);
+                      return (
+                        <tr key={subconcept.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {subconcept.name}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {concept ? concept.name : 'Sin asignar'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {subconcept.createdAt?.toDate
+                              ? subconcept.createdAt
+                                  .toDate()
+                                  .toLocaleDateString("es-ES")
+                              : "N/A"}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <div className="flex items-center justify-end space-x-2">
                               <button
-                                onClick={() => handleDeleteSubconcept(subconcept)}
-                                className="text-red-600 hover:text-red-900 p-1"
-                                title="Eliminar"
+                                onClick={() => handleEditSubconcept(subconcept)}
+                                className="text-primary hover:text-blue-900 p-1"
+                                title="Editar"
                               >
-                                <TrashIcon className="h-4 w-4" />
+                                <PencilIcon className="h-4 w-4" />
                               </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                              {userRole !== 'contador' && userRole !== 'director_general' && (
+                                <button
+                                  onClick={() => handleDeleteSubconcept(subconcept)}
+                                  className="text-red-600 hover:text-red-900 p-1"
+                                  title="Eliminar"
+                                >
+                                  <TrashIcon className="h-4 w-4" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -290,6 +333,7 @@ export default function SubconceptosPage() {
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleModalSuccess}
         initialData={editingSubconcept}
+        concepts={concepts}
       />
       
 

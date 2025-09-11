@@ -41,6 +41,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
   });
 
   const [generals, setGenerals] = useState([]);
+  const [concepts, setConcepts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingGenerals, setLoadingGenerals] = useState(false);
   const [generalsError, setGeneralsError] = useState(null);
@@ -68,6 +69,19 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
       }
     };
     loadGenerals();
+  }, []);
+
+  // Load concepts for SubconceptModal
+  useEffect(() => {
+    const loadConcepts = async () => {
+      try {
+        const allConcepts = await conceptService.getAll();
+        setConcepts(allConcepts.filter(c => c.type === "salida"));
+      } catch (err) {
+        console.error('Error loading concepts:', err);
+      }
+    };
+    loadConcepts();
   }, []);
 
   const formatNumberWithCommas = (value) => {
@@ -166,16 +180,11 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
       newErrors.subconceptId = "El subconcepto es requerido";
     }
 
-    if (!formData.description || formData.description.trim() === "") {
-      newErrors.description = "La descripción es requerida";
-    }
+    // Description is not required
+    // Provider is not required
 
     if (!formData.amount || parseFloat(formData.amount) <= 0) {
       newErrors.amount = "El monto debe ser mayor a 0";
-    }
-
-    if (!formData.providerId) {
-      newErrors.providerId = "El proveedor es requerido";
     }
 
     if (!formData.frequency) {
@@ -375,6 +384,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
             <ConceptSelector
               ref={conceptSelectorRef}
               type="salida"
+              generalId={formData.generalId}
               value={formData.conceptId}
               onChange={handleConceptChange}
               onCreateNew={() => setShowConceptModal(true)}
@@ -393,6 +403,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
             </label>
             <SubconceptSelector
               ref={subconceptSelectorRef}
+              conceptId={formData.conceptId}
               value={formData.subconceptId}
               onChange={handleSubconceptChange}
               onCreateNew={() => setShowSubconceptModal(true)}
@@ -486,7 +497,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Proveedor *
+              Proveedor
             </label>
             <ProviderSelector
               ref={providerSelectorRef}
@@ -497,7 +508,6 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
                   "Funcionalidad de crear proveedor será implementada próximamente"
                 )
               }
-              required
               disabled={loading}
             />
             {errors.providerId && (
@@ -531,7 +541,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
         {/* Descripción - Ancho completo */}
         <div>
           <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-            Descripción *
+            Descripción
           </label>
           <textarea
             id="description"
@@ -544,7 +554,6 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
             }`}
             placeholder="Describe el gasto recurrente..."
             disabled={loading}
-            required
           />
           {errors.description && (
             <p className="mt-1 text-sm text-red-600">{errors.description}</p>
@@ -598,6 +607,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
           isOpen={showConceptModal}
           onClose={() => setShowConceptModal(false)}
           onCreated={handleConceptCreated}
+          generals={generals}
         />
       )}
 
@@ -606,6 +616,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
           isOpen={showSubconceptModal}
           onClose={() => setShowSubconceptModal(false)}
           onCreated={handleSubconceptCreated}
+          concepts={concepts}
         />
       )}
     </div>

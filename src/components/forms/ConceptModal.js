@@ -7,20 +7,23 @@ const ConceptModal = ({
   onSuccess,
   type,
   initialData = null,
+  generals = [],
 }) => {
   const [formData, setFormData] = useState({
     name: initialData?.name || "",
     type: type || initialData?.type || "entrada",
+    generalId: initialData?.generalId || "",
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // Load data when modal opens - no need to load generals anymore
+  // Load data when modal opens
   useEffect(() => {
     if (isOpen && initialData) {
       setFormData({
         name: initialData.name || "",
         type: initialData.type || "entrada",
+        generalId: initialData.generalId || "",
       });
     }
   }, [isOpen, initialData]);
@@ -70,6 +73,7 @@ const ConceptModal = ({
       setFormData({
         name: "",
         type: type || "entrada",
+        generalId: "",
       });
     } catch (error) {
       setErrors({ submit: error.message });
@@ -176,7 +180,36 @@ const ConceptModal = ({
             )}
           </div>
 
-          
+          <div className="mb-4">
+            <label
+              htmlFor="generalId"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Categoría General *
+            </label>
+            <select
+              id="generalId"
+              name="generalId"
+              value={formData.generalId}
+              onChange={handleInputChange}
+              disabled={loading}
+              className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500 ${
+                errors.generalId ? "border-red-300" : "border-gray-300"
+              }`}
+            >
+              <option value="">Selecciona una categoría general</option>
+              {generals
+                .filter(general => general.type === formData.type)
+                .map((general) => (
+                  <option key={general.id} value={general.id}>
+                    {general.name}
+                  </option>
+                ))}
+            </select>
+            {errors.generalId && (
+              <p className="mt-1 text-sm text-red-600">{errors.generalId}</p>
+            )}
+          </div>
 
           <div className="flex justify-end space-x-3">
             <button

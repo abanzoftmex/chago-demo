@@ -5,10 +5,12 @@ const SubconceptModal = ({
   isOpen, 
   onClose, 
   onSuccess, 
-  initialData = null 
+  initialData = null,
+  concepts = []
 }) => {
   const [formData, setFormData] = useState({
-    name: initialData?.name || ''
+    name: initialData?.name || '',
+    conceptId: initialData?.conceptId || ''
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -16,7 +18,8 @@ const SubconceptModal = ({
   useEffect(() => {
     if (isOpen && initialData) {
       setFormData({
-        name: initialData.name || ''
+        name: initialData.name || '',
+        conceptId: initialData.conceptId || ''
       });
     }
   }, [isOpen, initialData]);
@@ -66,7 +69,8 @@ const SubconceptModal = ({
       
       // Reset form
       setFormData({
-        name: ''
+        name: '',
+        conceptId: ''
       });
       setErrors({});
     } catch (error) {
@@ -82,7 +86,8 @@ const SubconceptModal = ({
   const handleClose = () => {
     onClose();
     setFormData({
-      name: ''
+      name: '',
+      conceptId: ''
     });
     setErrors({});
   };
@@ -115,6 +120,35 @@ const SubconceptModal = ({
             </div>
           )}
 
+          <div className="mb-4">
+            <label
+              htmlFor="conceptId"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Concepto *
+            </label>
+            <select
+              id="conceptId"
+              name="conceptId"
+              value={formData.conceptId}
+              onChange={handleInputChange}
+              disabled={loading}
+              className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500 ${
+                errors.conceptId ? "border-red-300" : "border-gray-300"
+              }`}
+            >
+              <option value="">Selecciona un concepto</option>
+              {concepts.map((concept) => (
+                <option key={concept.id} value={concept.id}>
+                  {concept.name}
+                </option>
+              ))}
+            </select>
+            {errors.conceptId && (
+              <p className="mt-1 text-sm text-red-600">{errors.conceptId}</p>
+            )}
+          </div>
+
           {/* Name Field */}
           <div className="mb-6">
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
@@ -134,6 +168,33 @@ const SubconceptModal = ({
             />
             {errors.name && (
               <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+            )}
+          </div>
+
+          {/* Concept Field */}
+          <div className="mb-6">
+            <label htmlFor="conceptId" className="block text-sm font-medium text-gray-700 mb-2">
+              Concepto <span className="text-red-500">*</span>
+            </label>
+            <select
+              id="conceptId"
+              name="conceptId"
+              value={formData.conceptId}
+              onChange={handleInputChange}
+              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                errors.conceptId ? 'border-red-300' : 'border-gray-300'
+              }`}
+              disabled={loading}
+            >
+              <option value="">Selecciona un concepto</option>
+              {concepts.map((concept) => (
+                <option key={concept.id} value={concept.id}>
+                  {concept.name}
+                </option>
+              ))}
+            </select>
+            {errors.conceptId && (
+              <p className="mt-1 text-sm text-red-600">{errors.conceptId}</p>
             )}
           </div>
 

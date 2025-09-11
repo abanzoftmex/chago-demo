@@ -2,6 +2,7 @@ import React, { useState, useEffect, forwardRef, useImperativeHandle, useCallbac
 import { subconceptService } from '../../lib/services/subconceptService';
 
 const SubconceptSelector = forwardRef(({ 
+  conceptId,
   value, 
   onChange, 
   onCreateNew,
@@ -18,20 +19,30 @@ const SubconceptSelector = forwardRef(({
     try {
       setLoading(true);
       setError(null);
-      // Load all subconcepts - no concept filtering needed anymore
-      const data = await subconceptService.getAll();
-      setSubconcepts(data);
+      
+      if (!conceptId) {
+        // If no concept is selected, show empty list
+        setSubconcepts([]);
+        return;
+      }
+      
+      // Load all subconcepts and filter by conceptId
+      const allSubconcepts = await subconceptService.getAll();
+      const filteredSubconcepts = allSubconcepts.filter(subconcept => 
+        subconcept.conceptId === conceptId
+      );
+      setSubconcepts(filteredSubconcepts);
     } catch (err) {
       setError(err.message);
       console.error('Error loading subconcepts:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [conceptId]);
 
   useEffect(() => {
     loadSubconcepts();
-  }, [loadSubconcepts]);
+  }, [conceptId, loadSubconcepts]);
 
   const handleSelectChange = (e) => {
     const selectedValue = e.target.value;
@@ -77,10 +88,12 @@ const SubconceptSelector = forwardRef(({
         value={value || ''}
         onChange={handleSelectChange}
         required={required}
-        disabled={disabled}
+        disabled={disabled || !conceptId}
         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
       >
-        <option value="">{placeholder}</option>
+        <option value="">
+          {!conceptId ? "Primero selecciona un concepto" : placeholder}
+        </option>
         {subconcepts.map((s) => (
           <option key={s.id} value={s.id}>
             {s.name}
