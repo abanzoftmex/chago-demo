@@ -8,7 +8,7 @@ Se ha implementado un sistema de arrastre automático que calcula y registra el 
 ### 1. Cálculo Automático
 - **Frecuencia**: Cada 1° de mes a las 12:00 AM (medianoche)
 - **Endpoint**: `/api/cron/calculate-carryover`
-- **Configuración**: Schedule cron `"0 0 1 * *"` en `vercel.json`
+- **Configuración**: Schedule cron `"0 0 1 * *"` en `vercel.json`s
 
 ### 2. Lógica de Cálculo
 El sistema calcula automáticamente:
