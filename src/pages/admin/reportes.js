@@ -697,70 +697,7 @@ const Reportes = () => {
                   </div>
                 </div>
                 
-                {/* Información detallada del arrastre */}
-                {carryoverInfo && (
-                  <div className={`mt-4 p-4 border rounded-lg ${
-                    carryoverStatus.executed 
-                      ? 'bg-green-50 border-green-200' 
-                      : 'bg-blue-50 border-blue-200'
-                  }`}>
-                    <div className="flex justify-between items-center mb-2">
-                      <h5 className={`font-medium ${
-                        carryoverStatus.executed ? 'text-green-800' : 'text-blue-800'
-                      }`}>
-                        Detalle del Arrastre - {carryoverInfo.previousMonth}/{carryoverInfo.previousYear}
-                      </h5>
-                      {carryoverStatus.executed && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          <CheckCircleIcon className="h-3 w-3 mr-1" />
-                          Ejecutado
-                        </span>
-                      )}
-                      {!carryoverStatus.executed && carryoverStatus.canExecute && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                          <ClockIcon className="h-3 w-3 mr-1" />
-                          Pendiente
-                        </span>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <span className={carryoverStatus.executed ? 'text-green-600' : 'text-blue-600'}>
-                          Ingresos del mes:
-                        </span>
-                        <p className="font-semibold text-green-600">
-                          {formatCurrency(carryoverInfo.totalIngresos)}
-                        </p>
-                      </div>
-                      <div>
-                        <span className={carryoverStatus.executed ? 'text-green-600' : 'text-blue-600'}>
-                          Gastos pagados:
-                        </span>
-                        <p className="font-semibold text-red-600">
-                          {formatCurrency(carryoverInfo.totalGastosPagados)}
-                        </p>
-                      </div>
-                      <div>
-                        <span className={carryoverStatus.executed ? 'text-green-600' : 'text-blue-600'}>
-                          Saldo arrastrado:
-                        </span>
-                        <p className="font-semibold text-green-600">
-                          {formatCurrency(carryoverInfo.saldoArrastre)}
-                        </p>
-                      </div>
-                    </div>
-                    {carryoverStatus.executed && (
-                      <div className="mt-2 text-xs text-green-600">
-                        ✅ Este arrastre fue calculado automáticamente por el sistema
-                      </div>
-                    )}
-                    {!carryoverStatus.executed && carryoverStatus.canExecute && (
-                      <div className="mt-2 text-xs text-orange-600">
-                        ⏳ El sistema calculará automáticamente el arrastre el 1° del próximo mes
-                      </div>
-                    )}
-                  </div>
-                )}
+              
               </div>
             )}
           </div>
