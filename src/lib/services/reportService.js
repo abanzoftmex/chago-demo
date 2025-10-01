@@ -28,14 +28,39 @@ export const reportService = {
           }
         );
 
-        // Obtener TODAS las transacciones pendientes sin ningún filtro adicional
-        // El arrastre debe incluir TODOS los pendientes de todos los meses
+        // Obtener TODAS las transacciones pendientes hasta el mes del reporte
+        // Solo incluir gastos pendientes que sean del mes del reporte o anteriores
         const allTransactions = await transactionService.getAll();
+        const reportEndDate = new Date(filters.endDate);
+        const reportYear = reportEndDate.getFullYear();
+        const reportMonth = reportEndDate.getMonth(); // 0-based (0=enero, 11=diciembre)
 
-        // Filtrar manualmente para asegurar que obtenemos TODOS los pendientes
-        const allPendingTransactions = allTransactions.filter(transaction => 
-          transaction.type === 'salida' && transaction.status === 'pendiente'
-        );
+        // Filtrar gastos pendientes que sean hasta el mes del reporte (no meses futuros)
+        const allPendingTransactions = allTransactions.filter(transaction => {
+          if (transaction.type !== 'salida' || transaction.status !== 'pendiente') {
+            return false;
+          }
+          
+          const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
+          const transactionYear = transactionDate.getFullYear();
+          const transactionMonth = transactionDate.getMonth();
+          
+          // Solo incluir gastos pendientes hasta el mes del reporte
+          return (transactionYear < reportYear) || 
+                 (transactionYear === reportYear && transactionMonth <= reportMonth);
+        });
+
+        console.log('🔍 Filtrado de gastos pendientes por mes:', {
+          reportMonth: `${reportYear}-${String(reportMonth + 1).padStart(2, '0')}`,
+          totalPendingInSystem: allTransactions.filter(t => t.type === 'salida' && t.status === 'pendiente').length,
+          pendingUntilReportMonth: allPendingTransactions.length,
+          pendingByMonth: allPendingTransactions.reduce((acc, t) => {
+            const tDate = t.date?.toDate ? t.date.toDate() : new Date(t.date);
+            const monthKey = `${tDate.getFullYear()}-${String(tDate.getMonth() + 1).padStart(2, '0')}`;
+            acc[monthKey] = (acc[monthKey] || 0) + 1;
+            return acc;
+          }, {})
+        });
 
         // Debug específico: buscar transacciones de agosto 2025
         const augustTransactions = allTransactions.filter(transaction => {
@@ -118,7 +143,9 @@ export const reportService = {
         paymentStatus: {
           pendiente: { count: 0, amount: 0, carryover: 0 },
           parcial: { count: 0, amount: 0, carryover: 0 },
-          pagado: { count: 0, amount: 0, carryover: 0 }
+          pagado: { count: 0, amount: 0, carryover: 0 },
+          // Nueva categoría para gastos pendientes de meses anteriores
+          pendienteAnterior: { count: 0, amount: 0, carryover: 0 }
         },
         conceptBreakdown: {},
         generalBreakdown: {},
@@ -145,17 +172,11 @@ export const reportService = {
         console.log(`🔍 Buscando arrastre para mostrar en ${month}/${year}`);
         
         try {
-          // Buscar el arrastre que proviene del mes anterior
-          // Si estamos viendo septiembre, buscamos arrastre de agosto
-          // Si estamos viendo octubre, buscamos arrastre de septiembre
-          const previousMonth = month === 1 ? 12 : month - 1;
-          const previousYear = month === 1 ? year - 1 : year;
+          // Buscar el arrastre que viene HACIA este mes
+          // Si estamos viendo septiembre, buscamos el arrastre calculado PARA septiembre (desde agosto)
+          // Si estamos viendo octubre, buscamos el arrastre calculado PARA octubre (desde septiembre)
           
-          console.log(`🔍 Buscando arrastre del mes anterior: ${previousMonth}/${previousYear}`);
-          
-          // Buscar el documento de arrastre que fue generado desde el mes anterior
-          // Este documento tendrá month=mes_actual y previousMonth=mes_anterior
-          console.log(`🔍 Buscando carryover para año=${year}, mes=${month}`);
+          console.log(`🔍 Buscando arrastre calculado PARA ${month}/${year}`);
           monthlyCarryover = await carryoverService.getCarryoverForMonth(year, month);
           console.log('📊 Resultado de carryover desde registro:', monthlyCarryover);
           
@@ -203,7 +224,12 @@ export const reportService = {
 
       // Use the already declared hasDateFilter and define date range variables
       const startDate = hasDateFilter ? new Date(filters.startDate) : null;
-      const endDate = hasDateFilter ? new Date(filters.endDate) : null;
+      let endDate = null;
+      if (hasDateFilter) {
+        endDate = new Date(filters.endDate);
+        // Ajustar la fecha de fin para incluir todo el día (23:59:59)
+        endDate.setHours(23, 59, 59, 999);
+      }
 
     
       // Process transactions
@@ -216,21 +242,28 @@ export const reportService = {
         const month = transactionDate.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
 
         // Determine if this transaction is from the current period or carried over
-        // El arrastre incluye TODOS los pendientes de todos los meses (incluyendo el período actual)
-        // Para reportes, todas las transacciones pendientes contribuyen al arrastre
-        const isCarryover = transaction.status === 'pendiente' && transaction.type === 'salida';
+        // Solo las transacciones pendientes de MESES ANTERIORES son arrastre
+        // Las transacciones pendientes del período actual NO son arrastre
+        const isCarryover = transaction.status === 'pendiente' && 
+                           transaction.type === 'salida' && 
+                           hasDateFilter && 
+                           transactionDate < startDate;
         
         // Verificar si la transacción está dentro del período seleccionado
         const isInPeriod = !hasDateFilter || 
           (transactionDate >= startDate && transactionDate <= endDate);
 
-        // Log para transacciones de arrastre
-        if (transaction.isCarryover) {
-          console.log(`💰 Transacción de arrastre detectada:`, {
+        // Log para debugging de clasificación de transacciones
+        if (isInPeriod && transaction.type === 'salida') {
+          console.log(`🔍 Clasificando transacción:`, {
+            id: transaction.id.substring(0, 8),
+            date: transactionDate.toISOString().split('T')[0],
             amount,
-            date: transactionDate,
+            status: transaction.status,
+            isRecurring: transaction.isRecurring,
+            isCarryover,
             isInPeriod,
-            description: transaction.description
+            description: transaction.description?.substring(0, 30)
           });
         }
 
@@ -251,10 +284,18 @@ export const reportService = {
           }
         } else if (transaction.type === 'salida') {
           if (isInPeriod && !isCarryover) {
-            // Salidas del período que NO son pendientes
+            // Salidas del período actual (incluye pendientes del período)
             stats.totalSalidas += amount;
             stats.salidasCount++;
             stats.currentPeriodBalance -= amount;
+            
+            console.log(`✅ Contabilizando gasto del período:`, {
+              id: transaction.id.substring(0, 8),
+              amount,
+              status: transaction.status,
+              totalSalidas: stats.totalSalidas,
+              salidasCount: stats.salidasCount
+            });
           }
           
           if (isCarryover) {
@@ -271,16 +312,17 @@ export const reportService = {
           
           // Payment status (only for salidas)
           const status = transaction.status || 'pendiente';
-          if (stats.paymentStatus[status]) {
+          
+          if (isCarryover && status === 'pendiente') {
+            // Gastos pendientes de meses anteriores van a categoría especial
+            stats.paymentStatus.pendienteAnterior.count++;
+            stats.paymentStatus.pendienteAnterior.carryover += transaction.balance || amount;
+          } else if (stats.paymentStatus[status]) {
+            // Gastos del período actual (incluye pendientes del período)
             stats.paymentStatus[status].count++;
-            
-            if (isCarryover) {
-              // Todas las transacciones pendientes van al arrastre
-              stats.paymentStatus[status].carryover += transaction.balance || amount;
-            } else if (isInPeriod) {
-              // Solo las transacciones del período que NO son pendientes van al amount
-              stats.paymentStatus[status].amount += transaction.balance || amount;
-            }
+            // Para transacciones pagadas, usar amount; para pendientes, usar balance
+            const amountToAdd = status === 'pagado' ? amount : (transaction.balance || amount);
+            stats.paymentStatus[status].amount += amountToAdd;
           }
         }
 
@@ -361,8 +403,19 @@ export const reportService = {
         }
       });
 
-      // Calculate derived stats including carryover income
-      stats.totalBalance = stats.currentPeriodBalance + stats.carryoverBalance + stats.carryoverIncome;
+      // Calculate derived stats
+      // IMPORTANTE: Los gastos pendientes NO deben reducir el arrastre
+      // El arrastre (carryoverIncome) es saldo positivo disponible
+      // Los gastos pendientes (carryoverBalance) son obligaciones futuras, no reducen el saldo actual
+      stats.totalBalance = stats.currentPeriodBalance + stats.carryoverIncome;
+      
+      console.log('💰 Cálculo de balance corregido:', {
+        currentPeriodBalance: stats.currentPeriodBalance,
+        carryoverIncome: stats.carryoverIncome,
+        carryoverBalance: stats.carryoverBalance,
+        totalBalance: stats.totalBalance,
+        note: 'Gastos pendientes NO reducen el balance total'
+      });
       stats.averageEntrada = stats.entradasCount > 0 ? stats.totalEntradas / stats.entradasCount : 0;
       stats.averageSalida = stats.salidasCount > 0 ? stats.totalSalidas / stats.salidasCount : 0;
 
@@ -374,7 +427,10 @@ export const reportService = {
         carryoverIncome: stats.carryoverIncome,
         currentPeriodBalance: stats.currentPeriodBalance,
         carryoverBalance: stats.carryoverBalance,
-        totalBalance: stats.totalBalance
+        totalBalance: stats.totalBalance,
+        generalBreakdownCount: Object.keys(stats.generalBreakdown).length,
+        conceptBreakdownCount: Object.keys(stats.conceptBreakdown).length,
+        providerBreakdownCount: Object.keys(stats.providerBreakdown).length
       });
 
       return stats;

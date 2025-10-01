@@ -76,7 +76,7 @@ const Reportes = () => {
     // Update month name
     updateMonthName(newDate);
 
-    // Update filters
+    // Update filters with proper time handling
     setFilters((prev) => ({
       ...prev,
       startDate: startOfMonth.toISOString().split("T")[0],
@@ -123,10 +123,24 @@ const Reportes = () => {
     try {
       setLoading(true);
 
+      // Construir fechas correctamente para evitar problemas de zona horaria
+      let startDate = null;
+      let endDate = null;
+      
+      if (filters.startDate) {
+        const startParts = filters.startDate.split('-');
+        startDate = new Date(parseInt(startParts[0]), parseInt(startParts[1]) - 1, parseInt(startParts[2]));
+      }
+      
+      if (filters.endDate) {
+        const endParts = filters.endDate.split('-');
+        endDate = new Date(parseInt(endParts[0]), parseInt(endParts[1]) - 1, parseInt(endParts[2]));
+      }
+
       const filterData = {
         ...filters,
-        startDate: filters.startDate ? new Date(filters.startDate) : null,
-        endDate: filters.endDate ? new Date(filters.endDate) : null,
+        startDate: startDate,
+        endDate: endDate,
         conceptId: filters.conceptId || null,
         subconceptId: filters.subconceptId || null,
       };
@@ -177,16 +191,35 @@ const Reportes = () => {
 
   const loadCarryoverTransactions = async () => {
     try {
-      // Get ALL pending transactions regardless of date
+      // Get ALL pending transactions but filter by month like the backend
       const allTransactions = await transactionService.getAll({
         type: 'salida',
         status: 'pendiente'
       });
 
-      // All pending transactions are considered carryover
-      const pendingFromPrevious = allTransactions.filter(transaction => 
-        transaction.status === 'pendiente'
-      );
+      // Filter pending transactions to only include those up to the report month
+      const reportEndDate = new Date(filters.endDate);
+      const reportYear = reportEndDate.getFullYear();
+      const reportMonth = reportEndDate.getMonth(); // 0-based
+
+      const pendingFromPrevious = allTransactions.filter(transaction => {
+        if (transaction.status !== 'pendiente') return false;
+        
+        const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
+        const transactionYear = transactionDate.getFullYear();
+        const transactionMonth = transactionDate.getMonth();
+        
+        // Only include pending transactions up to the report month
+        return (transactionYear < reportYear) || 
+               (transactionYear === reportYear && transactionMonth <= reportMonth);
+      });
+
+      console.log('🔍 Frontend - Filtrado de gastos pendientes:', {
+        reportMonth: `${reportYear}-${String(reportMonth + 1).padStart(2, '0')}`,
+        totalPendingInSystem: allTransactions.length,
+        pendingUntilReportMonth: pendingFromPrevious.length,
+        filteredOut: allTransactions.length - pendingFromPrevious.length
+      });
 
       // Get reference data for display
       const [conceptsData, providersData, generalsData] = await Promise.all([
@@ -677,9 +710,21 @@ const Reportes = () => {
                       Gastos Pendientes
                     </h4>
                     <p
-                      className={`text-2xl font-bold ${stats.carryoverBalance >= 0 ? "text-green-600" : "text-red-600"}`}
+                      className={`text-2xl font-bold text-red-600`}
                     >
-                      {formatCurrency(stats.carryoverBalance)}
+                      {(() => {
+                        // Sumar gastos pendientes del período actual + meses anteriores
+                        const pendientesActuales = stats.paymentStatus?.pendiente?.amount || 0;
+                        const pendientesAnteriores = stats.paymentStatus?.pendienteAnterior?.carryover || 0;
+                        const totalPendientes = pendientesActuales + pendientesAnteriores;
+                        console.log('💰 Calculando gastos pendientes totales:', {
+                          pendientesActuales,
+                          pendientesAnteriores,
+                          totalPendientes,
+                          carryoverBalance: stats.carryoverBalance
+                        });
+                        return formatCurrency(-Math.abs(totalPendientes));
+                      })()}
                     </p>
                     <p className="text-sm text-orange-600">
                       Todos los pendientes
@@ -711,7 +756,7 @@ const Reportes = () => {
               Estado de Gastos
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <div className="flex justify-between items-start">
                   <h4 className="font-medium text-green-800">Pagados</h4>
@@ -777,17 +822,6 @@ const Reportes = () => {
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                 <div className="flex justify-between items-start">
                   <h4 className="font-medium text-red-800">Pendientes</h4>
-                  {stats.paymentStatus.pendiente.carryover > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs text-red-700 hover:bg-red-100 -mt-1 -mr-1"
-                      onClick={loadCarryoverTransactions}
-                    >
-                      <EyeIcon className="h-3 w-3 mr-1" />
-                      Ver pendientes
-                    </Button>
-                  )}
                 </div>
                 <p className="text-2xl font-bold text-red-600">
                   {stats.paymentStatus.pendiente.count}
@@ -797,12 +831,32 @@ const Reportes = () => {
                     Período:{" "}
                     {formatCurrency(stats.paymentStatus.pendiente.amount)}
                   </p>
-                  {stats.paymentStatus.pendiente.carryover > 0 && (
-                    <p className="text-xs text-red-500">
-                      Pendientes:{" "}
-                      {formatCurrency(stats.paymentStatus.pendiente.carryover)}
-                    </p>
+                </div>
+              </div>
+
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <div className="flex justify-between items-start">
+                  <h4 className="font-medium text-orange-800">Del mes anterior</h4>
+                  {stats.paymentStatus.pendienteAnterior.count > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-orange-700 hover:bg-orange-100 -mt-1 -mr-1"
+                      onClick={loadCarryoverTransactions}
+                    >
+                      <EyeIcon className="h-3 w-3 mr-1" />
+                      Ver detalles
+                    </Button>
                   )}
+                </div>
+                <p className="text-2xl font-bold text-orange-600">
+                  {stats.paymentStatus.pendienteAnterior.count}
+                </p>
+                <div className="space-y-1">
+                  <p className="text-sm text-orange-600">
+                    Meses anteriores:{" "}
+                    {formatCurrency(stats.paymentStatus.pendienteAnterior.carryover)}
+                  </p>
                 </div>
               </div>
             </div>

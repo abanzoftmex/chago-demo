@@ -35,10 +35,12 @@ export const carryoverService = {
       console.log(`Calculando arrastre para ${month}/${year} basado en ${prevMonth}/${prevYear}`);
       console.log(`Rango: ${startDate.toISOString()} - ${endDate.toISOString()}`);
 
-      // Obtener todas las transacciones del mes anterior
+      // Obtener todas las transacciones del mes anterior usando el mismo método que los reportes
       const transactions = await transactionService.getByDateRange(startDate, endDate);
+      
+      console.log(`🔍 ARRASTRE: Transacciones obtenidas del ${startDate.toISOString().split('T')[0]} al ${endDate.toISOString().split('T')[0]}: ${transactions.length}`);
 
-      // Calcular totales del mes anterior
+      // Calcular totales del mes anterior (método manual por ahora)
       let totalIngresos = 0;
       let totalGastosPagados = 0;
 
@@ -52,6 +54,8 @@ export const carryoverService = {
           }
         }
       });
+      
+      console.log(`📊 ARRASTRE: Totales calculados - Ingresos: ${totalIngresos}, Gastos pagados: ${totalGastosPagados}`);
 
       // Obtener el arrastre que tenía el mes anterior (si existía)
       let arrastePrevio = 0;
