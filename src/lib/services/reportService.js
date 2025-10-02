@@ -511,7 +511,6 @@ export const reportService = {
         .map(transaction => {
           const isIncome = transaction.type === 'entrada';
           const totalPaid = transaction.totalPaid || 0;
-          const balance = transaction.balance || (transaction.type === 'salida' ? transaction.amount - totalPaid : 0);
           
           return {
             'Fecha': new Date(transaction.date?.toDate ? transaction.date.toDate() : transaction.date)
@@ -523,7 +522,6 @@ export const reportService = {
             'Ingreso': isIncome ? transaction.amount : '',
             'Gasto': !isIncome ? transaction.amount : '',
             'Total Pagado': !isIncome ? totalPaid : '',
-            'Saldo': !isIncome ? balance : '',
             '_sortOrder': isIncome ? 0 : 1 // Para ordenar entradas primero
           };
         })
@@ -541,7 +539,10 @@ export const reportService = {
           return cleanTransaction;
         });
 
-      // Agregar filas de totales al final
+      // Agregar filas de totales al final (sin gastos pendientes)
+      // Calcular balance sin gastos pendientes: solo entradas del período + arrastre de ingresos - gastos del período
+      const balanceSinPendientes = stats.totalEntradas + (stats.carryoverIncome || 0) - Math.abs(stats.totalSalidas);
+      
       transactionsData.push(
         {}, // Fila vacía para separar
         {
@@ -552,8 +553,7 @@ export const reportService = {
           'Proveedor': 'TOTALES:',
           'Ingreso': '',
           'Gasto': '',
-          'Total Pagado': '',
-          'Saldo': ''
+          'Total Pagado': ''
         },
         {
           'Fecha': '',
@@ -562,9 +562,8 @@ export const reportService = {
           'Concepto': '',
           'Proveedor': 'Total Ingresos:',
           'Ingreso': '',
-          'Gasto': '',
-          'Total Pagado': '',
-          'Saldo': `$${stats.totalEntradas.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
+          'Gasto': `$${stats.totalEntradas.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+          'Total Pagado': ''
         },
         {
           'Fecha': '',
@@ -573,9 +572,8 @@ export const reportService = {
           'Concepto': '',
           'Proveedor': 'Total Gastos:',
           'Ingreso': '',
-          'Gasto': '',
-          'Total Pagado': '',
-          'Saldo': `$${Math.abs(stats.totalSalidas).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
+          'Gasto': `$${Math.abs(stats.totalSalidas).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+          'Total Pagado': ''
         },
         {
           'Fecha': '',
@@ -584,27 +582,8 @@ export const reportService = {
           'Concepto': '',
           'Proveedor': 'Ingresos del mes anterior:',
           'Ingreso': '',
-          'Gasto': '',
-          'Total Pagado': '',
-          'Saldo': `$${(stats.carryoverIncome || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
-        },
-        {
-          'Fecha': '',
-          'Tipo': '',
-          'General': '',
-          'Concepto': '',
-          'Proveedor': 'Gastos pendientes:',
-          'Ingreso': '',
-          'Gasto': '',
-          'Total Pagado': '',
-          'Saldo': (() => {
-            // Calcular total de gastos pendientes (carryover + período actual)
-            const pendientesCarryover = stats.paymentStatus?.pendiente?.carryover || 0;
-            const pendientesAmount = stats.paymentStatus?.pendiente?.amount || 0;
-            const totalPendientes = pendientesCarryover + pendientesAmount;
-            console.log('💰 Calculando gastos pendientes para Excel:', { pendientesCarryover, pendientesAmount, totalPendientes });
-            return `-$${Math.abs(totalPendientes).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
-          })()
+          'Gasto': `$${(stats.carryoverIncome || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+          'Total Pagado': ''
         },
         {}, // Fila vacía para separar
         {
@@ -614,16 +593,15 @@ export const reportService = {
           'Concepto': '',
           'Proveedor': 'BALANCE FINAL:',
           'Ingreso': '',
-          'Gasto': '',
-          'Total Pagado': '',
-          'Saldo': `${stats.totalBalance >= 0 ? '+' : ''}$${Math.abs(stats.totalBalance).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
+          'Gasto': `${balanceSinPendientes >= 0 ? '+' : ''}$${Math.abs(balanceSinPendientes).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+          'Total Pagado': ''
         }
       );
 
       const transactionsSheet = XLSX.utils.json_to_sheet(transactionsData);
       XLSX.utils.book_append_sheet(workbook, transactionsSheet, 'Transacciones');
 
-      // Summary sheet
+      // Summary sheet (sin gastos pendientes)
       const summaryData = [
         ['Estadística', 'Valor'],
         ['Total de Transacciones', stats.totalTransactions],
@@ -633,18 +611,11 @@ export const reportService = {
         [''],
         ['Arrastre del Mes Anterior', ''],
         ['Ingresos del mes anterior', `${(stats.carryoverIncome || 0).toLocaleString('es-MX')}`],
-        ['Gastos pendientes', `${Math.abs(stats.carryoverBalance || 0).toLocaleString('es-MX')}`],
-        ['Total Arrastre', `${((stats.carryoverIncome || 0) + (stats.carryoverBalance || 0)).toLocaleString('es-MX')}`],
         [''],
-        ['Balance Total Final', `${stats.totalBalance.toLocaleString('es-MX')}`],
+        ['Balance Total Final', `${balanceSinPendientes.toLocaleString('es-MX')}`],
         [''],
         ['Promedio Entradas', `${stats.averageEntrada.toLocaleString('es-MX')}`],
-        ['Promedio Salidas', `${stats.averageSalida.toLocaleString('es-MX')}`],
-        [''],
-        ['Estado de Pagos', ''],
-        ['Pendientes', `${stats.paymentStatus.pendiente.count} (${stats.paymentStatus.pendiente.amount.toLocaleString('es-MX')})`],
-        ['Parciales', `${stats.paymentStatus.parcial.count} (${stats.paymentStatus.parcial.amount.toLocaleString('es-MX')})`],
-        ['Pagados', `${stats.paymentStatus.pagado.count} (${stats.paymentStatus.pagado.amount.toLocaleString('es-MX')})`]
+        ['Promedio Salidas', `${stats.averageSalida.toLocaleString('es-MX')}`]
       ];
 
       const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);

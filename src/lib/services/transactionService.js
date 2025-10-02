@@ -13,7 +13,8 @@ import {
   startAfter,
   serverTimestamp,
 } from "firebase/firestore";
-import { db } from "../firebase/firebaseConfig";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { db, storage } from "../firebase/firebaseConfig";
 import { logService } from "./logService";
 
 const COLLECTION_NAME = "transactions";
@@ -452,5 +453,161 @@ export const transactionService = {
       console.error("Error creating initial expense:", error);
       throw new Error("Error al crear el gasto inicial");
     }
+  },
+
+  // Upload file to Firebase Storage for transactions
+  async uploadFile(file, transactionId) {
+    try {
+      console.log("TransactionService - Starting file upload:", {
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+      });
+
+      // Validate file
+      const validation = this.validateFile(file);
+      if (!validation.isValid) {
+        throw new Error(validation.error);
+      }
+
+      // Create unique filename
+      const timestamp = Date.now();
+      const fileName = `${timestamp}_${file.name}`;
+      const filePath = `transactions/${transactionId}/${fileName}`;
+
+      // Upload file with metadata
+      const storageRef = ref(storage, filePath);
+      const metadata = {
+        contentType: file.type || 'application/octet-stream',
+        customMetadata: {
+          originalFileName: file.name,
+          uploadedAt: new Date().toISOString()
+        }
+      };
+      
+      const snapshot = await uploadBytes(storageRef, file, metadata);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+
+      return {
+        fileName,
+        fileUrl: downloadURL,
+        fileType: file.type,
+        fileSize: file.size,
+        uploadedAt: new Date(),
+      };
+    } catch (error) {
+      console.error("TransactionService - Error uploading file:", error);
+      throw new Error("Error al subir el archivo");
+    }
+  },
+
+  // Delete file from Firebase Storage
+  async deleteFile(fileName, transactionId) {
+    try {
+      const filePath = `transactions/${transactionId}/${fileName}`;
+      const storageRef = ref(storage, filePath);
+      await deleteObject(storageRef);
+      console.log(`File ${fileName} deleted successfully from storage`);
+      return true;
+    } catch (error) {
+      // Don't throw error if file doesn't exist - this is expected behavior
+      if (error.code === "storage/object-not-found") {
+        console.log(`File ${fileName} was already deleted or doesn't exist in storage - this is OK`);
+        return true;
+      }
+      
+      // For other storage errors, log but don't throw to avoid breaking the flow
+      console.error("Storage error when deleting file:", error);
+      throw new Error("Error al eliminar el archivo del almacenamiento");
+    }
+  },
+
+  // Remove attachment from transaction
+  async removeAttachment(transactionId, fileName, user) {
+    try {
+      const transaction = await this.getById(transactionId);
+
+      // Remove attachment from array
+      const updatedAttachments = (transaction.attachments || []).filter(
+        (attachment) => attachment.fileName !== fileName
+      );
+
+      // Try to delete file from storage (don't fail if file doesn't exist)
+      try {
+        await this.deleteFile(fileName, transactionId);
+      } catch (storageError) {
+        // Log the storage error but don't fail the entire operation
+        console.warn("Storage deletion warning (continuing with database update):", storageError);
+      }
+
+      // Update transaction document
+      await this.update(transactionId, { attachments: updatedAttachments }, user);
+
+      return true;
+    } catch (error) {
+      console.error("Error removing attachment:", error);
+      throw new Error("Error al eliminar el archivo adjunto");
+    }
+  },
+
+  // Add attachments to transaction
+  async addAttachments(transactionId, files, user) {
+    try {
+      const transaction = await this.getById(transactionId);
+      const existingAttachments = transaction.attachments || [];
+      const newAttachments = [];
+
+      // Upload new files
+      for (const file of files) {
+        const attachment = await this.uploadFile(file, transactionId);
+        newAttachments.push(attachment);
+      }
+
+      // Combine with existing attachments
+      const allAttachments = [...existingAttachments, ...newAttachments];
+
+      // Update transaction
+      await this.update(transactionId, { attachments: allAttachments }, user);
+
+      return allAttachments;
+    } catch (error) {
+      console.error("Error adding attachments:", error);
+      throw new Error("Error al agregar archivos adjuntos");
+    }
+  },
+
+  // Validate file
+  validateFile(file) {
+    const maxSize = 10 * 1024 * 1024; // 10MB (más generoso que pagos)
+    const allowedTypes = [
+      "image/jpeg", 
+      "image/jpg", 
+      "image/png", 
+      "image/gif", 
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "text/plain"
+    ];
+
+    if (!file) {
+      return { isValid: false, error: "No se ha seleccionado ningún archivo" };
+    }
+
+    if (file.size > maxSize) {
+      return { 
+        isValid: false, 
+        error: `El archivo es muy grande. Tamaño máximo permitido: ${(maxSize / 1024 / 1024).toFixed(1)}MB` 
+      };
+    }
+
+    if (!allowedTypes.includes(file.type)) {
+      return { 
+        isValid: false, 
+        error: "Tipo de archivo no permitido. Formatos permitidos: JPG, PNG, GIF, PDF, DOC, DOCX, TXT" 
+      };
+    }
+
+    return { isValid: true };
   },
 };

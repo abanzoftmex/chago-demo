@@ -3,6 +3,7 @@ import { useAuth } from "../../../../context/AuthContext";
 import { useRouter } from "next/router";
 import AdminLayout from "../../../../components/layout/AdminLayout";
 import PaymentManager from "../../../../components/forms/PaymentManager";
+import FileUpload from "../../../../components/ui/FileUpload";
 import { transactionService } from "../../../../lib/services/transactionService";
 import { conceptService } from "../../../../lib/services/conceptService";
 import { subconceptService } from "../../../../lib/services/subconceptService";
@@ -149,6 +150,13 @@ const TransactionDetail = () => {
   const [showProviderModal, setShowProviderModal] = useState(false);
   const [deleteReasonError, setDeleteReasonError] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  
+  // Estados para manejo de archivos
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [showFileUpload, setShowFileUpload] = useState(false);
+  const [fileToDelete, setFileToDelete] = useState(null);
+  const [showDeleteFileModal, setShowDeleteFileModal] = useState(false);
+  const [deletingFile, setDeletingFile] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -395,6 +403,66 @@ const TransactionDetail = () => {
     }
   };
 
+  // Funciones para manejo de archivos de la transacción
+  const handleDeleteFile = (attachment) => {
+    setFileToDelete(attachment);
+    setShowDeleteFileModal(true);
+  };
+
+  const confirmDeleteFile = async () => {
+    if (!fileToDelete) return;
+    
+    setDeletingFile(true);
+    try {
+      await transactionService.removeAttachment(id, fileToDelete.fileName, user);
+      
+      // Actualizar el estado local
+      setTransaction(prev => ({
+        ...prev,
+        attachments: prev.attachments.filter(att => att.fileName !== fileToDelete.fileName)
+      }));
+      
+      setError("");
+      console.log("File deleted successfully from transaction");
+    } catch (err) {
+      console.error("Error deleting file from transaction:", err);
+      // Only show error if it's not a storage/object-not-found error
+      if (!err.message.includes("storage/object-not-found") && !err.message.includes("Object") && !err.message.includes("does not exist")) {
+        setError(err.message || "Error al eliminar el archivo");
+      } else {
+        // File was already deleted from storage, but we can still remove it from the database
+        console.log("File was already deleted from storage, but removed from database successfully");
+        setError("");
+      }
+    } finally {
+      setDeletingFile(false);
+      setShowDeleteFileModal(false);
+      setFileToDelete(null);
+    }
+  };
+
+  const handleUploadFiles = async (files) => {
+    setUploadingFiles(true);
+    try {
+      const newAttachments = await transactionService.addAttachments(id, files, user);
+      
+      // Actualizar el estado local
+      setTransaction(prev => ({
+        ...prev,
+        attachments: newAttachments
+      }));
+      
+      setError("");
+      console.log(`${files.length} file(s) uploaded successfully`);
+      setShowFileUpload(false);
+    } catch (err) {
+      console.error("Error uploading files:", err);
+      setError(err.message || "Error al subir los archivos");
+    } finally {
+      setUploadingFiles(false);
+    }
+  };
+
   if (loading) {
     return (
       <AdminLayout>
@@ -572,12 +640,25 @@ const TransactionDetail = () => {
           <div className="border border-border rounded-lg p-4 bg-background">
              <h2 className="text-sm font-medium mb-3">Información Adicional</h2>
             <div className="space-y-3">
-              {transaction.attachments && Array.isArray(transaction.attachments) && transaction.attachments.length > 0 && (
-                <div>
-                  <div className="flex items-center space-x-2 mb-2">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-2">
                     <Paperclip className="w-4 h-4 text-primary" />
-                    <span className="text-sm font-medium">Adjuntos de la transacción ({transaction.attachments.length})</span>
+                    <span className="text-sm font-medium">
+                      Adjuntos de la transacción ({transaction.attachments?.length || 0})
+                    </span>
                   </div>
+                  <button
+                    onClick={() => setShowFileUpload(true)}
+                    className="inline-flex items-center px-3 py-1 text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                    disabled={uploadingFiles}
+                  >
+                    <Plus className="w-3 h-3 mr-1" />
+                    Agregar archivos
+                  </button>
+                </div>
+                
+                {transaction.attachments && Array.isArray(transaction.attachments) && transaction.attachments.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {transaction.attachments.map((attachment, idx) => (
                       <div key={idx} className="border border-border rounded p-3 bg-background">
@@ -593,13 +674,24 @@ const TransactionDetail = () => {
                           >
                             <Eye className="w-3 h-3 mr-1" /> Ver
                           </button>
-                         
+                          <button
+                            onClick={() => handleDeleteFile(attachment)}
+                            className="py-1 px-3 text-xs bg-red-100 text-red-600 hover:bg-red-200 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-500 flex items-center rounded-sm"
+                            title="Eliminar archivo"
+                          >
+                            <Trash className="w-3 h-3 mr-1" /> Eliminar
+                          </button>
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="text-center py-4 text-gray-500">
+                    <Paperclip className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                    <p className="text-sm">No hay archivos adjuntos</p>
+                  </div>
+                )}
+              </div>
               {transaction.reference && (
                 <div className="flex items-start space-x-3">
                   <FileText className="w-4 h-4 text-primary mt-0.5" />
@@ -890,6 +982,127 @@ const TransactionDetail = () => {
         )}
       </div>
       
+      {/* Modal para subir archivos */}
+      {showFileUpload && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
+            <div className="p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Agregar archivos adjuntos</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Selecciona los archivos que deseas agregar a esta transacción
+              </p>
+            </div>
+            <div className="p-4">
+              <FileUpload
+                onUpload={handleUploadFiles}
+                existingFiles={[]}
+                multiple={true}
+                disabled={uploadingFiles}
+                acceptedTypes={[
+                  "image/jpeg", 
+                  "image/jpg", 
+                  "image/png", 
+                  "image/gif", 
+                  "application/pdf",
+                  "application/msword",
+                  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                  "text/plain"
+                ]}
+                maxSize={10 * 1024 * 1024} // 10MB
+              />
+              {uploadingFiles && (
+                <div className="mt-4 text-center">
+                  <div className="inline-flex items-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Subiendo archivos...
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setShowFileUpload(false)}
+                disabled={uploadingFiles}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:ring-2 focus:ring-gray-500"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para confirmar eliminación de archivo */}
+      {showDeleteFileModal && fileToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Confirmar eliminación</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                ¿Estás seguro de que deseas eliminar este archivo?
+              </p>
+            </div>
+            <div className="p-4">
+              <div className="flex items-center space-x-3">
+                <FileText className="w-8 h-8 text-gray-400" />
+                <div>
+                  <p className="font-medium text-gray-900">{fileToDelete.fileName}</p>
+                  <p className="text-sm text-gray-500">{fileToDelete.fileType}</p>
+                </div>
+              </div>
+              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                <div className="flex">
+                  <AlertCircle className="w-5 h-5 text-yellow-400" />
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-yellow-800">
+                      Esta acción no se puede deshacer
+                    </h3>
+                    <p className="mt-1 text-sm text-yellow-700">
+                      El archivo será eliminado permanentemente del servidor.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 border-t flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteFileModal(false);
+                  setFileToDelete(null);
+                }}
+                disabled={deletingFile}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:ring-2 focus:ring-gray-500"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteFile}
+                disabled={deletingFile}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:ring-2 focus:ring-red-500"
+              >
+                {deletingFile ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Eliminando...
+                  </>
+                ) : (
+                  <>Eliminar archivo</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Provider Details Modal */}
       {provider && (
         <ProviderDetailsModal

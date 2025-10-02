@@ -126,12 +126,12 @@ const Reportes = () => {
       // Construir fechas correctamente para evitar problemas de zona horaria
       let startDate = null;
       let endDate = null;
-      
+
       if (filters.startDate) {
         const startParts = filters.startDate.split('-');
         startDate = new Date(parseInt(startParts[0]), parseInt(startParts[1]) - 1, parseInt(startParts[2]));
       }
-      
+
       if (filters.endDate) {
         const endParts = filters.endDate.split('-');
         endDate = new Date(parseInt(endParts[0]), parseInt(endParts[1]) - 1, parseInt(endParts[2]));
@@ -149,11 +149,11 @@ const Reportes = () => {
       const now = new Date();
       const currentYear = now.getFullYear();
       const currentMonth = now.getMonth() + 1;
-      
+
       if (filterData.startDate && filterData.endDate) {
         const filterYear = filterData.startDate.getFullYear();
         const filterMonth = filterData.startDate.getMonth() + 1;
-        
+
         // Si estamos viendo el mes actual, verificar arrastre automáticamente
         if (filterYear === currentYear && filterMonth === currentMonth) {
           console.log('Verificando cálculo de arrastre automático para el mes actual...');
@@ -204,14 +204,14 @@ const Reportes = () => {
 
       const pendingFromPrevious = allTransactions.filter(transaction => {
         if (transaction.status !== 'pendiente') return false;
-        
+
         const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
         const transactionYear = transactionDate.getFullYear();
         const transactionMonth = transactionDate.getMonth();
-        
+
         // Only include pending transactions up to the report month
-        return (transactionYear < reportYear) || 
-               (transactionYear === reportYear && transactionMonth <= reportMonth);
+        return (transactionYear < reportYear) ||
+          (transactionYear === reportYear && transactionMonth <= reportMonth);
       });
 
       console.log('🔍 Frontend - Filtrado de gastos pendientes:', {
@@ -252,16 +252,16 @@ const Reportes = () => {
         if (filters.startDate instanceof Date) {
           startDateStr = filters.startDate.toISOString().split('T')[0];
         }
-        
+
         const startDateParts = startDateStr.split('-');
         const year = parseInt(startDateParts[0]);
         const month = parseInt(startDateParts[1]);
-        
+
         console.log(`🔍 checkCarryoverStatus: startDate=${startDateStr}, year=${year}, month=${month}`);
-        
+
         const status = await reportService.getCarryoverStatus(year, month);
         console.log(`📊 checkCarryoverStatus: status recibido:`, status);
-        
+
         setCarryoverStatus(status);
         setCarryoverInfo(status.data);
       }
@@ -521,7 +521,7 @@ const Reportes = () => {
               >
                 {loading ? "Generando..." : "Generar Reporte"}
               </Button>
-              
+
               {/* Switch para mostrar/ocultar ingresos */}
               <div className="flex items-center space-x-2">
                 <label className="text-sm font-medium text-foreground">
@@ -530,14 +530,12 @@ const Reportes = () => {
                 <button
                   type="button"
                   onClick={toggleShowIncomeInBreakdown}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                    showIncomeInBreakdown ? 'bg-blue-600' : 'bg-gray-200'
-                  }`}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${showIncomeInBreakdown ? 'bg-blue-600' : 'bg-gray-200'
+                    }`}
                 >
                   <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      showIncomeInBreakdown ? 'translate-x-6' : 'translate-x-1'
-                    }`}
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${showIncomeInBreakdown ? 'translate-x-6' : 'translate-x-1'
+                      }`}
                   />
                 </button>
               </div>
@@ -572,7 +570,7 @@ const Reportes = () => {
         {stats && (
           <div className="space-y-6">
             {/* Current Period Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="bg-background rounded-lg border border-border p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -589,6 +587,7 @@ const Reportes = () => {
                   <CurrencyDollarIcon className="h-8 w-8 text-green-600" />
                 </div>
               </div>
+
 
               <div className="bg-background rounded-lg border border-border p-6">
                 <div className="flex items-center justify-between">
@@ -607,6 +606,7 @@ const Reportes = () => {
                 </div>
               </div>
 
+              {/* Balance Total
               <div className="bg-background rounded-lg border border-border p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -626,7 +626,7 @@ const Reportes = () => {
                     className={`h-8 w-8 ${stats.totalBalance >= 0 ? "text-green-600" : "text-red-600"}`}
                   />
                 </div>
-              </div>
+              </div> */}
 
               <div className="bg-background rounded-lg border border-border p-6">
                 <div className="flex items-center justify-between">
@@ -650,101 +650,124 @@ const Reportes = () => {
             {(stats.carryoverBalance !== 0 ||
               stats.carryoverIncome !== 0 ||
               stats.currentPeriodBalance !== 0) && (
-              <div className="bg-background rounded-lg border border-border p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold text-foreground flex items-center">
-                    <ChartBarIcon className="h-5 w-5 mr-2" />
-                    Desglose de Balance
-                  </h3>
-                  {/* Estado del arrastre automático */}
-                  <div className="flex items-center space-x-2">
-                    {carryoverStatus.calculated && (
-                      <span className="text-xs text-green-600 flex items-center">
-                        <CheckCircleIcon className="h-4 w-4 mr-1" />
-                        Arrastre calculado automáticamente
+                <div className="bg-background rounded-lg border border-border p-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-foreground flex items-center">
+                      <ChartBarIcon className="h-5 w-5 mr-2" />
+                      Desglose de Balance
+                    </h3>
+                    {/* Estado del arrastre automático */}
+                    <div className="flex items-center space-x-2">
+                      {carryoverStatus.calculated && (
+                        <span className="text-xs text-green-600 flex items-center">
+                          <CheckCircleIcon className="h-4 w-4 mr-1" />
+                          Arrastre calculado automáticamente
+                        </span>
+                      )}
+                      {!carryoverStatus.calculated && (
+                        <span className="text-xs text-blue-600 flex items-center">
+                          <ClockIcon className="h-4 w-4 mr-1" />
+                          Se calculará automáticamente el 1° del mes
+                        </span>
+                      )}
+                      <span className="text-xs text-gray-500 italic">
+                        🤖 Cálculo automático cada 1° del mes a las 12:00 AM
                       </span>
-                    )}
-                    {!carryoverStatus.calculated && (
-                      <span className="text-xs text-blue-600 flex items-center">
-                        <ClockIcon className="h-4 w-4 mr-1" />
-                        Se calculará automáticamente el 1° del mes
-                      </span>
-                    )}
-                    <span className="text-xs text-gray-500 italic">
-                      🤖 Cálculo automático cada 1° del mes a las 12:00 AM
-                    </span>
+                    </div>
                   </div>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+
+
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <h4 className="font-medium text-green-800">
+                        Arrastre de Ingresos
+                      </h4>
+                      <p className="text-2xl font-bold text-green-600">
+                        {(() => {
+                          console.log(`🔍 Renderizando arrastre: stats.carryoverIncome=`, stats.carryoverIncome);
+                          return formatCurrency(stats.carryoverIncome || 0);
+                        })()}
+                      </p>
+                      <p className="text-sm text-green-600">
+                        Del mes anterior
+                      </p>
+                    </div>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h4 className="font-medium text-blue-800">
+                        Balance del Período
+                      </h4>
+                      <p
+                        className={`text-2xl font-bold ${stats.currentPeriodBalance >= 0 ? "text-green-600" : "text-red-600"}`}
+                      >
+                        {formatCurrency(stats.currentPeriodBalance)}
+                      </p>
+                      <p className="text-sm text-blue-600">
+                        Solo transacciones actuales
+                      </p>
+                    </div>
+
+
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <h4 className="font-medium text-gray-800">Balance Total</h4>
+                      <p
+                        className={`text-2xl font-bold ${(() => {
+                          // Calcular balance real sin gastos pendientes:
+                          // Arrastre + Ingresos del período - Solo gastos PAGADOS del período
+                          const gastosPagados = (stats.paymentStatus?.pagado?.amount || 0) + (stats.paymentStatus?.liquidado?.amount || 0);
+                          const balanceSinPendientes = stats.carryoverIncome + stats.totalEntradas - gastosPagados;
+                          console.log('🧮 Balance sin pendientes:', {
+                            carryoverIncome: stats.carryoverIncome,
+                            ingresosPeriodo: stats.totalEntradas,
+                            gastosPagados,
+                            balanceSinPendientes,
+                            totalBalanceOriginal: stats.totalBalance
+                          });
+                          return balanceSinPendientes >= 0 ? "text-green-600" : "text-red-600";
+                        })()}`}
+                      >
+                        {(() => {
+                          // Calcular balance real sin gastos pendientes:
+                          // Arrastre + Ingresos del período - Solo gastos PAGADOS del período
+                          const gastosPagados = (stats.paymentStatus?.pagado?.amount || 0) + (stats.paymentStatus?.liquidado?.amount || 0);
+                          const balanceSinPendientes = stats.carryoverIncome + stats.totalEntradas - gastosPagados;
+                          return formatCurrency(balanceSinPendientes);
+                        })()}
+                      </p>
+                      <p className="text-sm text-gray-600">Sin gastos pendientes</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Considerando pendientes: {formatCurrency(stats.totalBalance)}
+                      </p>
+                    </div>
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                      <h4 className="font-medium text-orange-800">
+                        Gastos Pendientes
+                      </h4>
+                      <p
+                        className={`text-2xl font-bold text-red-600`}
+                      >
+                        {(() => {
+                          // Sumar gastos pendientes del período actual + meses anteriores
+                          const pendientesActuales = stats.paymentStatus?.pendiente?.amount || 0;
+                          const pendientesAnteriores = stats.paymentStatus?.pendienteAnterior?.carryover || 0;
+                          const totalPendientes = pendientesActuales + pendientesAnteriores;
+                          console.log('💰 Calculando gastos pendientes totales:', {
+                            pendientesActuales,
+                            pendientesAnteriores,
+                            totalPendientes,
+                            carryoverBalance: stats.carryoverBalance
+                          });
+                          return formatCurrency(-Math.abs(totalPendientes));
+                        })()}
+                      </p>
+                      <p className="text-sm text-orange-600">
+                        Todos los pendientes
+                      </p>
+                    </div>
+                  </div>
+
+
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-medium text-blue-800">
-                      Balance del Período
-                    </h4>
-                    <p
-                      className={`text-2xl font-bold ${stats.currentPeriodBalance >= 0 ? "text-green-600" : "text-red-600"}`}
-                    >
-                      {formatCurrency(stats.currentPeriodBalance)}
-                    </p>
-                    <p className="text-sm text-blue-600">
-                      Solo transacciones actuales
-                    </p>
-                  </div>
-
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <h4 className="font-medium text-green-800">
-                      Arrastre de Ingresos
-                    </h4>
-                    <p className="text-2xl font-bold text-green-600">
-                      {(() => {
-                        console.log(`🔍 Renderizando arrastre: stats.carryoverIncome=`, stats.carryoverIncome);
-                        return formatCurrency(stats.carryoverIncome || 0);
-                      })()}
-                    </p>
-                    <p className="text-sm text-green-600">
-                      Del mes anterior
-                    </p>
-                  </div>
-
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                    <h4 className="font-medium text-orange-800">
-                      Gastos Pendientes
-                    </h4>
-                    <p
-                      className={`text-2xl font-bold text-red-600`}
-                    >
-                      {(() => {
-                        // Sumar gastos pendientes del período actual + meses anteriores
-                        const pendientesActuales = stats.paymentStatus?.pendiente?.amount || 0;
-                        const pendientesAnteriores = stats.paymentStatus?.pendienteAnterior?.carryover || 0;
-                        const totalPendientes = pendientesActuales + pendientesAnteriores;
-                        console.log('💰 Calculando gastos pendientes totales:', {
-                          pendientesActuales,
-                          pendientesAnteriores,
-                          totalPendientes,
-                          carryoverBalance: stats.carryoverBalance
-                        });
-                        return formatCurrency(-Math.abs(totalPendientes));
-                      })()}
-                    </p>
-                    <p className="text-sm text-orange-600">
-                      Todos los pendientes
-                    </p>
-                  </div>
-
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <h4 className="font-medium text-gray-800">Balance Total</h4>
-                    <p
-                      className={`text-2xl font-bold ${stats.totalBalance >= 0 ? "text-green-600" : "text-red-600"}`}
-                    >
-                      {formatCurrency(stats.totalBalance)}
-                    </p>
-                    <p className="text-sm text-gray-600">Completo</p>
-                  </div>
-                </div>
-                
-              
-              </div>
-            )}
+              )}
           </div>
         )}
 
@@ -878,11 +901,11 @@ const Reportes = () => {
                 </h4>
                 <div className="mt-2 text-sm text-blue-700">
                   <p className="flex items-center">
-                    • Los porcentajes en <span className="text-red-600 font-semibold mx-1">rojo</span> 
+                    • Los porcentajes en <span className="text-red-600 font-semibold mx-1">rojo</span>
                     con <ArrowDownIcon className="h-4 w-4 mx-1 text-red-600" /> representan el % del total de gastos
                   </p>
                   <p className="flex items-center mt-1">
-                    • Los porcentajes en <span className="text-green-600 font-semibold mx-1">verde</span> 
+                    • Los porcentajes en <span className="text-green-600 font-semibold mx-1">verde</span>
                     con <ArrowUpIcon className="h-4 w-4 mx-1 text-green-600" /> representan el % del total de ingresos
                   </p>
                 </div>
@@ -892,159 +915,153 @@ const Reportes = () => {
         )}
 
         {/* General Breakdown */}
-        {stats && Object.keys(stats.generalBreakdown).length > 0 && 
-         Object.entries(stats.generalBreakdown).some(([general, data]) => showIncomeInBreakdown || data.salidas > 0) && (
-          <div className="bg-background rounded-lg border border-border p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-foreground">
-                Desglose por Categoría General
-              </h3>
-              <p className="text-sm text-muted-foreground italic">
-                Solo período: {currentMonthName}
-              </p>
-            </div>
+        {stats && Object.keys(stats.generalBreakdown).length > 0 &&
+          Object.entries(stats.generalBreakdown).some(([general, data]) => showIncomeInBreakdown || data.salidas > 0) && (
+            <div className="bg-background rounded-lg border border-border p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-foreground">
+                  Desglose por Categoría General
+                </h3>
+                <p className="text-sm text-muted-foreground italic">
+                  Solo período: {currentMonthName}
+                </p>
+              </div>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-border">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Categoría General
-                    </th>
-                    {showIncomeInBreakdown && (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-border">
+                  <thead className="bg-muted">
+                    <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Ingreso
+                        Categoría General
                       </th>
-                    )}
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Gastos
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Cantidad
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      {showIncomeInBreakdown ? "% de Gastos/Ingresos" : "% de Gastos"}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-background divide-y divide-border">
-                  {Object.entries(stats.generalBreakdown)
-                    .filter(([general, data]) => showIncomeInBreakdown || data.salidas > 0)
-                    .map(([general, data]) => (
-                      <tr key={general}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
-                          {general}
-                        </td>
-                        {showIncomeInBreakdown && (
-                          <td className={`px-6 py-4 whitespace-nowrap text-sm ${
-                            data.entradas === 0 ? 'text-foreground' : 'text-green-600'
-                          }`}>
-                            {formatCurrency(data.entradas)}
+                      {showIncomeInBreakdown && (
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Ingreso
+                        </th>
+                      )}
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Gastos
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Cantidad
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        {showIncomeInBreakdown ? "% de Gastos/Ingresos" : "% de Gastos"}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-background divide-y divide-border">
+                    {Object.entries(stats.generalBreakdown)
+                      .filter(([general, data]) => showIncomeInBreakdown || data.salidas > 0)
+                      .map(([general, data]) => (
+                        <tr key={general}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
+                            {general}
                           </td>
-                        )}
-                        <td className={`px-6 py-4 whitespace-nowrap text-sm ${
-                          data.salidas === 0 ? 'text-foreground' : 'text-red-600'
-                        }`}>
-                          {formatCurrency(data.salidas)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
-                          {data.count}
-                        </td>
-                        <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${
-                          showIncomeInBreakdown && isMainlyIncome(data) 
-                            ? 'text-green-600' 
-                            : 'text-red-600'
-                        }`}>
-                          {showIncomeInBreakdown 
-                            ? formatSmartPercentage(data, stats.totalSalidas, stats.totalEntradas)
-                            : formatPercentage(data.salidas, stats.totalSalidas)
-                          }
-                        </td>
-                      </tr>
-                    )
-                  )}
-                </tbody>
-              </table>
+                          {showIncomeInBreakdown && (
+                            <td className={`px-6 py-4 whitespace-nowrap text-sm ${data.entradas === 0 ? 'text-foreground' : 'text-green-600'
+                              }`}>
+                              {formatCurrency(data.entradas)}
+                            </td>
+                          )}
+                          <td className={`px-6 py-4 whitespace-nowrap text-sm ${data.salidas === 0 ? 'text-foreground' : 'text-red-600'
+                            }`}>
+                            {formatCurrency(data.salidas)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                            {data.count}
+                          </td>
+                          <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${showIncomeInBreakdown && isMainlyIncome(data)
+                              ? 'text-green-600'
+                              : 'text-red-600'
+                            }`}>
+                            {showIncomeInBreakdown
+                              ? formatSmartPercentage(data, stats.totalSalidas, stats.totalEntradas)
+                              : formatPercentage(data.salidas, stats.totalSalidas)
+                            }
+                          </td>
+                        </tr>
+                      )
+                      )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        )}
+          )}
         {/* Concept Breakdown */}
-        {stats && Object.keys(stats.conceptBreakdown).length > 0 && 
-         Object.entries(stats.conceptBreakdown).some(([concept, data]) => showIncomeInBreakdown || data.salidas > 0) && (
-          <div className="bg-background rounded-lg border border-border p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-foreground">
-                Desglose por Concepto
-              </h3>
-              <p className="text-sm text-muted-foreground italic">
-                Solo período: {currentMonthName}
-              </p>
-            </div>
+        {stats && Object.keys(stats.conceptBreakdown).length > 0 &&
+          Object.entries(stats.conceptBreakdown).some(([concept, data]) => showIncomeInBreakdown || data.salidas > 0) && (
+            <div className="bg-background rounded-lg border border-border p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-foreground">
+                  Desglose por Concepto
+                </h3>
+                <p className="text-sm text-muted-foreground italic">
+                  Solo período: {currentMonthName}
+                </p>
+              </div>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-border">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Concepto
-                    </th>
-                    {showIncomeInBreakdown && (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-border">
+                  <thead className="bg-muted">
+                    <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Ingreso
+                        Concepto
                       </th>
-                    )}
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Gastos
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Cantidad
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      {showIncomeInBreakdown ? "% de Gastos/Ingresos" : "% de Gastos"}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-background divide-y divide-border">
-                  {Object.entries(stats.conceptBreakdown)
-                    .filter(([concept, data]) => showIncomeInBreakdown || data.salidas > 0)
-                    .map(([concept, data]) => (
-                      <tr key={concept}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
-                          {concept}
-                        </td>
-                        {showIncomeInBreakdown && (
-                          <td className={`px-6 py-4 whitespace-nowrap text-sm ${
-                            data.entradas === 0 ? 'text-foreground' : 'text-green-600'
-                          }`}>
-                            {formatCurrency(data.entradas)}
+                      {showIncomeInBreakdown && (
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Ingreso
+                        </th>
+                      )}
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Gastos
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Cantidad
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        {showIncomeInBreakdown ? "% de Gastos/Ingresos" : "% de Gastos"}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-background divide-y divide-border">
+                    {Object.entries(stats.conceptBreakdown)
+                      .filter(([concept, data]) => showIncomeInBreakdown || data.salidas > 0)
+                      .map(([concept, data]) => (
+                        <tr key={concept}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
+                            {concept}
                           </td>
-                        )}
-                        <td className={`px-6 py-4 whitespace-nowrap text-sm ${
-                          data.salidas === 0 ? 'text-foreground' : 'text-red-600'
-                        }`}>
-                          {formatCurrency(data.salidas)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
-                          {data.count}
-                        </td>
-                        <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${
-                          showIncomeInBreakdown && isMainlyIncome(data) 
-                            ? 'text-green-600' 
-                            : 'text-red-600'
-                        }`}>
-                          {showIncomeInBreakdown 
-                            ? formatSmartPercentage(data, stats.totalSalidas, stats.totalEntradas)
-                            : formatPercentage(data.salidas, stats.totalSalidas)
-                          }
-                        </td>
-                      </tr>
-                    )
-                  )}
-                </tbody>
-              </table>
+                          {showIncomeInBreakdown && (
+                            <td className={`px-6 py-4 whitespace-nowrap text-sm ${data.entradas === 0 ? 'text-foreground' : 'text-green-600'
+                              }`}>
+                              {formatCurrency(data.entradas)}
+                            </td>
+                          )}
+                          <td className={`px-6 py-4 whitespace-nowrap text-sm ${data.salidas === 0 ? 'text-foreground' : 'text-red-600'
+                            }`}>
+                            {formatCurrency(data.salidas)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                            {data.count}
+                          </td>
+                          <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${showIncomeInBreakdown && isMainlyIncome(data)
+                              ? 'text-green-600'
+                              : 'text-red-600'
+                            }`}>
+                            {showIncomeInBreakdown
+                              ? formatSmartPercentage(data, stats.totalSalidas, stats.totalEntradas)
+                              : formatPercentage(data.salidas, stats.totalSalidas)
+                            }
+                          </td>
+                        </tr>
+                      )
+                      )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* Provider Breakdown (for salidas) */}
         {stats && Object.keys(stats.providerBreakdown).length > 0 && (
@@ -1180,14 +1197,14 @@ const Reportes = () => {
                             {formatCurrency(transaction.amount)}
                           </span>
                         </div>
-                        
+
                         <div className="space-y-1 text-sm text-muted-foreground">
                           <p><strong>Proveedor:</strong> {transaction.providerName}</p>
                           <p><strong>Categoría:</strong> {transaction.generalName}</p>
                           <p><strong>Fecha:</strong> {
-                            transaction.date?.toDate ? 
-                            transaction.date.toDate().toLocaleDateString('es-ES') :
-                            new Date(transaction.date).toLocaleDateString('es-ES')
+                            transaction.date?.toDate ?
+                              transaction.date.toDate().toLocaleDateString('es-ES') :
+                              new Date(transaction.date).toLocaleDateString('es-ES')
                           }</p>
                           {transaction.description && (
                             <p><strong>Descripción:</strong> {transaction.description}</p>
