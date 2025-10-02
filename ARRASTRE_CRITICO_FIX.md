@@ -3,7 +3,7 @@
 ## Problema CRÍTICO Identificado
 
 ### Evidencia del Bug:a
-1. **Septiembre solo**: Balance Arrastrado = $63,033.60
+1. **Septiembre solo**: Balance Arrastrado = $63,033.60a
 2. **Agosto + Septiembre**: Balance Arrastrado = $63,033.60 (¡IGUAL!)a
 3. **Gasto inicial de agosto**: No aparece en el arrastre de septiembreaa
 a
