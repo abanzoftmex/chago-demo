@@ -4,7 +4,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 First, run the development server:a
 a
-```basha
+```bashaa
 npm run deva
 # oraas
 yarn devaa
