@@ -9,6 +9,12 @@ import { useAuth } from "../../../context/AuthContext";
 import { useToast } from "../../../components/ui/Toast";
 import { transactionService } from "../../../lib/services/transactionService";
 import { conceptService } from "../../../lib/services/conceptService";
+import { 
+  PlusIcon,
+  ArrowTrendingUpIcon,
+  PencilIcon,
+  EyeIcon
+} from '@heroicons/react/24/outline';
 
 const Ingresos = () => {
   const router = useRouter();
@@ -184,19 +190,7 @@ const Ingresos = () => {
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
               <div className="flex items-center space-x-4">
                 <div className="p-3 bg-green-600 rounded-xl shadow-lg">
-                  <svg
-                    className="w-6 h-6 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8c-1.657 0-3 1.343-3 3m6 0a3 3 0 00-3-3m-7 3a7 7 0 1114 0 7 7 0 01-14 0z"
-                    />
-                  </svg>
+                  <ArrowTrendingUpIcon className="h-6 w-6 text-white" />
                 </div>
                 <div>
                   <div className="flex items-center space-x-2">
@@ -219,20 +213,7 @@ const Ingresos = () => {
                 <button
                   onClick={handleNewTransaction}
                   className="px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 focus:ring-4 focus:ring-green-500/20 focus:ring-offset-2 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl font-medium"
-                >
-                  <svg
-                    className="w-5 h-5 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 4v16m8-8H4"
-                    />
-                  </svg>
+                ><PlusIcon className="h-4 w-4 mr-1.5" />
                   Nuevo Ingreso
                 </button>
               )}
@@ -281,19 +262,7 @@ const Ingresos = () => {
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-center space-x-3">
                     <div className="p-2 bg-green-600 rounded-lg">
-                      <svg
-                        className="w-5 h-5 text-white"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 8c-1.657 0-3 1.343-3 3m6 0a3 3 0 00-3-3m-7 3a7 7 0 1114 0 7 7 0 01-14 0z"
-                        />
-                      </svg>
+                      <ArrowTrendingUpIcon className="h-4 w-4 text-white" />
                     </div>
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900">
@@ -436,22 +405,22 @@ const Ingresos = () => {
                                   {canManageTransactions && (
                                     <button
                                       onClick={() => handleEditTransaction(transaction)}
-                                      className="text-blue-600 hover:text-blue-800 transition-colors flex items-center"
+                                      className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center"
                                       title="Editar ingreso"
+                                      cursor="pointer"
                                     >
-                                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                      </svg>
-                                      Editar
+                                    <PencilIcon className="h-4 w-4" />  
                                     </button>
                                   )}
                                   <button
                                     onClick={() =>
                                       handleViewDetails(transaction.id)
                                     }
-                                    className="text-primary hover:text-primary/80 transition-colors"
+                                    className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors"
+                                    title="Ver detalles"
+                                    cursor="pointer"
                                   >
-                                    Ver Detalles
+                                    <EyeIcon className="h-4 w-4" />  
                                   </button>
                                 </div>
                               </td>

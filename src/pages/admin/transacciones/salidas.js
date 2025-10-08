@@ -10,6 +10,13 @@ import { transactionService } from "../../../lib/services/transactionService";
 import { conceptService } from "../../../lib/services/conceptService";
 import { providerService } from "../../../lib/services/providerService";
 import Link from "next/link";
+import { 
+  PlusIcon,
+  ArrowTrendingDownIcon,
+  PencilIcon,
+  ClipboardIcon,
+  EyeIcon
+} from '@heroicons/react/24/outline';
 
 const SolicitudesPago = () => {
   const router = useRouter();
@@ -286,19 +293,7 @@ const SolicitudesPago = () => {
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
               <div className="flex items-center space-x-4">
                 <div className="p-3 bg-red-600 rounded-xl shadow-lg">
-                  <svg
-                    className="w-6 h-6 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-                    />
-                  </svg>
+                  <ArrowTrendingDownIcon className="h-6 w-6 text-white" />
                 </div>
                 <div>
                   <div className="flex items-center space-x-2">
@@ -316,19 +311,7 @@ const SolicitudesPago = () => {
                     Gestiona y realiza seguimiento de todos los gastos de la organización
                   </p>
                   <div className="flex items-center mt-2 text-sm text-gray-500">
-                    <svg
-                      className="w-4 h-4 mr-1"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                      />
-                    </svg>
+                    <ClipboardIcon className="h-4 w-4 mr-1" />
                     {transactions.length} gastos registrados
                   </div>
                 </div>
@@ -339,20 +322,7 @@ const SolicitudesPago = () => {
                   <button
                     onClick={handleNewTransaction}
                     className="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 focus:ring-4 focus:ring-red-500/20 focus:ring-offset-2 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl font-medium"
-                  >
-                    <svg
-                      className="w-5 h-5 mr-2"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
+                  ><PlusIcon className="h-4 w-4 mr-1.5" />
                     Nuevo Gasto
                   </button>
                 </div>
@@ -431,19 +401,7 @@ const SolicitudesPago = () => {
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-center space-x-3">
                     <div className="p-2 bg-red-600 rounded-lg">
-                      <svg
-                        className="w-5 h-5 text-white"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-                        />
-                      </svg>
+                      <ArrowTrendingDownIcon className="h-4 w-4 text-white" />
                     </div>
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900">
@@ -647,20 +605,20 @@ const SolicitudesPago = () => {
                                   {canManageTransactions && (
                                     <button
                                       onClick={() => handleEditTransaction(transaction)}
-                                      className="text-blue-600 hover:text-blue-800 transition-colors flex items-center"
+                                      className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center"
                                       title="Editar gasto"
+                                      cursor="pointer"
                                     >
-                                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                      </svg>
-                                      Editar
+                                      <PencilIcon className="h-4 w-4" /> 
                                     </button>
                                   )}
                                   <button
                                     onClick={() => handleViewDetails(transaction.id)}
-                                    className="text-primary hover:text-primary/80 transition-colors"
+                                    className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors"
+                                    title="Ver detalles"
+                                    cursor="pointer"
                                   >
-                                    Ver Detalles
+                                    <EyeIcon className="h-4 w-4" />
                                   </button>
                                 </div>
                               </td>

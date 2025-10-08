@@ -19,6 +19,8 @@ import {
   Clock, 
   AlertCircle, 
   RefreshCw,
+  ClockIcon,
+  EyeIcon,
   X
 } from "lucide-react";
 import Select from "react-select";
@@ -525,19 +527,7 @@ const Historial = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="p-3 bg-slate-600 rounded-xl shadow-lg">
-                <svg
-                  className="w-6 h-6 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 7h18M3 12h18M3 17h18"
-                  />
-                </svg>
+                <ClockIcon className="w-6 h-6 text-white" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Historial</h1>
@@ -722,19 +712,7 @@ const Historial = () => {
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-slate-600 rounded-lg">
-                  <svg
-                    className="w-5 h-5 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 7h18M3 12h18M3 17h18"
-                    />
-                  </svg>
+                  <ClockIcon className="w-4 h-4 text-white" />
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">
@@ -851,9 +829,11 @@ const Historial = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <button
                             onClick={() => handleViewDetails(transaction.id)}
-                            className="text-primary hover:text-primary/80 transition-colors"
+                            className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors"
+                            title="Ver detalles"
+                            cursor="pointer"
                           >
-                            Ver Detalles
+                            <EyeIcon className="h-4 w-4" /> 
                           </button>
                         </td>
                       </tr>

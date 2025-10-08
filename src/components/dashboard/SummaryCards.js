@@ -21,18 +21,20 @@ const SummaryCards = ({ summary }) => {
   const cards = [
     {
       title: `Entradas del Mes (${currentMonthName})`,
+      bgcolorcard: 'bg-green-50',
       value: summary.entradas,
       icon: ArrowTrendingUpIcon,
       color: 'text-green-600',
-      bgColor: 'bg-green-50',
+      bgColor: 'bg-green-100',
       count: summary.entradasCount
     },
     {
       title: `Salidas del Mes (${currentMonthName})`,
+      bgcolorcard: 'bg-red-50',
       value: summary.salidas,
       icon: ArrowTrendingDownIcon,
       color: 'text-red-600',
-      bgColor: 'bg-red-50',
+      bgColor: 'bg-red-100',
       count: summary.salidasCount
     },
     {
@@ -40,14 +42,14 @@ const SummaryCards = ({ summary }) => {
       value: summary.balance,
       icon: ScaleIcon,
       color: summary.balance >= 0 ? 'text-green-600' : 'text-red-600',
-      bgColor: summary.balance >= 0 ? 'bg-green-50' : 'bg-red-50',
+      bgColor: summary.balance >= 0 ? 'bg-green-100' : 'bg-red-50',
     },
     {
       title: 'Total Transacciones',
       value: summary.totalTransactions,
       icon: DocumentTextIcon,
-      color: 'text-primary',
-      bgColor: 'bg-orange-50',
+      color: 'text-gray-600',
+      bgColor: 'bg-gray-100',
       isCount: true,
       showSplit: true,
       entradasCount: summary.entradasCount,
@@ -63,12 +65,12 @@ const SummaryCards = ({ summary }) => {
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-6">
       {cards.map((card, index) => {
         const Icon = card.icon;
         
         return (
-          <div key={index} className="bg-background rounded-lg border border-border p-6">
+          <div key={index} className={`${card.bgcolorcard} rounded-lg border border-border p-6`}>
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-2">
@@ -82,17 +84,17 @@ const SummaryCards = ({ summary }) => {
                     <div className="flex items-center space-x-1">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                       <span className="text-green-600">Ingresos:</span>
-                      <span className="font-medium text-green-600">{card.entradasCount}</span>
+                    <span className="font-medium text-green-600">  <strong>{card.entradasCount}</strong></span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <div className="w-2 h-2 bg-red-500 rounded-full"></div>
                       <span className="text-red-600">Gastos:</span>
-                      <span className="font-medium text-red-600">{card.salidasCount}</span>
+                      <span className="font-medium text-red-600"> <strong>{card.salidasCount}</strong></span>
                     </div>
                   </div>
                 ) : card.count !== undefined && (
                   <p className="text-sm text-muted-foreground mt-1">
-                    {card.count} transacciones
+                    <strong>{card.count}</strong> transaccion(es)
                   </p>
                 )}
               </div>
