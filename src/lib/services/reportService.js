@@ -506,8 +506,43 @@ export const reportService = {
         generalMap[general.id] = general.name;
       });
 
+      // Filtrar transacciones para Excel: NO incluir gastos pendientes de meses anteriores
+      let filteredTransactions = transactions;
+      if (filters.startDate && filters.endDate) {
+        const reportEndDate = new Date(filters.endDate);
+        const reportYear = reportEndDate.getFullYear();
+        const reportMonth = reportEndDate.getMonth(); // 0-based
+
+        filteredTransactions = transactions.filter(transaction => {
+          // Incluir todas las entradas
+          if (transaction.type === 'entrada') {
+            return true;
+          }
+          
+          // Para salidas, solo incluir las del período del reporte (no gastos pendientes de meses anteriores)
+          if (transaction.type === 'salida') {
+            const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
+            const transactionYear = transactionDate.getFullYear();
+            const transactionMonth = transactionDate.getMonth();
+            
+            // Solo incluir gastos del mismo año y mes del reporte
+            return transactionYear === reportYear && transactionMonth === reportMonth;
+          }
+          
+          return true;
+        });
+        
+        console.log('📊 Filtrado de transacciones para Excel:', {
+          reportMonth: `${reportYear}-${String(reportMonth + 1).padStart(2, '0')}`,
+          totalTransactions: transactions.length,
+          filteredTransactions: filteredTransactions.length,
+          excluded: transactions.length - filteredTransactions.length,
+          note: 'Excluidos gastos pendientes de meses anteriores del Excel'
+        });
+      }
+
       // Transactions sheet - con columnas separadas y ordenadas correctamente
-      const transactionsData = transactions
+      const transactionsData = filteredTransactions
         .map(transaction => {
           const isIncome = transaction.type === 'entrada';
           const totalPaid = transaction.totalPaid || 0;

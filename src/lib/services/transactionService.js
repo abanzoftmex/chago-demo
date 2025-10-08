@@ -610,4 +610,65 @@ export const transactionService = {
 
     return { isValid: true };
   },
+
+  // Get transaction statistics for a date range (only counts, not full data)
+  async getStatsByDateRange(startDate, endDate, filters = {}) {
+    try {
+      let q = collection(db, COLLECTION_NAME);
+
+      // Apply date range filter
+      q = query(
+        q,
+        where("date", ">=", startDate),
+        where("date", "<=", endDate)
+      );
+
+      // Apply additional filters (except status - we need all statuses for counting)
+      if (filters.type) {
+        q = query(q, where("type", "==", filters.type));
+      }
+
+      if (filters.providerId) {
+        q = query(q, where("providerId", "==", filters.providerId));
+      }
+
+      if (filters.generalId) {
+        q = query(q, where("generalId", "==", filters.generalId));
+      }
+
+      if (filters.conceptId) {
+        q = query(q, where("conceptId", "==", filters.conceptId));
+      }
+
+      if (filters.subconceptId) {
+        q = query(q, where("subconceptId", "==", filters.subconceptId));
+      }
+
+      const querySnapshot = await getDocs(q);
+      
+      // Initialize counters
+      const stats = {
+        pendiente: 0,
+        parcial: 0,
+        pagado: 0,
+        total: 0
+      };
+
+      // Count each transaction by status
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        const status = data.status || 'pendiente'; // Default to pendiente if no status
+        
+        if (stats.hasOwnProperty(status)) {
+          stats[status]++;
+        }
+        stats.total++;
+      });
+
+      return stats;
+    } catch (error) {
+      console.error("Error getting transaction stats by date range:", error);
+      throw new Error("Error al obtener estadísticas de transacciones");
+    }
+  },
 };

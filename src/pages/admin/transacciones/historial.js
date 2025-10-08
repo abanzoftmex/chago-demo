@@ -26,6 +26,7 @@ import Select from "react-select";
 const Historial = () => {
   const router = useRouter();
   const [transactions, setTransactions] = useState([]);
+  const [transactionStats, setTransactionStats] = useState({ pendiente: 0, parcial: 0, pagado: 0, total: 0 });
   const [concepts, setConcepts] = useState([]);
   const [descriptions, setDescriptions] = useState([]);
   const [providers, setProviders] = useState([]);
@@ -187,6 +188,38 @@ const Historial = () => {
     }));
   }, []);
 
+  // Load statistics separately for efficiency
+  const loadStatistics = async () => {
+    try {
+      if (!filters.startDate || !filters.endDate) return;
+
+      const startDate = new Date(filters.startDate);
+      const endDate = new Date(filters.endDate);
+      endDate.setHours(23, 59, 59, 999); // End of day
+
+      // Build filter object (excluding status since we need all statuses for stats)
+      const statsFilters = {
+        type: filters.type || undefined,
+        conceptId: filters.conceptId || undefined,
+        providerId: filters.providerId || undefined,
+        generalId: filters.generalId || undefined,
+        // Don't include status filter for stats
+      };
+
+      const stats = await transactionService.getStatsByDateRange(
+        startDate,
+        endDate,
+        statsFilters
+      );
+
+      setTransactionStats(stats);
+    } catch (err) {
+      console.error("Error loading transaction stats:", err);
+      // Don't show error for stats, just use fallback
+      setTransactionStats({ pendiente: 0, parcial: 0, pagado: 0, total: 0 });
+    }
+  };
+
   // Load transactions when filters change
   useEffect(() => {
     // Only load transactions after initial data has been loaded
@@ -257,6 +290,9 @@ const Historial = () => {
         );
 
         setTransactions(paginatedData);
+
+        // Load statistics separately for badges
+        await loadStatistics();
       } catch (err) {
         console.error("Error loading transactions:", err);
         setError("Error al cargar las transacciones");
@@ -267,6 +303,13 @@ const Historial = () => {
 
     loadTransactions();
   }, [filters, currentPage, concepts, providers, generals, itemsPerPage, initialDataLoaded]);
+
+  // Load statistics when date or non-status filters change
+  useEffect(() => {
+    if (initialDataLoaded && filters.startDate && filters.endDate) {
+      loadStatistics();
+    }
+  }, [filters.startDate, filters.endDate, filters.type, filters.conceptId, filters.providerId, filters.generalId, initialDataLoaded]);
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => {
@@ -704,15 +747,15 @@ const Historial = () => {
               </div>
               <div className="flex items-center space-x-2">
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                  {transactions.filter((t) => t.status === "pendiente").length}{" "}
+                  {transactionStats.pendiente}{" "}
                   Pendientes
                 </span>
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                  {transactions.filter((t) => t.status === "parcial").length}{" "}
+                  {transactionStats.parcial}{" "}
                   Parciales
                 </span>
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  {transactions.filter((t) => t.status === "pagado").length}{" "}
+                  {transactionStats.pagado}{" "}
                   Pagadas
                 </span>
               </div>
