@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
   
   // Configuración de headers para cache
   async headers() {
@@ -71,7 +70,7 @@ const nextConfig = {
 
   // Optimizaciones adicionales
   compiler: {
-    removeConsole: process.env.NODE_ENV === 'production',
+    removeConsole: false, // Set to true in production builds
   },
 };
 
