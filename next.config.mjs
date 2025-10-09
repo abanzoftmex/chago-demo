@@ -1,65 +1,65 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  
+
   // Configuración de headers para cache
   async headers() {
     return [
       {
         // Archivos estáticos de Next.js (JS, CSS)
-        source: '/_next/static/(.*)',
+        source: "/_next/static/(.*)",
         headers: [
           {
-            key: 'Cache-Control',
+            key: "Cache-Control",
             // Cache por 1 hora, revalidar después
-            value: 'public, max-age=3600, stale-while-revalidate=86400',
+            value: "public, max-age=3600, stale-while-revalidate=86400",
           },
         ],
       },
       {
         // Chunks de JavaScript específicos
-        source: '/_next/static/chunks/(.*)',
+        source: "/_next/static/chunks/(.*)",
         headers: [
           {
-            key: 'Cache-Control',
+            key: "Cache-Control",
             // Cache por 1 hora, forzar revalidación
-            value: 'public, max-age=3600, must-revalidate',
+            value: "public, max-age=3600, must-revalidate",
           },
         ],
       },
       {
         // Páginas compiladas
-        source: '/_next/static/chunks/pages/(.*)',
+        source: "/_next/static/chunks/pages/(.*)",
         headers: [
           {
-            key: 'Cache-Control',
-            value: 'public, max-age=3600, must-revalidate',
+            key: "Cache-Control",
+            value: "public, max-age=3600, must-revalidate",
           },
         ],
       },
       {
         // Archivos JavaScript en general
-        source: '/(.*).js',
+        source: "/(.*).js",
         headers: [
           {
-            key: 'Cache-Control',
-            value: 'public, max-age=3600, must-revalidate',
+            key: "Cache-Control",
+            value: "public, max-age=3600, must-revalidate",
           },
         ],
       },
       {
         // API routes - sin cache para evitar problemas
-        source: '/api/(.*)',
+        source: "/api/(.*)",
         headers: [
           {
-            key: 'Cache-Control',
-            value: 'no-cache, no-store, must-revalidate',
+            key: "Cache-Control",
+            value: "no-cache, no-store, must-revalidate",
           },
         ],
       },
     ];
   },
-  
+
   // Configuración de build ID para invalidar cache con cada deploy
   generateBuildId: async () => {
     // Usar timestamp redondeado a la hora más cercana
