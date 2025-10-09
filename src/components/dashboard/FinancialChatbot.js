@@ -134,6 +134,7 @@ const FinancialChatbot = () => {
 
       if (!data.success) {
         setError(data.message || "Error al procesar la consulta");
+        setIsLoading(false);
         return;
       }
 
@@ -148,6 +149,7 @@ const FinancialChatbot = () => {
       }
 
     } catch (err) {
+      console.error("Error en chatbot:", err);
       setError("Error al procesar tu pregunta. Por favor, intenta nuevamente.");
     } finally {
       setIsLoading(false);

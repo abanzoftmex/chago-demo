@@ -1003,17 +1003,18 @@ function generateFallbackResponse(question, filteredData, questionAnalysis) {
   
   // Preguntas sobre períodos específicos
   if (questionLower.includes("semana")) {
-    const data = metricas.ultimaSemana;
-    const gastosSemana = gastoPorSemana.length > 0 ? gastoPorSemana[0] : null;
+    const data = metricas;
+    const transaccionesDetalladas = filteredData.transaccionesDetalladas || [];
+    const gastosSemanales = transaccionesDetalladas.filter(t => t.type === 'salida');
+    const top3Gastos = gastosSemanales.sort((a, b) => b.amount - a.amount).slice(0, 3);
     
     let respuesta = `En la última semana has gastado **${formatCurrency(data.totalGastos)}** y recibido **${formatCurrency(data.totalIngresos)}**.\n\n`;
     respuesta += `**Tu balance semanal es de ${formatCurrency(data.balance)}.**\n\n`;
     
-    if (gastosSemana && gastosSemana.transacciones.length > 0) {
-      const top3Gastos = gastosSemana.transacciones.sort((a, b) => b.amount - a.amount).slice(0, 3);
+    if (top3Gastos.length > 0) {
       respuesta += `**Principales gastos de la semana:**\n`;
       top3Gastos.forEach((gasto, index) => {
-        respuesta += `${index + 1}. **${formatCurrency(gasto.amount)}** - ${gasto.concept} (${gasto.dateString})\n`;
+        respuesta += `${index + 1}. **${formatCurrency(gasto.amount)}** - ${gasto.concepto} (${gasto.dateString})\n`;
       });
     }
     
@@ -1026,14 +1027,14 @@ function generateFallbackResponse(question, filteredData, questionAnalysis) {
           "Balance Semana": data.balance,
           "Número de Transacciones": data.numeroTransacciones,
         },
-        percentages: gastosSemana ? gastosSemana.transacciones.slice(0, 5).map(gasto => {
+        percentages: top3Gastos.map(gasto => {
           const porcentaje = data.totalGastos > 0 ? (gasto.amount / data.totalGastos * 100) : 0;
           return {
-            label: gasto.concept,
+            label: gasto.concepto,
             percentage: porcentaje,
             value: gasto.amount
           };
-        }) : null,
+        }).slice(0, 5),
         chartData: null
       }
     };
@@ -1041,7 +1042,7 @@ function generateFallbackResponse(question, filteredData, questionAnalysis) {
 
   // Preguntas sobre 2 meses
   if (questionLower.includes("2 meses") || questionLower.includes("dos meses")) {
-    const data = metricas.ultimos2Meses;
+    const data = metricas;
     const topConceptos = gastosPorConcepto.slice(0, 5);
     
     let desglose = "";
@@ -1071,7 +1072,7 @@ function generateFallbackResponse(question, filteredData, questionAnalysis) {
   }
 
   // Respuesta genérica final
-  const dataTotal = metricas.total;
+  const dataTotal = metricas;
   const topConcepto = gastosPorConcepto[0];
   
   return {
