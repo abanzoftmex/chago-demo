@@ -4,7 +4,12 @@ import { conceptService } from "../../../lib/services/conceptService";
 import { providerService } from "../../../lib/services/providerService";
 import { generalService } from "../../../lib/services/generalService";
 import { subconceptService } from "../../../lib/services/subconceptService";
-import { enhanceQuery, analyzeQueryType, determineVisualizationComponents, prepareDataForQuery } from "../../../lib/utils/queryEnhancer";
+import {
+  enhanceQuery,
+  analyzeQueryType,
+  determineVisualizationComponents,
+  prepareDataForQuery,
+} from "../../../lib/utils/queryEnhancer";
 import { DIVISIONS } from "../../../lib/constants/divisions";
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY);
@@ -19,55 +24,63 @@ function formatCurrency(amount) {
 
 // Configuración de límites por tipo de consulta
 const QUERY_LIMITS = {
-  quick: 100,           // Consultas rápidas (balance actual, este mes)
-  monthly: 500,         // Consultas mensuales (último mes, últimos 2 meses)
-  quarterly: 1500,      // Consultas trimestrales (últimos 3 meses)
-  yearly: 3000,         // Consultas anuales (año actual, último año)
-  historical: 5000,     // Consultas históricas (tendencias, comparaciones)
-  complete: null        // Sin límite (análisis completos)
+  quick: 100, // Consultas rápidas (balance actual, este mes)
+  monthly: 500, // Consultas mensuales (último mes, últimos 2 meses)
+  quarterly: 1500, // Consultas trimestrales (últimos 3 meses)
+  yearly: 3000, // Consultas anuales (año actual, último año)
+  historical: 5000, // Consultas históricas (tendencias, comparaciones)
+  complete: null, // Sin límite (análisis completos)
 };
 
 // Función para determinar el límite según el tipo de consulta
 function determineQueryLimit(question) {
   const questionLower = question.toLowerCase();
-  
+
   // Consultas rápidas - Límite bajo
-  if (questionLower.includes('balance actual') || 
-      questionLower.includes('estado actual') ||
-      questionLower.includes('hoy') ||
-      questionLower.includes('ahora')) {
+  if (
+    questionLower.includes("balance actual") ||
+    questionLower.includes("estado actual") ||
+    questionLower.includes("hoy") ||
+    questionLower.includes("ahora")
+  ) {
     return QUERY_LIMITS.quick;
   }
-  
+
   // Consultas históricas/tendencias - Límite alto
-  if (questionLower.includes('tendencia') || 
-      questionLower.includes('evolución') ||
-      questionLower.includes('histórico') ||
-      questionLower.includes('comparación') ||
-      questionLower.includes('análisis completo') ||
-      questionLower.includes('todo el año') ||
-      questionLower.includes('todos los años')) {
+  if (
+    questionLower.includes("tendencia") ||
+    questionLower.includes("evolución") ||
+    questionLower.includes("histórico") ||
+    questionLower.includes("comparación") ||
+    questionLower.includes("análisis completo") ||
+    questionLower.includes("todo el año") ||
+    questionLower.includes("todos los años")
+  ) {
     return QUERY_LIMITS.historical;
   }
-  
+
   // Consultas anuales
-  if (questionLower.includes('año') || 
-      questionLower.includes('anual') ||
-      questionLower.includes('últimos 12 meses') ||
-      questionLower.includes('último año')) {
+  if (
+    questionLower.includes("año") ||
+    questionLower.includes("anual") ||
+    questionLower.includes("últimos 12 meses") ||
+    questionLower.includes("último año")
+  ) {
     return QUERY_LIMITS.yearly;
   }
-  
+
   // Consultas trimestrales
-  if (questionLower.includes('trimestre') ||
-      questionLower.includes('últimos 3 meses') ||
-      questionLower.includes('tres meses') ||
-      questionLower.includes('últimos 4 meses') ||
-      questionLower.includes('últimos 5 meses') ||
-      questionLower.includes('últimos 6 meses')) {
+  if (
+    questionLower.includes("trimestre") ||
+    questionLower.includes("últimos 3 meses") ||
+    questionLower.includes("tres meses") ||
+    questionLower.includes("últimos 4 meses") ||
+    questionLower.includes("últimos 5 meses") ||
+    questionLower.includes("últimos 6 meses")
+  ) {
     return QUERY_LIMITS.quarterly;
   }
-  
+
   // Consultas mensuales (por defecto)
   return QUERY_LIMITS.monthly;
 }
@@ -75,23 +88,23 @@ function determineQueryLimit(question) {
 // Función para obtener información sobre el alcance del análisis
 function getAnalysisScope(limit, actualTransactions) {
   const limitTypes = {
-    [QUERY_LIMITS.quick]: 'rápido',
-    [QUERY_LIMITS.monthly]: 'mensual',
-    [QUERY_LIMITS.quarterly]: 'trimestral',
-    [QUERY_LIMITS.yearly]: 'anual',
-    [QUERY_LIMITS.historical]: 'histórico'
+    [QUERY_LIMITS.quick]: "rápido",
+    [QUERY_LIMITS.monthly]: "mensual",
+    [QUERY_LIMITS.quarterly]: "trimestral",
+    [QUERY_LIMITS.yearly]: "anual",
+    [QUERY_LIMITS.historical]: "histórico",
   };
 
-  const limitType = limitTypes[limit] || 'personalizado';
+  const limitType = limitTypes[limit] || "personalizado";
   const isLimited = limit && actualTransactions >= limit;
-  
+
   return {
     limitApplied: limit,
     limitType,
     transactionsAnalyzed: actualTransactions,
     isLimited,
-    coverage: isLimited ? 'parcial' : 'completo',
-    message: `Transacciones analizadas para llegar a la respuesta: ${actualTransactions}${isLimited ? ' (vista parcial)' : ''}`
+    coverage: isLimited ? "parcial" : "completo",
+    message: `Transacciones analizadas para llegar a la respuesta: ${actualTransactions}${isLimited ? " (vista parcial)" : ""}`,
   };
 }
 
@@ -112,53 +125,81 @@ export default async function handler(req, res) {
 
     // Determinar límite dinámico según el tipo de consulta
     const transactionLimit = determineQueryLimit(question);
-    
-    console.log(`Consulta: "${question.substring(0, 50)}..." - Límite aplicado: ${transactionLimit || 'Sin límite'}`);
+
+    console.log(
+      `Consulta: "${question.substring(0, 50)}..." - Límite aplicado: ${transactionLimit || "Sin límite"}`
+    );
 
     // Mejorar la consulta con el analizador
     const enhancedQuestion = enhanceQuery(question);
     const queryAnalysis = analyzeQueryType(enhancedQuestion);
-    
-    console.log('Query analysis:', queryAnalysis);
+
+    console.log("Query analysis:", queryAnalysis);
 
     // Obtener todos los datos del sistema para el análisis completo
-    const [transactions, concepts, providers, generals, subconcepts] = await Promise.all([
-      transactionService.getAll({ limit: transactionLimit }),
-      conceptService.getAll(),
-      providerService.getAll(),
-      generalService.getAll(),
-      subconceptService.getAll()
-    ]);
+    const [transactions, concepts, providers, generals, subconcepts] =
+      await Promise.all([
+        transactionService.getAll({ limit: transactionLimit }),
+        conceptService.getAll(),
+        providerService.getAll(),
+        generalService.getAll(),
+        subconceptService.getAll(),
+      ]);
 
     // Agregar información de divisiones (datos estáticos)
     const divisions = DIVISIONS;
 
     // Preparar datos para el análisis
-    const financialData = prepareFinancialData(transactions, concepts, providers);
-    
+    const financialData = prepareFinancialData(
+      transactions,
+      concepts,
+      providers
+    );
+
     // Preparar datos específicos según la consulta
-    const querySpecificData = prepareDataForQuery(transactions, concepts, providers, generals, subconcepts, divisions, queryAnalysis);
-    
+    const querySpecificData = prepareDataForQuery(
+      transactions,
+      concepts,
+      providers,
+      generals,
+      subconcepts,
+      divisions,
+      queryAnalysis
+    );
+
     // Determinar componentes de visualización
-    const visualizationComponents = determineVisualizationComponents(queryAnalysis, querySpecificData);
+    const visualizationComponents = determineVisualizationComponents(
+      queryAnalysis,
+      querySpecificData
+    );
 
     // Análisis inteligente de la pregunta para determinar filtros
     const questionAnalysis = analyzeQuestion(enhancedQuestion);
-    
+
     // Filtrar datos según el análisis de la pregunta
     const filteredData = filterDataByQuestion(financialData, questionAnalysis);
 
     // Generar respuesta con IA usando la consulta mejorada
-    const response = await generateChatbotResponse(enhancedQuestion, filteredData, questionAnalysis, querySpecificData, visualizationComponents, {
-      generals,
-      concepts,
-      subconcepts,
-      providers,
-      divisions
-    });
+    const response = await generateChatbotResponse(
+      enhancedQuestion,
+      filteredData,
+      questionAnalysis,
+      querySpecificData,
+      visualizationComponents,
+      {
+        generals,
+        concepts,
+        subconcepts,
+        providers,
+        divisions,
+      }
+    );
 
     // Añadir información sobre el alcance del análisis
-    const analysisScope = getAnalysisScope(transactionLimit, transactions.length);
+    const analysisScope = getAnalysisScope(
+      transactionLimit,
+      transactions.length
+    );
 
     console.log("Final response to send:", response);
 
@@ -167,7 +208,7 @@ export default async function handler(req, res) {
       response: response.text,
       data: {
         ...response.data,
-        analysisScope // Información sobre el alcance del análisis
+        analysisScope, // Información sobre el alcance del análisis
       },
     });
   } catch (error) {
@@ -181,24 +222,26 @@ export default async function handler(req, res) {
 
 function prepareFinancialData(transactions, concepts, providers) {
   const now = new Date();
-  
+
   // Funciones helper para filtrar por fecha
   const filterByDate = (days) => {
     const cutoffDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-    return transactions.filter(t => {
-      const transactionDate = t.date.toDate ? t.date.toDate() : new Date(t.date);
+    return transactions.filter((t) => {
+      const transactionDate = t.date.toDate
+        ? t.date.toDate()
+        : new Date(t.date);
       return transactionDate >= cutoffDate;
     });
   };
 
   // Calcular métricas para un conjunto de transacciones
   const calculateMetrics = (transactionSet) => {
-    const ingresos = transactionSet.filter(t => t.type === "entrada");
-    const gastos = transactionSet.filter(t => t.type === "salida");
-    
+    const ingresos = transactionSet.filter((t) => t.type === "entrada");
+    const gastos = transactionSet.filter((t) => t.type === "salida");
+
     const totalIngresos = ingresos.reduce((sum, t) => sum + t.amount, 0);
     const totalGastos = gastos.reduce((sum, t) => sum + t.amount, 0);
-    
+
     return {
       totalIngresos,
       totalGastos,
@@ -218,74 +261,88 @@ function prepareFinancialData(transactions, concepts, providers) {
   const lastYear = filterByDate(365);
 
   // Análisis por conceptos
-  const gastosPorConcepto = concepts.map(concept => {
-    const transaccionesConcepto = transactions.filter(t => t.conceptId === concept.id && t.type === "salida");
-    const total = transaccionesConcepto.reduce((sum, t) => sum + t.amount, 0);
-    return {
-      concepto: concept.name,
-      conceptId: concept.id,
-      total,
-      numeroTransacciones: transaccionesConcepto.length,
-      transacciones: transaccionesConcepto.map(t => ({
-        id: t.id,
-        amount: t.amount,
-        description: t.description,
-        date: t.date.toDate ? t.date.toDate() : new Date(t.date),
-        providerId: t.providerId
-      })),
-      porcentaje: 0 // Se calculará después
-    };
-  }).filter(item => item.total > 0);
+  const gastosPorConcepto = concepts
+    .map((concept) => {
+      const transaccionesConcepto = transactions.filter(
+        (t) => t.conceptId === concept.id && t.type === "salida"
+      );
+      const total = transaccionesConcepto.reduce((sum, t) => sum + t.amount, 0);
+      return {
+        concepto: concept.name,
+        conceptId: concept.id,
+        total,
+        numeroTransacciones: transaccionesConcepto.length,
+        transacciones: transaccionesConcepto.map((t) => ({
+          id: t.id,
+          amount: t.amount,
+          description: t.description,
+          date: t.date.toDate ? t.date.toDate() : new Date(t.date),
+          providerId: t.providerId,
+        })),
+        porcentaje: 0, // Se calculará después
+      };
+    })
+    .filter((item) => item.total > 0);
 
-  const totalGastos = gastosPorConcepto.reduce((sum, item) => sum + item.total, 0);
-  gastosPorConcepto.forEach(item => {
-    item.porcentaje = totalGastos > 0 ? (item.total / totalGastos * 100) : 0;
+  const totalGastos = gastosPorConcepto.reduce(
+    (sum, item) => sum + item.total,
+    0
+  );
+  gastosPorConcepto.forEach((item) => {
+    item.porcentaje = totalGastos > 0 ? (item.total / totalGastos) * 100 : 0;
   });
   gastosPorConcepto.sort((a, b) => b.total - a.total);
 
   // Análisis por proveedores
-  const gastosPorProveedor = providers.map(provider => {
-    const transaccionesProveedor = transactions.filter(t => t.providerId === provider.id && t.type === "salida");
-    const total = transaccionesProveedor.reduce((sum, t) => sum + t.amount, 0);
-    return {
-      proveedor: provider.name,
-      providerId: provider.id,
-      total,
-      numeroTransacciones: transaccionesProveedor.length,
-      transacciones: transaccionesProveedor.map(t => ({
-        id: t.id,
-        amount: t.amount,
-        description: t.description,
-        date: t.date.toDate ? t.date.toDate() : new Date(t.date),
-        conceptId: t.conceptId
-      })),
-      porcentaje: totalGastos > 0 ? (total / totalGastos * 100) : 0
-    };
-  }).filter(item => item.total > 0);
+  const gastosPorProveedor = providers
+    .map((provider) => {
+      const transaccionesProveedor = transactions.filter(
+        (t) => t.providerId === provider.id && t.type === "salida"
+      );
+      const total = transaccionesProveedor.reduce(
+        (sum, t) => sum + t.amount,
+        0
+      );
+      return {
+        proveedor: provider.name,
+        providerId: provider.id,
+        total,
+        numeroTransacciones: transaccionesProveedor.length,
+        transacciones: transaccionesProveedor.map((t) => ({
+          id: t.id,
+          amount: t.amount,
+          description: t.description,
+          date: t.date.toDate ? t.date.toDate() : new Date(t.date),
+          conceptId: t.conceptId,
+        })),
+        porcentaje: totalGastos > 0 ? (total / totalGastos) * 100 : 0,
+      };
+    })
+    .filter((item) => item.total > 0);
   gastosPorProveedor.sort((a, b) => b.total - a.total);
 
   // Transacciones detalladas para análisis específicos
-  const transaccionesDetalladas = transactions.map(t => {
-    const concept = concepts.find(c => c.id === t.conceptId);
-    const provider = providers.find(p => p.id === t.providerId);
+  const transaccionesDetalladas = transactions.map((t) => {
+    const concept = concepts.find((c) => c.id === t.conceptId);
+    const provider = providers.find((p) => p.id === t.providerId);
     const date = t.date.toDate ? t.date.toDate() : new Date(t.date);
-    
+
     return {
       id: t.id,
       amount: t.amount,
       type: t.type,
       description: t.description,
       date: date,
-      dateString: date.toLocaleDateString('es-MX'),
-      dayOfWeek: date.toLocaleDateString('es-MX', { weekday: 'long' }),
-      month: date.toLocaleDateString('es-MX', { month: 'long' }),
+      dateString: date.toLocaleDateString("es-MX"),
+      dayOfWeek: date.toLocaleDateString("es-MX", { weekday: "long" }),
+      month: date.toLocaleDateString("es-MX", { month: "long" }),
       year: date.getFullYear(),
       week: getWeekNumber(date),
-      concept: concept ? concept.name : 'Sin concepto',
+      concept: concept ? concept.name : "Sin concepto",
       conceptId: t.conceptId,
-      provider: provider ? provider.name : 'Sin proveedor',
+      provider: provider ? provider.name : "Sin proveedor",
       providerId: t.providerId,
-      status: t.status
+      status: t.status,
     };
   });
 
@@ -300,23 +357,29 @@ function prepareFinancialData(transactions, concepts, providers) {
       ultimoAno: calculateMetrics(lastYear),
       total: calculateMetrics(transactions),
     },
-    
+
     // Análisis agrupados
     gastosPorConcepto,
     gastosPorProveedor,
-    
+
     // Datos detallados para análisis específicos
     transaccionesDetalladas,
-    
+
     // Estadísticas adicionales
-    transaccionesPendientes: transactions.filter(t => t.status === "pendiente").length,
+    transaccionesPendientes: transactions.filter(
+      (t) => t.status === "pendiente"
+    ).length,
     numeroTotalTransacciones: transactions.length,
-    fechaUltimaTransaccion: transactions.length > 0 ? 
-      Math.max(...transactions.map(t => {
-        const date = t.date.toDate ? t.date.toDate() : new Date(t.date);
-        return date.getTime();
-      })) : null,
-      
+    fechaUltimaTransaccion:
+      transactions.length > 0
+        ? Math.max(
+            ...transactions.map((t) => {
+              const date = t.date.toDate ? t.date.toDate() : new Date(t.date);
+              return date.getTime();
+            })
+          )
+        : null,
+
     // Análisis de tendencias
     gastoPorDia: getGastoPorDia(transaccionesDetalladas),
     gastoPorSemana: getGastoPorSemana(transaccionesDetalladas),
@@ -326,50 +389,58 @@ function prepareFinancialData(transactions, concepts, providers) {
 
 // Función helper para obtener el número de semana
 function getWeekNumber(date) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const d = new Date(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+  );
   const dayNum = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
-  return Math.ceil((((d - yearStart) / 86400000) + 1)/7);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
 }
 
 // Función para análisis por día
 function getGastoPorDia(transacciones) {
   const gastosPorDia = {};
-  transacciones.filter(t => t.type === 'salida').forEach(t => {
-    const fecha = t.dateString;
-    if (!gastosPorDia[fecha]) {
-      gastosPorDia[fecha] = {
-        fecha,
-        total: 0,
-        transacciones: []
-      };
-    }
-    gastosPorDia[fecha].total += t.amount;
-    gastosPorDia[fecha].transacciones.push(t);
-  });
-  
-  return Object.values(gastosPorDia).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  transacciones
+    .filter((t) => t.type === "salida")
+    .forEach((t) => {
+      const fecha = t.dateString;
+      if (!gastosPorDia[fecha]) {
+        gastosPorDia[fecha] = {
+          fecha,
+          total: 0,
+          transacciones: [],
+        };
+      }
+      gastosPorDia[fecha].total += t.amount;
+      gastosPorDia[fecha].transacciones.push(t);
+    });
+
+  return Object.values(gastosPorDia).sort(
+    (a, b) => new Date(b.fecha) - new Date(a.fecha)
+  );
 }
 
 // Función para análisis por semana
 function getGastoPorSemana(transacciones) {
   const gastosPorSemana = {};
-  transacciones.filter(t => t.type === 'salida').forEach(t => {
-    const semana = `${t.year}-W${t.week}`;
-    if (!gastosPorSemana[semana]) {
-      gastosPorSemana[semana] = {
-        semana,
-        year: t.year,
-        weekNumber: t.week,
-        total: 0,
-        transacciones: []
-      };
-    }
-    gastosPorSemana[semana].total += t.amount;
-    gastosPorSemana[semana].transacciones.push(t);
-  });
-  
+  transacciones
+    .filter((t) => t.type === "salida")
+    .forEach((t) => {
+      const semana = `${t.year}-W${t.week}`;
+      if (!gastosPorSemana[semana]) {
+        gastosPorSemana[semana] = {
+          semana,
+          year: t.year,
+          weekNumber: t.week,
+          total: 0,
+          transacciones: [],
+        };
+      }
+      gastosPorSemana[semana].total += t.amount;
+      gastosPorSemana[semana].transacciones.push(t);
+    });
+
   return Object.values(gastosPorSemana).sort((a, b) => {
     if (a.year !== b.year) return b.year - a.year;
     return b.weekNumber - a.weekNumber;
@@ -379,23 +450,27 @@ function getGastoPorSemana(transacciones) {
 // Función para análisis por mes
 function getGastoPorMes(transacciones) {
   const gastosPorMes = {};
-  transacciones.filter(t => t.type === 'salida').forEach(t => {
-    const mes = `${t.year}-${t.month}`;
-    if (!gastosPorMes[mes]) {
-      gastosPorMes[mes] = {
-        mes: t.month,
-        year: t.year,
-        total: 0,
-        transacciones: []
-      };
-    }
-    gastosPorMes[mes].total += t.amount;
-    gastosPorMes[mes].transacciones.push(t);
-  });
-  
+  transacciones
+    .filter((t) => t.type === "salida")
+    .forEach((t) => {
+      const mes = `${t.year}-${t.month}`;
+      if (!gastosPorMes[mes]) {
+        gastosPorMes[mes] = {
+          mes: t.month,
+          year: t.year,
+          total: 0,
+          transacciones: [],
+        };
+      }
+      gastosPorMes[mes].total += t.amount;
+      gastosPorMes[mes].transacciones.push(t);
+    });
+
   return Object.values(gastosPorMes).sort((a, b) => {
     if (a.year !== b.year) return b.year - a.year;
-    return new Date(`${a.mes} 1, ${a.year}`) - new Date(`${b.mes} 1, ${b.year}`);
+    return (
+      new Date(`${a.mes} 1, ${a.year}`) - new Date(`${b.mes} 1, ${b.year}`)
+    );
   });
 }
 
@@ -403,7 +478,7 @@ function getGastoPorMes(transacciones) {
 function analyzeQuestion(question) {
   const questionLower = question.toLowerCase();
   const currentDate = new Date();
-  
+
   const analysis = {
     timeframe: null,
     specificMonth: null,
@@ -412,20 +487,30 @@ function analyzeQuestion(question) {
     providers: [],
     metrics: [],
     chartType: null,
-    specific: false
+    specific: false,
   };
 
   // Meses en español para detectar consultas específicas
   const months = {
-    'enero': 0, 'febrero': 1, 'marzo': 2, 'abril': 3, 'mayo': 4, 'junio': 5,
-    'julio': 6, 'agosto': 7, 'septiembre': 8, 'octubre': 9, 'noviembre': 10, 'diciembre': 11
+    enero: 0,
+    febrero: 1,
+    marzo: 2,
+    abril: 3,
+    mayo: 4,
+    junio: 5,
+    julio: 6,
+    agosto: 7,
+    septiembre: 8,
+    octubre: 9,
+    noviembre: 10,
+    diciembre: 11,
   };
 
   // Detectar meses específicos
   for (const [monthName, monthIndex] of Object.entries(months)) {
     if (questionLower.includes(monthName)) {
       analysis.specificMonth = monthIndex;
-      analysis.timeframe = 'specific_month';
+      analysis.timeframe = "specific_month";
       analysis.specific = true;
       break;
     }
@@ -442,40 +527,70 @@ function analyzeQuestion(question) {
 
   // Análisis de período de tiempo (mantener lógica existente)
   if (!analysis.timeframe) {
-    if (questionLower.includes('último mes') || questionLower.includes('este mes') || questionLower.includes('mes actual')) {
-      analysis.timeframe = 'current_month';
+    if (
+      questionLower.includes("último mes") ||
+      questionLower.includes("este mes") ||
+      questionLower.includes("mes actual")
+    ) {
+      analysis.timeframe = "current_month";
       analysis.specific = true;
-    } else if (questionLower.includes('últimos 2 meses') || questionLower.includes('dos meses')) {
-      analysis.timeframe = 'last_2_months';
-    } else if (questionLower.includes('esta semana') || questionLower.includes('semana actual')) {
-      analysis.timeframe = 'current_week';
+    } else if (
+      questionLower.includes("últimos 2 meses") ||
+      questionLower.includes("dos meses")
+    ) {
+      analysis.timeframe = "last_2_months";
+    } else if (
+      questionLower.includes("esta semana") ||
+      questionLower.includes("semana actual")
+    ) {
+      analysis.timeframe = "current_week";
       analysis.specific = true;
-    } else if (questionLower.includes('año') || questionLower.includes('anual')) {
-      analysis.timeframe = 'current_year';
+    } else if (
+      questionLower.includes("año") ||
+      questionLower.includes("anual")
+    ) {
+      analysis.timeframe = "current_year";
     }
   }
 
   // Análisis de métricas solicitadas
-  if (questionLower.includes('gasto') || questionLower.includes('gasté')) {
-    analysis.metrics.push('gastos');
+  if (questionLower.includes("gasto") || questionLower.includes("gasté")) {
+    analysis.metrics.push("gastos");
   }
-  if (questionLower.includes('ingreso')) {
-    analysis.metrics.push('ingresos');
+  if (questionLower.includes("ingreso")) {
+    analysis.metrics.push("ingresos");
   }
-  if (questionLower.includes('balance')) {
-    analysis.metrics.push('balance');
+  if (questionLower.includes("balance")) {
+    analysis.metrics.push("balance");
   }
 
   // Análisis de tipo de gráfica sugerida
-  if (questionLower.includes('distribución') || questionLower.includes('porcentaje') || questionLower.includes('categoría')) {
-    analysis.chartType = 'pie';
-  } else if (questionLower.includes('comparar') || questionLower.includes('vs') || questionLower.includes('diferencia')) {
-    analysis.chartType = 'bar';
-  } else if (questionLower.includes('tendencia') || questionLower.includes('tiempo') || questionLower.includes('evolución')) {
-    analysis.chartType = 'line';
-  } else if (questionLower.includes('mayores gastos') || questionLower.includes('gastos más altos') || questionLower.includes('gastos del mes') || questionLower.includes('gastos este mes')) {
-    analysis.chartType = 'bar';
-    analysis.chartSubtype = 'gastos_por_dia';
+  if (
+    questionLower.includes("distribución") ||
+    questionLower.includes("porcentaje") ||
+    questionLower.includes("categoría")
+  ) {
+    analysis.chartType = "pie";
+  } else if (
+    questionLower.includes("comparar") ||
+    questionLower.includes("vs") ||
+    questionLower.includes("diferencia")
+  ) {
+    analysis.chartType = "bar";
+  } else if (
+    questionLower.includes("tendencia") ||
+    questionLower.includes("tiempo") ||
+    questionLower.includes("evolución")
+  ) {
+    analysis.chartType = "line";
+  } else if (
+    questionLower.includes("mayores gastos") ||
+    questionLower.includes("gastos más altos") ||
+    questionLower.includes("gastos del mes") ||
+    questionLower.includes("gastos este mes")
+  ) {
+    analysis.chartType = "bar";
+    analysis.chartSubtype = "gastos_por_dia";
   }
 
   return analysis;
@@ -483,30 +598,33 @@ function analyzeQuestion(question) {
 
 // Función para generar datos de gráfico específicos según la pregunta
 function generateChartData(filteredData, questionAnalysis) {
-  console.log('generateChartData llamada con:', {
+  console.log("generateChartData llamada con:", {
     questionAnalysis,
-    transacciones: filteredData.transaccionesDetalladas?.length || 0
+    transacciones: filteredData.transaccionesDetalladas?.length || 0,
   });
-  
+
   if (!questionAnalysis.chartType) {
-    console.log('No chartType definido');
+    console.log("No chartType definido");
     return null;
   }
 
-  if (questionAnalysis.chartType === 'bar' && questionAnalysis.chartSubtype === 'gastos_por_dia') {
-    console.log('Generando gráfico de gastos individuales por día');
-    
+  if (
+    questionAnalysis.chartType === "bar" &&
+    questionAnalysis.chartSubtype === "gastos_por_dia"
+  ) {
+    console.log("Generando gráfico de gastos individuales por día");
+
     // Generar gráfico de barras de gastos individuales por día
     const gastosIndividuales = [];
-    
+
     filteredData.transaccionesDetalladas
-      .filter(t => t.type === 'salida')
-      .forEach(t => {
+      .filter((t) => t.type === "salida")
+      .forEach((t) => {
         const fecha = new Date(t.date);
         const dia = fecha.getDate();
-        const mes = fecha.toLocaleString('es-MX', { month: 'short' });
+        const mes = fecha.toLocaleString("es-MX", { month: "short" });
         const fechaLabel = `${dia} ${mes}`;
-        
+
         // Crear una entrada por cada transacción individual
         gastosIndividuales.push({
           label: `${fechaLabel} - ${t.concepto}`,
@@ -514,12 +632,12 @@ function generateChartData(filteredData, questionAnalysis) {
           fecha: t.date,
           concepto: t.concepto,
           proveedor: t.proveedor,
-          descripcion: t.description || 'Sin descripción',
-          shortLabel: fechaLabel
+          descripcion: t.description || "Sin descripción",
+          shortLabel: fechaLabel,
         });
       });
 
-    console.log('Gastos individuales generados:', gastosIndividuales);
+    console.log("Gastos individuales generados:", gastosIndividuales);
 
     // Ordenar por fecha y tomar los datos para el gráfico
     const chartData = gastosIndividuales
@@ -527,25 +645,25 @@ function generateChartData(filteredData, questionAnalysis) {
       .map((item, index) => ({
         label: item.label,
         value: item.value,
-        shortLabel: item.shortLabel
+        shortLabel: item.shortLabel,
       }));
 
-    console.log('ChartData final:', chartData);
+    console.log("ChartData final:", chartData);
 
     return {
-      type: 'bar',
+      type: "bar",
       data: chartData,
-      title: 'Gastos Individuales por Día'
+      title: "Gastos Individuales por Día",
     };
   }
 
-  if (questionAnalysis.chartType === 'pie') {
+  if (questionAnalysis.chartType === "pie") {
     // Generar datos para gráfico de pastel por concepto
     const gastosPorConcepto = {};
-    
+
     filteredData.transaccionesDetalladas
-      .filter(t => t.type === 'salida')
-      .forEach(t => {
+      .filter((t) => t.type === "salida")
+      .forEach((t) => {
         if (!gastosPorConcepto[t.concepto]) {
           gastosPorConcepto[t.concepto] = 0;
         }
@@ -553,23 +671,23 @@ function generateChartData(filteredData, questionAnalysis) {
       });
 
     const total = Object.values(gastosPorConcepto).reduce((a, b) => a + b, 0);
-    
+
     return Object.entries(gastosPorConcepto)
       .map(([concepto, amount]) => ({
         label: concepto,
         value: amount,
-        percentage: ((amount / total) * 100).toFixed(1)
+        percentage: ((amount / total) * 100).toFixed(1),
       }))
       .sort((a, b) => b.value - a.value);
   }
 
-  if (questionAnalysis.chartType === 'bar') {
+  if (questionAnalysis.chartType === "bar") {
     // Gráfico de barras genérico por concepto
     const gastosPorConcepto = {};
-    
+
     filteredData.transaccionesDetalladas
-      .filter(t => t.type === 'salida')
-      .forEach(t => {
+      .filter((t) => t.type === "salida")
+      .forEach((t) => {
         if (!gastosPorConcepto[t.concepto]) {
           gastosPorConcepto[t.concepto] = 0;
         }
@@ -577,14 +695,14 @@ function generateChartData(filteredData, questionAnalysis) {
       });
 
     return {
-      type: 'bar',
+      type: "bar",
       data: Object.entries(gastosPorConcepto)
         .map(([concepto, amount]) => ({
           label: concepto,
-          value: amount
+          value: amount,
         }))
         .sort((a, b) => b.value - a.value),
-      title: 'Gastos por Concepto'
+      title: "Gastos por Concepto",
     };
   }
 
@@ -596,52 +714,63 @@ function filterDataByQuestion(financialData, questionAnalysis) {
   const currentDate = new Date();
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
-  
+
   let filteredTransactions = financialData.transaccionesDetalladas;
 
   // Filtrar por período de tiempo
-  if (questionAnalysis.timeframe === 'specific_month' && questionAnalysis.specificMonth !== null) {
+  if (
+    questionAnalysis.timeframe === "specific_month" &&
+    questionAnalysis.specificMonth !== null
+  ) {
     // Filtrar por mes y año específicos
     const targetMonth = questionAnalysis.specificMonth;
     const targetYear = questionAnalysis.specificYear || currentYear;
-    
-    filteredTransactions = filteredTransactions.filter(t => {
+
+    filteredTransactions = filteredTransactions.filter((t) => {
       const transactionDate = new Date(t.date);
-      return transactionDate.getMonth() === targetMonth && 
-             transactionDate.getFullYear() === targetYear;
+      return (
+        transactionDate.getMonth() === targetMonth &&
+        transactionDate.getFullYear() === targetYear
+      );
     });
-  } else if (questionAnalysis.timeframe === 'current_month') {
-    filteredTransactions = filteredTransactions.filter(t => {
+  } else if (questionAnalysis.timeframe === "current_month") {
+    filteredTransactions = filteredTransactions.filter((t) => {
       const transactionDate = new Date(t.date);
-      return transactionDate.getMonth() === currentMonth && 
-             transactionDate.getFullYear() === currentYear;
+      return (
+        transactionDate.getMonth() === currentMonth &&
+        transactionDate.getFullYear() === currentYear
+      );
     });
-  } else if (questionAnalysis.timeframe === 'current_week') {
+  } else if (questionAnalysis.timeframe === "current_week") {
     const startOfWeek = new Date(currentDate);
     startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
-    filteredTransactions = filteredTransactions.filter(t => {
+    filteredTransactions = filteredTransactions.filter((t) => {
       const transactionDate = new Date(t.date);
       return transactionDate >= startOfWeek;
     });
-  } else if (questionAnalysis.timeframe === 'last_2_months') {
+  } else if (questionAnalysis.timeframe === "last_2_months") {
     const twoMonthsAgo = new Date(currentDate);
     twoMonthsAgo.setMonth(currentDate.getMonth() - 2);
-    filteredTransactions = filteredTransactions.filter(t => {
+    filteredTransactions = filteredTransactions.filter((t) => {
       const transactionDate = new Date(t.date);
       return transactionDate >= twoMonthsAgo;
     });
   }
 
   // Recalcular métricas con transacciones filtradas
-  const filteredGastos = filteredTransactions.filter(t => t.type === 'salida');
-  const filteredIngresos = filteredTransactions.filter(t => t.type === 'entrada');
+  const filteredGastos = filteredTransactions.filter(
+    (t) => t.type === "salida"
+  );
+  const filteredIngresos = filteredTransactions.filter(
+    (t) => t.type === "entrada"
+  );
 
   const totalGastos = filteredGastos.reduce((sum, t) => sum + t.amount, 0);
   const totalIngresos = filteredIngresos.reduce((sum, t) => sum + t.amount, 0);
 
   // Recalcular gastos por concepto con datos filtrados
   const gastosPorConcepto = {};
-  filteredGastos.forEach(t => {
+  filteredGastos.forEach((t) => {
     if (!gastosPorConcepto[t.concept]) {
       gastosPorConcepto[t.concept] = 0;
     }
@@ -650,7 +779,7 @@ function filterDataByQuestion(financialData, questionAnalysis) {
 
   // Recalcular gastos por proveedor con datos filtrados
   const gastosPorProveedor = {};
-  filteredGastos.forEach(t => {
+  filteredGastos.forEach((t) => {
     if (!gastosPorProveedor[t.provider]) {
       gastosPorProveedor[t.provider] = 0;
     }
@@ -665,111 +794,152 @@ function filterDataByQuestion(financialData, questionAnalysis) {
       numeroTransacciones: filteredTransactions.length,
       numeroGastos: filteredGastos.length,
       numeroIngresos: filteredIngresos.length,
-      promedioGasto: filteredGastos.length > 0 ? totalGastos / filteredGastos.length : 0
+      promedioGasto:
+        filteredGastos.length > 0 ? totalGastos / filteredGastos.length : 0,
     },
-    gastosPorConcepto: Object.entries(gastosPorConcepto).map(([concepto, total]) => ({
-      concepto,
-      total,
-      porcentaje: totalGastos > 0 ? (total / totalGastos * 100) : 0
-    })).sort((a, b) => b.total - a.total),
-    gastosPorProveedor: Object.entries(gastosPorProveedor).map(([proveedor, total]) => ({
-      proveedor,
-      total,
-      porcentaje: totalGastos > 0 ? (total / totalGastos * 100) : 0
-    })).sort((a, b) => b.total - a.total),
+    gastosPorConcepto: Object.entries(gastosPorConcepto)
+      .map(([concepto, total]) => ({
+        concepto,
+        total,
+        porcentaje: totalGastos > 0 ? (total / totalGastos) * 100 : 0,
+      }))
+      .sort((a, b) => b.total - a.total),
+    gastosPorProveedor: Object.entries(gastosPorProveedor)
+      .map(([proveedor, total]) => ({
+        proveedor,
+        total,
+        porcentaje: totalGastos > 0 ? (total / totalGastos) * 100 : 0,
+      }))
+      .sort((a, b) => b.total - a.total),
     transaccionesDetalladas: filteredTransactions,
-    periodo: questionAnalysis.timeframe || 'all',
-    sugerenciaTipoGrafica: questionAnalysis.chartType
+    periodo: questionAnalysis.timeframe || "all",
+    sugerenciaTipoGrafica: questionAnalysis.chartType,
   };
 }
 
 // Función para limpiar y consolidar datos duplicados
 function cleanAndConsolidateData(filteredData) {
-  console.log('Datos antes de limpiar:', {
-    conceptos: filteredData.gastosPorConcepto.map(c => ({ concepto: c.concepto, total: c.total }))
+  console.log("Datos antes de limpiar:", {
+    conceptos: filteredData.gastosPorConcepto.map((c) => ({
+      concepto: c.concepto,
+      total: c.total,
+    })),
   });
 
   // Limpiar y consolidar gastos por concepto
   const conceptMap = {};
-  filteredData.gastosPorConcepto.forEach(item => {
+  filteredData.gastosPorConcepto.forEach((item) => {
     const conceptName = item.concepto.trim();
     if (conceptMap[conceptName]) {
-      console.log(`Consolidando concepto duplicado: ${conceptName} - Total anterior: ${conceptMap[conceptName].total}, Sumando: ${item.total}`);
+      console.log(
+        `Consolidando concepto duplicado: ${conceptName} - Total anterior: ${conceptMap[conceptName].total}, Sumando: ${item.total}`
+      );
       conceptMap[conceptName].total += item.total;
     } else {
       conceptMap[conceptName] = {
         concepto: conceptName,
-        total: item.total
+        total: item.total,
       };
     }
   });
 
   // Recalcular porcentajes
-  const totalGastos = Object.values(conceptMap).reduce((sum, item) => sum + item.total, 0);
-  const cleanedGastosPorConcepto = Object.values(conceptMap).map(item => ({
-    ...item,
-    porcentaje: totalGastos > 0 ? (item.total / totalGastos * 100) : 0
-  })).sort((a, b) => b.total - a.total);
+  const totalGastos = Object.values(conceptMap).reduce(
+    (sum, item) => sum + item.total,
+    0
+  );
+  const cleanedGastosPorConcepto = Object.values(conceptMap)
+    .map((item) => ({
+      ...item,
+      porcentaje: totalGastos > 0 ? (item.total / totalGastos) * 100 : 0,
+    }))
+    .sort((a, b) => b.total - a.total);
 
-  console.log('Datos después de limpiar:', {
-    conceptos: cleanedGastosPorConcepto.map(c => ({ concepto: c.concepto, total: c.total, porcentaje: c.porcentaje }))
+  console.log("Datos después de limpiar:", {
+    conceptos: cleanedGastosPorConcepto.map((c) => ({
+      concepto: c.concepto,
+      total: c.total,
+      porcentaje: c.porcentaje,
+    })),
   });
 
   // Limpiar y consolidar gastos por proveedor
   const providerMap = {};
-  filteredData.gastosPorProveedor.forEach(item => {
+  filteredData.gastosPorProveedor.forEach((item) => {
     const providerName = item.proveedor.trim();
     if (providerMap[providerName]) {
       providerMap[providerName].total += item.total;
     } else {
       providerMap[providerName] = {
         proveedor: providerName,
-        total: item.total
+        total: item.total,
       };
     }
   });
 
-  const cleanedGastosPorProveedor = Object.values(providerMap).map(item => ({
-    ...item,
-    porcentaje: totalGastos > 0 ? (item.total / totalGastos * 100) : 0
-  })).sort((a, b) => b.total - a.total);
+  const cleanedGastosPorProveedor = Object.values(providerMap)
+    .map((item) => ({
+      ...item,
+      porcentaje: totalGastos > 0 ? (item.total / totalGastos) * 100 : 0,
+    }))
+    .sort((a, b) => b.total - a.total);
 
   return {
     ...filteredData,
     gastosPorConcepto: cleanedGastosPorConcepto,
-    gastosPorProveedor: cleanedGastosPorProveedor
+    gastosPorProveedor: cleanedGastosPorProveedor,
   };
 }
 
-async function generateChatbotResponse(question, filteredData, questionAnalysis, querySpecificData = null, visualizationComponents = null, systemData = null) {
+async function generateChatbotResponse(
+  question,
+  filteredData,
+  questionAnalysis,
+  querySpecificData = null,
+  visualizationComponents = null,
+  systemData = null
+) {
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   // Limpiar datos antes de enviar a la IA
   const cleanedData = cleanAndConsolidateData(filteredData);
 
   const monthNames = [
-    'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre",
   ];
 
   const timeFrameText = {
-    'current_month': 'del mes actual',
-    'current_week': 'de esta semana',
-    'last_2_months': 'de los últimos 2 meses',
-    'current_year': 'de este año',
-    'specific_month': questionAnalysis.specificMonth !== null 
-      ? `de ${monthNames[questionAnalysis.specificMonth]} ${questionAnalysis.specificYear || new Date().getFullYear()}`
-      : 'del mes especificado',
-    'all': 'total'
+    current_month: "del mes actual",
+    current_week: "de esta semana",
+    last_2_months: "de los últimos 2 meses",
+    current_year: "de este año",
+    specific_month:
+      questionAnalysis.specificMonth !== null
+        ? `de ${monthNames[questionAnalysis.specificMonth]} ${questionAnalysis.specificYear || new Date().getFullYear()}`
+        : "del mes especificado",
+    all: "total",
   };
 
   const prompt = `
 Eres un asistente financiero experto. Analiza esta pregunta específica: "${question}"
 
-DATOS FINANCIEROS FILTRADOS PARA ESTA CONSULTA (${timeFrameText[cleanedData.periodo] || 'período solicitado'}):
+DATOS FINANCIEROS FILTRADOS PARA ESTA CONSULTA (${timeFrameText[cleanedData.periodo] || "período solicitado"}):
 ${JSON.stringify(cleanedData, null, 2)}
 
-${querySpecificData ? `
+${
+  querySpecificData
+    ? `
 DATOS ESPECÍFICOS PARA ESTA CONSULTA:
 - Análisis por categorías generales: ${JSON.stringify(querySpecificData.chartData, null, 2)}
 - Métricas específicas: ${JSON.stringify(querySpecificData.metrics, null, 2)}
@@ -777,11 +947,11 @@ DATOS ESPECÍFICOS PARA ESTA CONSULTA:
 - Información del sistema: ${JSON.stringify(querySpecificData.systemInfo, null, 2)}
 
 DATOS COMPLETOS DEL SISTEMA DISPONIBLES:
-- Categorías Generales (${systemData?.generals?.length || 0}): ${systemData?.generals?.map(g => `${g.name} (${g.type})`).join(', ') || 'No disponible'}
-- Conceptos (${systemData?.concepts?.length || 0}): ${systemData?.concepts?.map(c => c.name).join(', ') || 'No disponible'}
-- Subconceptos (${systemData?.subconcepts?.length || 0}): ${systemData?.subconcepts?.map(s => s.name).join(', ') || 'No disponible'}
-- Proveedores (${systemData?.providers?.length || 0}): ${systemData?.providers?.map(p => p.name).join(', ') || 'No disponible'}
-- Divisiones disponibles: ${systemData?.divisions?.map(d => d.label).join(', ') || 'No disponible'}
+- Categorías Generales (${systemData?.generals?.length || 0}): ${systemData?.generals?.map((g) => `${g.name} (${g.type})`).join(", ") || "No disponible"}
+- Conceptos (${systemData?.concepts?.length || 0}): ${systemData?.concepts?.map((c) => c.name).join(", ") || "No disponible"}
+- Subconceptos (${systemData?.subconcepts?.length || 0}): ${systemData?.subconcepts?.map((s) => s.name).join(", ") || "No disponible"}
+- Proveedores (${systemData?.providers?.length || 0}): ${systemData?.providers?.map((p) => p.name).join(", ") || "No disponible"}
+- Divisiones disponibles: ${systemData?.divisions?.map((d) => d.label).join(", ") || "No disponible"}
 
 CONTEXTO ADICIONAL:
 - Las categorías generales agrupan los conceptos por tipo (ej: "Jornada 1", "Jornada 2", etc.)
@@ -793,12 +963,18 @@ CONTEXTO ADICIONAL:
 - Si se pregunta por "generales del mes" muestra el desglose por categorías generales
 - Si se pregunta por "subconceptos del mes" muestra el desglose por subconceptos
 - Si se pregunta por "divisiones del mes" muestra el desglose por divisiones
-` : ''}
+`
+    : ""
+}
 
-${visualizationComponents ? `
+${
+  visualizationComponents
+    ? `
 COMPONENTES DE VISUALIZACIÓN SUGERIDOS:
-${visualizationComponents.map(comp => `- ${comp.type}: ${comp.title} (prioridad: ${comp.priority})`).join('\n')}
-` : ''}
+${visualizationComponents.map((comp) => `- ${comp.type}: ${comp.title} (prioridad: ${comp.priority})`).join("\n")}
+`
+    : ""
+}
 
 IMPORTANTE: 
 - Solo analiza y responde sobre los datos filtrados que corresponden EXACTAMENTE a la pregunta
@@ -817,7 +993,7 @@ IMPORTANTE:
 - Si la pregunta menciona "proveedores", usa los datos de proveedores
 
 INSTRUCCIONES PARA GRÁFICAS:
-${questionAnalysis.chartType ? `- Tipo de gráfica sugerida: ${questionAnalysis.chartType}` : '- Propón el tipo de gráfica más relevante'}
+${questionAnalysis.chartType ? `- Tipo de gráfica sugerida: ${questionAnalysis.chartType}` : "- Propón el tipo de gráfica más relevante"}
 - Para distribución por categorías: usa "bar" (NUNCA uses "pie")
 - Para comparaciones de montos: usa "bar"
 - Para tendencias temporales: usa "line"
@@ -866,17 +1042,17 @@ Enfócate solo en lo que se preguntó.
     const result = await model.generateContent(prompt);
     const response = await result.response;
     let text = response.text();
-    
+
     // Limpiar el texto si viene con markdown
-    if (text.includes('```json')) {
-      text = text.replace(/```json\n?/g, '').replace(/\n?```/g, '');
+    if (text.includes("```json")) {
+      text = text.replace(/```json\n?/g, "").replace(/\n?```/g, "");
     }
-    
+
     // Intentar parsear como JSON
     try {
       const parsedResponse = JSON.parse(text);
       console.log("Parsed AI response:", parsedResponse);
-      
+
       // Si no se generó chartData automáticamente, intentar generarlo basado en la pregunta
       if (!parsedResponse.data.chartData && questionAnalysis.chartType) {
         const autoChartData = generateChartData(filteredData, questionAnalysis);
@@ -886,24 +1062,37 @@ Enfócate solo en lo que se preguntó.
       }
 
       // Agregar transacciones detalladas si no están presentes
-      if (!parsedResponse.data.transactions && filteredData.transaccionesDetalladas) {
+      if (
+        !parsedResponse.data.transactions &&
+        filteredData.transaccionesDetalladas
+      ) {
         // Para consultas de gastos, incluir solo salidas; para general, incluir todas
         let transactionsToInclude = filteredData.transaccionesDetalladas;
-        
-        if (questionAnalysis.metrics.includes('gastos') && !questionAnalysis.metrics.includes('ingresos')) {
+
+        if (
+          questionAnalysis.metrics.includes("gastos") &&
+          !questionAnalysis.metrics.includes("ingresos")
+        ) {
           // Solo gastos
-          transactionsToInclude = filteredData.transaccionesDetalladas.filter(t => t.type === 'salida');
-        } else if (questionAnalysis.metrics.includes('ingresos') && !questionAnalysis.metrics.includes('gastos')) {
+          transactionsToInclude = filteredData.transaccionesDetalladas.filter(
+            (t) => t.type === "salida"
+          );
+        } else if (
+          questionAnalysis.metrics.includes("ingresos") &&
+          !questionAnalysis.metrics.includes("gastos")
+        ) {
           // Solo ingresos
-          transactionsToInclude = filteredData.transaccionesDetalladas.filter(t => t.type === 'entrada');
+          transactionsToInclude = filteredData.transaccionesDetalladas.filter(
+            (t) => t.type === "entrada"
+          );
         }
-        
+
         // Ordenar por fecha descendente y limitar para no sobrecargar la UI
         parsedResponse.data.transactions = transactionsToInclude
           .sort((a, b) => new Date(b.date) - new Date(a.date))
           .slice(0, 20); // Aumentar límite a 20 transacciones
       }
-      
+
       return parsedResponse;
     } catch (parseError) {
       console.error("Failed to parse AI response as JSON:", text);
@@ -917,70 +1106,94 @@ Enfócate solo en lo que se preguntó.
 }
 
 function generateFallbackResponse(question, filteredData, questionAnalysis) {
-  const { metricas, gastosPorConcepto, gastosPorProveedor, transaccionesDetalladas } = filteredData;
-  
+  const {
+    metricas,
+    gastosPorConcepto,
+    gastosPorProveedor,
+    transaccionesDetalladas,
+  } = filteredData;
+
   // Análisis simple basado en palabras clave
   const questionLower = question.toLowerCase();
-  
+
   // Preguntas sobre gastos más altos
-  if ((questionLower.includes("mayor") || questionLower.includes("más") || questionLower.includes("alto")) && 
-      questionLower.includes("gasto")) {
-    
+  if (
+    (questionLower.includes("mayor") ||
+      questionLower.includes("más") ||
+      questionLower.includes("alto")) &&
+    questionLower.includes("gasto")
+  ) {
     // Determinar el período
-    let transaccionesRelevantes = transaccionesDetalladas.filter(t => t.type === 'salida');
+    let transaccionesRelevantes = transaccionesDetalladas.filter(
+      (t) => t.type === "salida"
+    );
     let periodo = "total";
-    
+
     if (questionLower.includes("semana")) {
       const ahora = new Date();
       const inicioSemana = new Date(ahora.getTime() - 7 * 24 * 60 * 60 * 1000);
-      transaccionesRelevantes = transaccionesRelevantes.filter(t => new Date(t.date) >= inicioSemana);
+      transaccionesRelevantes = transaccionesRelevantes.filter(
+        (t) => new Date(t.date) >= inicioSemana
+      );
       periodo = "de la semana";
     } else if (questionLower.includes("día") || questionLower.includes("hoy")) {
-      const hoy = new Date().toLocaleDateString('es-MX');
-      transaccionesRelevantes = transaccionesRelevantes.filter(t => t.dateString === hoy);
+      const hoy = new Date().toLocaleDateString("es-MX");
+      transaccionesRelevantes = transaccionesRelevantes.filter(
+        (t) => t.dateString === hoy
+      );
       periodo = "de hoy";
     } else if (questionLower.includes("mes")) {
       const ahora = new Date();
       const inicioMes = new Date(ahora.getTime() - 30 * 24 * 60 * 60 * 1000);
-      transaccionesRelevantes = transaccionesRelevantes.filter(t => new Date(t.date) >= inicioMes);
+      transaccionesRelevantes = transaccionesRelevantes.filter(
+        (t) => new Date(t.date) >= inicioMes
+      );
       periodo = "del mes";
     }
-    
+
     if (transaccionesRelevantes.length === 0) {
       return {
         text: `No se encontraron gastos ${periodo}.`,
-        data: null
+        data: null,
       };
     }
-    
+
     // Encontrar el gasto más alto
-    const gastoMasAlto = transaccionesRelevantes.reduce((max, t) => t.amount > max.amount ? t : max);
-    const top5Gastos = transaccionesRelevantes.sort((a, b) => b.amount - a.amount).slice(0, 5);
-    
-    const totalPeriodo = transaccionesRelevantes.reduce((sum, t) => sum + t.amount, 0);
-    const porcentajeDelTotal = totalPeriodo > 0 ? (gastoMasAlto.amount / totalPeriodo * 100) : 0;
-    
+    const gastoMasAlto = transaccionesRelevantes.reduce((max, t) =>
+      t.amount > max.amount ? t : max
+    );
+    const top5Gastos = transaccionesRelevantes
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5);
+
+    const totalPeriodo = transaccionesRelevantes.reduce(
+      (sum, t) => sum + t.amount,
+      0
+    );
+    const porcentajeDelTotal =
+      totalPeriodo > 0 ? (gastoMasAlto.amount / totalPeriodo) * 100 : 0;
+
     let respuesta = `El gasto más alto ${periodo} fue de **${formatCurrency(gastoMasAlto.amount)}** el día **${gastoMasAlto.dateString}**.\n\n`;
     respuesta += `**Detalles:**\n`;
     respuesta += `* **Concepto:** ${gastoMasAlto.concept}\n`;
     respuesta += `* **Proveedor:** ${gastoMasAlto.provider}\n`;
     respuesta += `* **Descripción:** ${gastoMasAlto.description}\n`;
     respuesta += `* **Porcentaje del total ${periodo}:** ${porcentajeDelTotal.toFixed(1)}%\n\n`;
-    
+
     if (top5Gastos.length > 1) {
       respuesta += `**Top 5 gastos ${periodo}:**\n`;
       top5Gastos.forEach((gasto, index) => {
         respuesta += `${index + 1}. **${formatCurrency(gasto.amount)}** - ${gasto.concept} (${gasto.dateString})\n`;
       });
     }
-    
+
     // Generar datos de gráfico automáticamente
     const dataForChart = {
       ...filteredData,
-      transaccionesDetalladas: transaccionesRelevantes
+      transaccionesDetalladas: transaccionesRelevantes,
     };
     const chartData = generateChartData(dataForChart, questionAnalysis);
-    
+
     return {
       text: respuesta,
       data: {
@@ -990,34 +1203,39 @@ function generateFallbackResponse(question, filteredData, questionAnalysis) {
           "Porcentaje del Total": porcentajeDelTotal,
           "Número de Gastos": transaccionesRelevantes.length,
         },
-        percentages: top5Gastos.slice(0, 3).map(gasto => ({
+        percentages: top5Gastos.slice(0, 3).map((gasto) => ({
           label: `${gasto.concept} (${gasto.dateString})`,
-          percentage: totalPeriodo > 0 ? (gasto.amount / totalPeriodo * 100) : 0,
-          value: gasto.amount
+          percentage:
+            totalPeriodo > 0 ? (gasto.amount / totalPeriodo) * 100 : 0,
+          value: gasto.amount,
         })),
         transactions: transaccionesRelevantes.slice(0, 10), // Limitar a 10 transacciones para la tabla
-        chartData: chartData
-      }
+        chartData: chartData,
+      },
     };
   }
-  
+
   // Preguntas sobre períodos específicos
   if (questionLower.includes("semana")) {
     const data = metricas;
     const transaccionesDetalladas = filteredData.transaccionesDetalladas || [];
-    const gastosSemanales = transaccionesDetalladas.filter(t => t.type === 'salida');
-    const top3Gastos = gastosSemanales.sort((a, b) => b.amount - a.amount).slice(0, 3);
-    
+    const gastosSemanales = transaccionesDetalladas.filter(
+      (t) => t.type === "salida"
+    );
+    const top3Gastos = gastosSemanales
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 3);
+
     let respuesta = `En la última semana has gastado **${formatCurrency(data.totalGastos)}** y recibido **${formatCurrency(data.totalIngresos)}**.\n\n`;
     respuesta += `**Tu balance semanal es de ${formatCurrency(data.balance)}.**\n\n`;
-    
+
     if (top3Gastos.length > 0) {
       respuesta += `**Principales gastos de la semana:**\n`;
       top3Gastos.forEach((gasto, index) => {
         respuesta += `${index + 1}. **${formatCurrency(gasto.amount)}** - ${gasto.concepto} (${gasto.dateString})\n`;
       });
     }
-    
+
     return {
       text: respuesta,
       data: {
@@ -1027,54 +1245,62 @@ function generateFallbackResponse(question, filteredData, questionAnalysis) {
           "Balance Semana": data.balance,
           "Número de Transacciones": data.numeroTransacciones,
         },
-        percentages: top3Gastos.map(gasto => {
-          const porcentaje = data.totalGastos > 0 ? (gasto.amount / data.totalGastos * 100) : 0;
-          return {
-            label: gasto.concepto,
-            percentage: porcentaje,
-            value: gasto.amount
-          };
-        }).slice(0, 5),
-        chartData: null
-      }
+        percentages: top3Gastos
+          .map((gasto) => {
+            const porcentaje =
+              data.totalGastos > 0
+                ? (gasto.amount / data.totalGastos) * 100
+                : 0;
+            return {
+              label: gasto.concepto,
+              percentage: porcentaje,
+              value: gasto.amount,
+            };
+          })
+          .slice(0, 5),
+        chartData: null,
+      },
     };
   }
 
   // Preguntas sobre 2 meses
-  if (questionLower.includes("2 meses") || questionLower.includes("dos meses")) {
+  if (
+    questionLower.includes("2 meses") ||
+    questionLower.includes("dos meses")
+  ) {
     const data = metricas;
     const topConceptos = gastosPorConcepto.slice(0, 5);
-    
+
     let desglose = "";
     if (topConceptos.length > 0) {
-      desglose = ` Tu gasto se dividió en: ${topConceptos.map(c => 
-        `**${Math.round(c.porcentaje)}%** en ${c.concepto}`
-      ).join(", ")}.`;
+      desglose = ` Tu gasto se dividió en: ${topConceptos
+        .map((c) => `**${Math.round(c.porcentaje)}%** en ${c.concepto}`)
+        .join(", ")}.`;
     }
-    
+
     return {
       text: `En los últimos 2 meses has gastado **${formatCurrency(data.totalGastos)}** y recibido **${formatCurrency(data.totalIngresos)}**. Tu balance es de **${formatCurrency(data.balance)}**.${desglose} ${data.balance >= 0 ? "¡Vas bien financieramente!" : "Considera revisar tus gastos más altos."}`,
       data: {
         metrics: {
           "Total Gastos": data.totalGastos,
           "Total Ingresos": data.totalIngresos,
-          "Balance": data.balance,
+          Balance: data.balance,
           "Número de Transacciones": data.numeroTransacciones,
         },
-        percentages: topConceptos.map(item => ({
+        percentages: topConceptos.map((item) => ({
           label: item.concepto,
           percentage: Math.round(item.porcentaje * 10) / 10,
-          value: item.total
+          value: item.total,
         })),
-        chartData: null
-      }
+        chartData: null,
+      },
     };
   }
 
   // Respuesta genérica final
   const dataTotal = metricas;
   const topConcepto = gastosPorConcepto[0];
-  
+
   return {
     text: `Aquí tienes un resumen general: Gastos totales: **${formatCurrency(dataTotal.totalGastos)}**, Ingresos totales: **${formatCurrency(dataTotal.totalIngresos)}**, Balance: **${formatCurrency(dataTotal.balance)}**. ${topConcepto ? `Tu mayor gasto es en **${topConcepto.concepto}** (${Math.round(topConcepto.porcentaje)}%).` : ""} ¿Te gustaría saber algo más específico?`,
     data: {
@@ -1083,12 +1309,12 @@ function generateFallbackResponse(question, filteredData, questionAnalysis) {
         "Ingresos Totales": dataTotal.totalIngresos,
         "Balance Total": dataTotal.balance,
       },
-      percentages: gastosPorConcepto.slice(0, 3).map(item => ({
+      percentages: gastosPorConcepto.slice(0, 3).map((item) => ({
         label: item.concepto,
         percentage: Math.round(item.porcentaje * 10) / 10,
-        value: item.total
+        value: item.total,
       })),
-      chartData: null
-    }
+      chartData: null,
+    },
   };
 }
