@@ -8,7 +8,7 @@
 - ✅ **Input fijo en la parte inferior**: Similar a ChatGPT, siempre visible
 - ✅ **Scroll automático**: Los mensajes nuevos aparecen automáticamente en la vista
 a
-### 2. **Interfaz Profesional y Minimalista**
+### 2. **Interfaz Profesional y Minimalista**a
 - ✅ **Colores neutros**: Fondo blanco/gris claro, sin colores llamativos
 - ✅ **Acentos en verde esmeralda**: Color profesional y moderno (emerald-500 to teal-600)
 - ✅ **Tipografía limpia**: Tamaños de fuente apropiados, jerarquía clara
