@@ -74,6 +74,9 @@ const RecurringExpenseDetailsModal = ({ expense, isOpen, onClose, conceptName, s
                   <p className="text-sm text-gray-600">
                     {conceptName} - {subconceptName}
                   </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Creado el {formatDate(expense.createdAt)}
+                  </p>
                 </div>
               </div>
               <button
