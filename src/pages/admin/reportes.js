@@ -10,6 +10,7 @@ import { conceptService } from "../../lib/services/conceptService";
 import { subconceptService } from "../../lib/services/subconceptService";
 import { transactionService } from "../../lib/services/transactionService";
 import { providerService } from "../../lib/services/providerService";
+import { DIVISIONS, formatDivision } from "../../lib/constants/divisions";
 import { useAuth } from "../../context/AuthContext";
 import useReportStore from "../../lib/stores/reportStore";
 import {
@@ -52,6 +53,7 @@ const Reportes = () => {
     generalId: "",
     conceptId: "",
     subconceptId: "",
+    division: "",
   });
   const [currentMonthName, setCurrentMonthName] = useState("");
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -143,6 +145,7 @@ const Reportes = () => {
         endDate: endDate,
         conceptId: filters.conceptId || null,
         subconceptId: filters.subconceptId || null,
+        division: filters.division || null,
       };
 
       // Verificar si estamos viendo el mes actual y calcular arrastre automáticamente
@@ -402,7 +405,7 @@ const Reportes = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
             {/* Date Range */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
@@ -504,6 +507,27 @@ const Reportes = () => {
                 {getFilteredSubconcepts().map((subconcept) => (
                   <option key={subconcept.id} value={subconcept.id}>
                     {subconcept.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Division Filter */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                División
+              </label>
+              <select
+                value={filters.division}
+                onChange={(e) =>
+                  handleFilterChange("division", e.target.value)
+                }
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              >
+                <option value="">Todas</option>
+                {DIVISIONS.map((division) => (
+                  <option key={division.value} value={division.value}>
+                    {division.label}
                   </option>
                 ))}
               </select>
@@ -1102,6 +1126,67 @@ const Reportes = () => {
                       <tr key={provider}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
                           {provider}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                          {formatCurrency(data.amount)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
+                          {formatCurrency(data.pendingAmount)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                          {data.count}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">
+                          {formatPercentage(data.amount, stats.totalSalidas)}
+                        </td>
+                      </tr>
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Division Breakdown (for salidas) */}
+        {stats && stats.divisionBreakdown && Object.keys(stats.divisionBreakdown).length > 0 && (
+          <div className="bg-background rounded-lg border border-border p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-foreground">
+                Desglose por División (Gastos)
+              </h3>
+              <p className="text-sm text-muted-foreground italic">
+                Solo período: {currentMonthName}
+              </p>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-border">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      División
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Monto Total
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Saldo Pendiente
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Transacciones
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      % de Gastos
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-background divide-y divide-border">
+                  {Object.entries(stats.divisionBreakdown).map(
+                    ([division, data]) => (
+                      <tr key={division}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
+                          {division}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                           {formatCurrency(data.amount)}

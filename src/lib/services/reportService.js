@@ -24,7 +24,8 @@ export const reportService = {
             providerId: filters.providerId,
             generalId: filters.generalId,
             conceptId: filters.conceptId,
-            subconceptId: filters.subconceptId
+            subconceptId: filters.subconceptId,
+            division: filters.division
           }
         );
 
@@ -37,6 +38,7 @@ export const reportService = {
 
         // Filtrar gastos pendientes que sean hasta el mes del reporte (no meses futuros)
         const allPendingTransactions = allTransactions.filter(transaction => {
+          // Solo gastos pendientes
           if (transaction.type !== 'salida' || transaction.status !== 'pendiente') {
             return false;
           }
@@ -45,9 +47,38 @@ export const reportService = {
           const transactionYear = transactionDate.getFullYear();
           const transactionMonth = transactionDate.getMonth();
           
-          // Solo incluir gastos pendientes hasta el mes del reporte
-          return (transactionYear < reportYear) || 
+          // Verificar que la fecha esté dentro del rango
+          const isInDateRange = (transactionYear < reportYear) || 
                  (transactionYear === reportYear && transactionMonth <= reportMonth);
+          
+          if (!isInDateRange) return false;
+          
+          // Aplicar filtros adicionales a las transacciones de arrastre (solo si se especificaron)
+          if (filters.providerId && transaction.providerId !== filters.providerId) {
+            return false;
+          }
+          
+          if (filters.generalId && transaction.generalId !== filters.generalId) {
+            return false;
+          }
+          
+          if (filters.conceptId && transaction.conceptId !== filters.conceptId) {
+            return false;
+          }
+          
+          if (filters.subconceptId && transaction.subconceptId !== filters.subconceptId) {
+            return false;
+          }
+          
+          // Filtro de división: solo aplicar si se especificó Y la transacción tiene división
+          if (filters.division) {
+            // Si el filtro está activo, solo incluir transacciones que coincidan con esa división
+            if (transaction.division !== filters.division) {
+              return false;
+            }
+          }
+          
+          return true;
         });
 
         console.log('🔍 Filtrado de gastos pendientes por mes:', {
@@ -111,7 +142,8 @@ export const reportService = {
           providerId: filters.providerId,
           generalId: filters.generalId,
           conceptId: filters.conceptId,
-          subconceptId: filters.subconceptId
+          subconceptId: filters.subconceptId,
+          division: filters.division
         });
       }
       
@@ -149,6 +181,7 @@ export const reportService = {
         },
         conceptBreakdown: {},
         generalBreakdown: {},
+        divisionBreakdown: {},
         providerBreakdown: {},
         monthlyBreakdown: {}
       };
@@ -364,6 +397,24 @@ export const reportService = {
           }
           stats.generalBreakdown[generalName].total += amount;
           stats.generalBreakdown[generalName].count++;
+        }
+
+        // Division breakdown (solo para salidas) - solo para transacciones del período actual
+        if (isInPeriod && !isCarryover && transaction.type === 'salida' && transaction.division) {
+          const { formatDivision } = require('../constants/divisions');
+          const divisionName = formatDivision(transaction.division);
+          
+          if (!stats.divisionBreakdown[divisionName]) {
+            stats.divisionBreakdown[divisionName] = {
+              amount: 0,
+              count: 0,
+              pendingAmount: 0
+            };
+          }
+          
+          stats.divisionBreakdown[divisionName].amount += amount;
+          stats.divisionBreakdown[divisionName].count++;
+          stats.divisionBreakdown[divisionName].pendingAmount += transaction.balance || 0;
         }
 
         // Provider breakdown (solo para salidas) - solo para transacciones del período actual

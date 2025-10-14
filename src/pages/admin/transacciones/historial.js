@@ -7,6 +7,7 @@ import { conceptService } from "../../../lib/services/conceptService";
 import { descriptionService } from "../../../lib/services/descriptionService";
 import { providerService } from "../../../lib/services/providerService";
 import { generalService } from "../../../lib/services/generalService";
+import { DIVISIONS, formatDivision } from "../../../lib/constants/divisions";
 import { 
   Search, 
   TrendingUp, 
@@ -21,7 +22,8 @@ import {
   RefreshCw,
   ClockIcon,
   EyeIcon,
-  X
+  X,
+  Layers
 } from "lucide-react";
 import Select from "react-select";
 
@@ -121,6 +123,14 @@ const Historial = () => {
     }))
   ];
 
+  const divisionOptions = [
+    { value: "", label: "Todas las divisiones" },
+    ...DIVISIONS.map(division => ({
+      value: division.value,
+      label: division.label
+    }))
+  ];
+
   // Filters
   const [filters, setFilters] = useState({
     type: "",
@@ -128,6 +138,7 @@ const Historial = () => {
     providerId: "",
     generalId: "",
     status: "",
+    division: "",
     search: "",
     startDate: "",
     endDate: "",
@@ -205,6 +216,7 @@ const Historial = () => {
         conceptId: filters.conceptId || undefined,
         providerId: filters.providerId || undefined,
         generalId: filters.generalId || undefined,
+        division: filters.division || undefined,
         // Don't include status filter for stats
       };
 
@@ -243,6 +255,7 @@ const Historial = () => {
           providerId: filters.providerId || undefined,
           generalId: filters.generalId || undefined,
           status: filters.status || undefined,
+          division: filters.division || undefined,
         };
 
         // If date range is specified, use date range query
@@ -311,7 +324,7 @@ const Historial = () => {
     if (initialDataLoaded && filters.startDate && filters.endDate) {
       loadStatistics();
     }
-  }, [filters.startDate, filters.endDate, filters.type, filters.conceptId, filters.providerId, filters.generalId, initialDataLoaded]);
+  }, [filters.startDate, filters.endDate, filters.type, filters.conceptId, filters.providerId, filters.generalId, filters.division, initialDataLoaded]);
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => {
@@ -363,6 +376,7 @@ const Historial = () => {
       providerId: "",
       generalId: "",
       status: "",
+      division: "",
       search: "",
       startDate: formatDateForInput(firstDay),
       endDate: formatDateForInput(lastDay),
@@ -495,6 +509,14 @@ const Historial = () => {
       });
     }
     
+    if (filters.division) {
+      activeFilters.push({
+        label: 'División',
+        value: formatDivision(filters.division),
+        icon: Layers
+      });
+    }
+    
     if (filters.search) {
       activeFilters.push({
         label: 'Búsqueda',
@@ -552,7 +574,7 @@ const Historial = () => {
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
           <div className="p-4">
             {/* Filters Grid - Full width distribution */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-4 mb-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 mb-4">
               {/* Search */}
               <div className="flex flex-col">
                 <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
@@ -650,6 +672,23 @@ const Historial = () => {
                   placeholder="Seleccionar..."
                   isClearable
                   isSearchable
+                />
+              </div>
+
+              {/* Division Filter */}
+              <div className="flex flex-col">
+                <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                  <Layers className="w-4 h-4 mr-1.5" />
+                  División
+                </label>
+                <Select
+                  value={divisionOptions.find(option => option.value === filters.division)}
+                  onChange={(selectedOption) => handleFilterChange("division", selectedOption?.value || "")}
+                  options={divisionOptions}
+                  styles={selectStyles}
+                  placeholder="Seleccionar..."
+                  isClearable
+                  isSearchable={false}
                 />
               </div>
 
@@ -782,6 +821,9 @@ const Historial = () => {
                         Proveedor
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        División
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Monto
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -819,6 +861,9 @@ const Historial = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                           {getProviderName(transaction.providerId, transaction)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                          {transaction.type === 'salida' ? formatDivision(transaction.division) : '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
                           {formatCurrency(transaction.amount)}
@@ -871,6 +916,11 @@ const Historial = () => {
                         <p className="text-sm text-muted-foreground">
                           {getProviderName(transaction.providerId, transaction)}
                         </p>
+                        {transaction.type === 'salida' && transaction.division && (
+                          <p className="text-sm text-muted-foreground">
+                            {formatDivision(transaction.division)}
+                          </p>
+                        )}
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-semibold text-foreground">

@@ -312,6 +312,10 @@ export const transactionService = {
         q = query(q, where("status", "==", filters.status));
       }
 
+      if (filters.division) {
+        q = query(q, where("division", "==", filters.division));
+      }
+
       q = query(q, orderBy("date", "desc"));
 
       const querySnapshot = await getDocs(q);
@@ -642,6 +646,10 @@ export const transactionService = {
 
       if (filters.subconceptId) {
         q = query(q, where("subconceptId", "==", filters.subconceptId));
+      }
+
+      if (filters.division) {
+        q = query(q, where("division", "==", filters.division));
       }
 
       const querySnapshot = await getDocs(q);
