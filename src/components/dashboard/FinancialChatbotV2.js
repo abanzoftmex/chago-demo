@@ -8,6 +8,10 @@ import {
   TrendingUp,
   ChevronDown,
   RefreshCw,
+  ChartCandlestick,
+  ChartNoAxesCombined,
+  CircleDollarSign,
+  BanknoteArrowDown,
 } from "lucide-react";
 import ReusableDataTable from "../chatbot/ReusableDataTable";
 import ReusableChart from "../chatbot/ReusableChart";
@@ -50,10 +54,10 @@ const FinancialChatbotV2 = () => {
   ];
 
   const quickActions = [
-    { icon: "📊", label: "Balance actual", query: "¿Cuál es mi balance actual?" },
-    { icon: "💰", label: "Gastos del mes", query: "¿Cuánto gasté este mes?" },
-    { icon: "📈", label: "Tendencia anual", query: "¿Cuál es la tendencia de gastos en el último año?" },
-    { icon: "🏆", label: "Top gastos", query: "¿Cuáles son mis mayores gastos?" },
+    { icon: <ChartCandlestick/>, label: "Balance actual", query: "¿Cuál es mi balance actual?" },
+    { icon: <ChartNoAxesCombined/>, label: "Gastos del mes", query: "¿Cuánto gasté este mes?" },
+    { icon: <CircleDollarSign/>, label: "Tendencia anual", query: "¿Cuál es la tendencia de gastos en el último año?" },
+    { icon: <BanknoteArrowDown/>, label: "Top gastos", query: "¿Cuáles son mis mayores gastos?" },
   ];
 
   const handleSendMessage = async (message = null) => {
@@ -327,10 +331,10 @@ const FinancialChatbotV2 = () => {
   return (
     <div className="flex flex-col h-[90dvh] bg-white overflow-hidden rounded-lg shadow-lg border border-gray-200">
       {/* Header */}
-      <div className="border-b border-gray-200 bg-white sticky top-0 z-10">
+      <div className="bg-purple-50 border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center shadow-sm">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-600 rounded-lg flex items-center justify-center shadow-sm">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -340,7 +344,8 @@ const FinancialChatbotV2 = () => {
           </div>
           <button
             onClick={handleNewConversation}
-            className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+            cursor="pointer"
+            className="flex items-center space-x-2 px-3 py-2 text-sm bg-gradient-to-br from-purple-500 to-blue-600 text-white hover:text-white hover:bg-gray-100 rounded-lg transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             <span>Nueva conversación</span>
@@ -356,7 +361,7 @@ const FinancialChatbotV2 = () => {
             <div className="space-y-8">
               {/* Hero Section */}
               <div className="text-center space-y-4 py-8">
-                <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center mx-auto shadow-lg">
+                <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto shadow-lg">
                   <Sparkles className="w-8 h-8 text-white" />
                 </div>
                 <h2 className="text-3xl font-bold text-gray-900">
@@ -376,9 +381,9 @@ const FinancialChatbotV2 = () => {
                     <button
                       key={index}
                       onClick={() => handleSendMessage(action.query)}
-                      className="flex items-center space-x-3 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200 hover:border-gray-300 transition-all text-left group"
+                      className="bg-purple-50 flex items-center space-x-3 p-4 hover:bg-gray-100 rounded-xl border border-gray-200 hover:border-gray-300 transition-all text-left group"
                     >
-                      <span className="text-2xl">{action.icon}</span>
+                      <span className="text-2xl text-purple-600">{action.icon}</span>
                       <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">
                         {action.label}
                       </span>
@@ -526,8 +531,9 @@ const FinancialChatbotV2 = () => {
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-gray-200 bg-white sticky bottom-0">
+      <div className="border-t bg-gradient-to-br from-purple-500 to-blue-600 border-gray-200 bg-white sticky bottom-0">
         <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="text-2xl font-bold text-white mb-2">Haz una pregunta:</div>
           <div className="flex items-end space-x-3">
             <div className="flex-1 relative">
               <textarea
@@ -552,7 +558,7 @@ const FinancialChatbotV2 = () => {
               )}
             </div>
           </div>
-          <p className="text-xs text-gray-400 mt-2 text-center">
+          <p className="text-xs text-white mt-2 text-center">
             Presiona Enter para enviar • Shift + Enter para nueva línea
           </p>
         </div>
