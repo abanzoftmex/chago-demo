@@ -5,6 +5,7 @@ import { descriptionService } from './descriptionService';
 import { generalService } from './generalService';
 import { carryoverService } from './carryoverService';
 import { createEnhancedPDFReport } from './pdfTemplates';
+import { formatDivision } from '../constants/divisions';
 import * as XLSX from 'xlsx';
 
 export const reportService = {
@@ -605,6 +606,7 @@ export const reportService = {
             'General': generalMap[transaction.generalId] || 'Sin categoría general',
             'Concepto': conceptMap[transaction.conceptId] || 'Sin concepto',
             'Proveedor': providerMap[transaction.providerId] || 'N/A',
+            'División': !isIncome ? formatDivision(transaction.division) : 'N/A',
             'Ingreso': isIncome ? transaction.amount : '',
             'Gasto': !isIncome ? transaction.amount : '',
             'Total Pagado': !isIncome ? totalPaid : '',
@@ -637,6 +639,7 @@ export const reportService = {
           'General': '',
           'Concepto': '',
           'Proveedor': 'TOTALES:',
+          'División': '',
           'Ingreso': '',
           'Gasto': '',
           'Total Pagado': ''
@@ -647,6 +650,7 @@ export const reportService = {
           'General': '',
           'Concepto': '',
           'Proveedor': 'Total Ingresos:',
+          'División': '',
           'Ingreso': '',
           'Gasto': `$${stats.totalEntradas.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
           'Total Pagado': ''
@@ -657,6 +661,7 @@ export const reportService = {
           'General': '',
           'Concepto': '',
           'Proveedor': 'Total Gastos:',
+          'División': '',
           'Ingreso': '',
           'Gasto': `$${Math.abs(stats.totalSalidas).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
           'Total Pagado': ''
@@ -667,6 +672,7 @@ export const reportService = {
           'General': '',
           'Concepto': '',
           'Proveedor': 'Ingresos del mes anterior:',
+          'División': '',
           'Ingreso': '',
           'Gasto': `$${(stats.carryoverIncome || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
           'Total Pagado': ''
@@ -678,6 +684,7 @@ export const reportService = {
           'General': '',
           'Concepto': '',
           'Proveedor': 'BALANCE FINAL:',
+          'División': '',
           'Ingreso': '',
           'Gasto': `${balanceSinPendientes >= 0 ? '+' : ''}$${Math.abs(balanceSinPendientes).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
           'Total Pagado': ''
@@ -718,6 +725,59 @@ export const reportService = {
 
       const generalSheet = XLSX.utils.json_to_sheet(generalData);
       XLSX.utils.book_append_sheet(workbook, generalSheet, 'Por General');
+
+      // Division breakdown sheet - nueva hoja para gastos por división
+      const divisionBreakdown = {};
+      
+      // Calcular totales por división usando las transacciones filtradas
+      filteredTransactions.forEach(transaction => {
+        // Solo procesar gastos (salidas) que tengan división
+        if (transaction.type === 'salida' && transaction.division) {
+          const divisionLabel = formatDivision(transaction.division);
+          
+          if (!divisionBreakdown[divisionLabel]) {
+            divisionBreakdown[divisionLabel] = {
+              gastos: 0,
+              cantidad: 0
+            };
+          }
+          
+          divisionBreakdown[divisionLabel].gastos += transaction.amount;
+          divisionBreakdown[divisionLabel].cantidad++;
+        }
+      });
+
+      // Calcular total de gastos para porcentajes
+      const totalGastosPorDivision = Object.values(divisionBreakdown)
+        .reduce((sum, division) => sum + division.gastos, 0);
+
+      const divisionData = Object.entries(divisionBreakdown).map(([division, data]) => ({
+        'División': division,
+        'Total Gastos': `$${data.gastos.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+        'Cantidad de Transacciones': data.cantidad,
+        'Porcentaje del Total': `${((data.gastos / totalGastosPorDivision) * 100).toFixed(2)}%`
+      })).sort((a, b) => {
+        // Ordenar por monto de gastos (mayor a menor)
+        const amountA = parseFloat(a['Total Gastos'].replace(/[$,]/g, ''));
+        const amountB = parseFloat(b['Total Gastos'].replace(/[$,]/g, ''));
+        return amountB - amountA;
+      });
+
+      // Agregar fila de total
+      if (divisionData.length > 0) {
+        divisionData.push(
+          {}, // Fila vacía
+          {
+            'División': 'TOTAL GENERAL:',
+            'Total Gastos': `$${totalGastosPorDivision.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+            'Cantidad de Transacciones': Object.values(divisionBreakdown).reduce((sum, d) => sum + d.cantidad, 0),
+            'Porcentaje del Total': '100.00%'
+          }
+        );
+      }
+
+      const divisionSheet = XLSX.utils.json_to_sheet(divisionData);
+      XLSX.utils.book_append_sheet(workbook, divisionSheet, 'Por División');
 
       // Generate filename
       const now = new Date();
