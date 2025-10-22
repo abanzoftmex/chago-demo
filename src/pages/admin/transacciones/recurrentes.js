@@ -14,6 +14,9 @@ import { generalService } from "../../../lib/services/generalService";
 import { 
   ArrowPathIcon,
   PlusIcon,
+  EyeIcon,
+  TrashIcon,
+  CalendarIcon,
 } from '@heroicons/react/24/outline';
 
 const GastosRecurrentes = () => {
@@ -363,10 +366,12 @@ const GastosRecurrentes = () => {
                               expense.frequency === 'biweekly' ? 'bg-yellow-100 text-yellow-800' :
                               'bg-green-100 text-green-800'
                             }`}>
-                              {expense.frequency === 'daily' ? '📅 Diario' :
-                               expense.frequency === 'weekly' ? '📅 Semanal' :
-                               expense.frequency === 'biweekly' ? '📅 Quincenal' :
-                               '📅 Mensual'}
+                              {
+                              expense.frequency === 'daily' ? ( <div className="flex items-center"><CalendarIcon className="w-3 h-3 mr-1" /> <span>Diario</span></div> ) :
+                              expense.frequency === 'weekly' ? ( <div className="flex items-center"><CalendarIcon className="w-3 h-3 mr-1" /><span>Semanal</span></div> ) :
+                              expense.frequency === 'biweekly' ? ( <div className="flex items-center"><CalendarIcon className="w-3 h-3 mr-1" /><span>Quincenal</span></div> ) :
+                                ( <div className="flex items-center"><CalendarIcon className="w-3 h-3 mr-1" /><span>Mensual</span></div> )
+                              }
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
@@ -379,19 +384,18 @@ const GastosRecurrentes = () => {
                             <div className="flex items-center space-x-2">
                               <button
                                 onClick={() => handleViewDetails(expense)}
-                                className="px-3 py-1 bg-blue-100 text-blue-800 hover:bg-blue-200 rounded-md text-xs font-medium transition-colors inline-flex items-center"
+                                title="Ver detalles de recurrente"
+                                className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors"
                               >
-                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                                </svg>
-                                Detalles
+                                 <EyeIcon className="h-4 w-4" />
                               </button>
                               {canManageTransactions && (
                                 <button
                                   onClick={() => handleDelete(expense.id)}
-                                  className="px-3 py-1 bg-red-100 text-red-800 hover:bg-red-200 rounded-md text-xs font-medium transition-colors"
+                                  title="Eliminar recurrente"
+                                  className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center"
                                 >
-                                  Eliminar
+                                  <TrashIcon className="h-4 w-4" />
                                 </button>
                               )}
                             </div>
@@ -426,10 +430,12 @@ const GastosRecurrentes = () => {
                                 expense.frequency === 'biweekly' ? 'bg-yellow-100 text-yellow-800' :
                                 'bg-green-100 text-green-800'
                               }`}>
-                                {expense.frequency === 'daily' ? 'Diario' :
-                                 expense.frequency === 'weekly' ? 'Semanal' :
-                                 expense.frequency === 'biweekly' ? 'Quincenal' :
-                                 'Mensual'}
+                                {
+                                expense.frequency === 'daily' ? ( <div className="flex items-center"><CalendarIcon className="w-3 h-3 mr-1" /> <span>Diario</span></div> ) :
+                                expense.frequency === 'weekly' ? ( <div className="flex items-center"><CalendarIcon className="w-3 h-3 mr-1" /><span>Semanal</span></div> ) :
+                                expense.frequency === 'biweekly' ? ( <div className="flex items-center"><CalendarIcon className="w-3 h-3 mr-1" /><span>Quincenal</span></div> ) :
+                                ( <div className="flex items-center"><CalendarIcon className="w-3 h-3 mr-1" /><span>Mensual</span></div> )
+                                }
                               </span>
                             </div>
                             <Switch
@@ -468,19 +474,16 @@ const GastosRecurrentes = () => {
                         <div className="flex items-center space-x-2">
                           <button
                             onClick={() => handleViewDetails(expense)}
-                            className="px-3 py-1 bg-blue-100 text-blue-800 hover:bg-blue-200 rounded-md text-xs font-medium transition-colors inline-flex items-center"
+                            className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors"
                           >
-                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                            </svg>
-                            Detalles
+                             <EyeIcon className="h-4 w-4" />
                           </button>
                           {canManageTransactions && (
                             <button
                               onClick={() => handleDelete(expense.id)}
-                              className="px-3 py-1 bg-red-100 text-red-800 hover:bg-red-200 rounded-md text-xs font-medium transition-colors"
+                              className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center"
                             >
-                              Eliminar
+                              <TrashIcon className="h-4 w-4" />
                             </button>
                           )}
                         </div>

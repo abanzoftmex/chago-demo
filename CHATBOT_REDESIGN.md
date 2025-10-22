@@ -1,14 +1,14 @@
 # Rediseño del Chatbot Financiero - Estilo ChatGPT/OpenAI
-
+A-2
 ## 🎨 Cambios Principales
 
 ### 1. **Layout Completamente Nuevo**
-- ✅ **Diseño de conversación tipo ChatGPT**: Mensajes del usuario a la derecha, respuestas del asistente a la izquierda
+- ✅ **Diseño de conversación tipo ChatGPT**: Mensajes del usuario a la derecha, respuestas del asistenate a la izquierda
 - ✅ **Vista de pantalla completa**: Aprovecha todo el espacio disponible
 - ✅ **Input fijo en la parte inferior**: Similar a ChatGPT, siempre visible
 - ✅ **Scroll automático**: Los mensajes nuevos aparecen automáticamente en la vista
 a
-### 2. **Interfaz Profesional y Minimalista**
+### 2. **Interfaz Profesional y Minimalista**aa
 - ✅ **Colores neutros**: Fondo blanco/gris claro, sin colores llamativos
 - ✅ **Acentos en verde esmeralda**: Color profesional y moderno (emerald-500 to teal-600)
 - ✅ **Tipografía limpia**: Tamaños de fuente apropiados, jerarquía clara
