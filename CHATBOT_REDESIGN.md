@@ -3,7 +3,7 @@ A-2
 ## 🎨 Cambios Principales
 
 ### 1. **Layout Completamente Nuevo**
-- ✅ **Diseño de conversación tipo ChatGPT**: Mensajes del usuario a la derecha, respuestas del asistenate a la izquierda
+- ✅ **Diseño de conversación tipo ChatGPT**: Mensajes del usuario a la derecha, respuestas del asistenate a la izquierdaa
 - ✅ **Vista de pantalla completa**: Aprovecha todo el espacio disponible
 - ✅ **Input fijo en la parte inferior**: Similar a ChatGPT, siempre visible
 - ✅ **Scroll automático**: Los mensajes nuevos aparecen automáticamente en la vista
