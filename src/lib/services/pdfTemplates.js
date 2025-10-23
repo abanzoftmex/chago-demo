@@ -97,6 +97,17 @@ export const addSectionHeader = (doc, title, yPosition, icon = '') => {
  * Helper function to create info cards
  */
 export const createInfoCard = (doc, x, y, width, height, title, value, color = COLORS.text, subtitle = '') => {
+    // Validate parameters
+    if (!doc || x === undefined || y === undefined || !title || !value) {
+        console.error('createInfoCard: Invalid parameters', { x, y, title, value });
+        return;
+    }
+
+    // Ensure parameters are properly formatted
+    const safeTitle = String(title || '');
+    const safeValue = String(value || '');
+    const safeSubtitle = String(subtitle || '');
+
     // Card background
     doc.setFillColor(...COLORS.white);
     doc.roundedRect(x, y, width, height, 2, 2, 'F');
@@ -114,20 +125,20 @@ export const createInfoCard = (doc, x, y, width, height, title, value, color = C
     doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
     doc.setFont('helvetica', 'normal');
-    doc.text(title, x + 5, y + 12);
+    doc.text(safeTitle, x + 5, y + 12);
 
     // Value
     doc.setFontSize(16);
     doc.setTextColor(...color);
     doc.setFont('helvetica', 'bold');
-    doc.text(value, x + 5, y + 22);
+    doc.text(safeValue, x + 5, y + 22);
 
     // Subtitle if provided
-    if (subtitle) {
+    if (safeSubtitle) {
         doc.setFontSize(8);
         doc.setTextColor(120, 120, 120);
         doc.setFont('helvetica', 'normal');
-        doc.text(subtitle, x + 5, y + 28);
+        doc.text(safeSubtitle, x + 5, y + 28);
     }
 };
 
@@ -445,6 +456,141 @@ export const createEnhancedPDFReport = async (transactions, stats, filters, conc
         });
 
         currentY = doc.lastAutoTable.finalY + 10;
+    }
+
+    // Division breakdown if applicable (only for gastos)
+    if (Object.keys(stats.divisionBreakdown || {}).length > 0) {
+        // Check if we need a new page
+        if (currentY > 200) {
+            doc.addPage();
+            await addPageHeader(doc, 'Reporte Administrativo');
+            currentY = 50;
+        }
+
+        currentY = addSectionHeader(doc, 'Desglose por División (Solo Gastos)', currentY);
+
+        // Create cards for divisions
+        const divisions = Object.entries(stats.divisionBreakdown)
+            .sort(([, a], [, b]) => b.amount - a.amount);
+
+        const cardWidth = 58;
+        const cardHeight = 30;
+        const cardSpacing = 4;
+        let cardX = 15;
+        let cardRow = 0;
+
+        divisions.forEach(([division, data], index) => {
+            if (index > 0 && index % 3 === 0) {
+                cardRow++;
+                cardX = 15;
+            }
+
+            const yPos = currentY + (cardRow * (cardHeight + 5));
+            
+            // Validate division data before creating card
+            const safeDivision = division && division.trim() ? division : 'Sin División';
+            const safeAmount = data.amount || 0;
+            const safeCount = data.count || 0;
+            
+            createInfoCard(doc, cardX, yPos, cardWidth, cardHeight, safeDivision,
+                `$${safeAmount.toLocaleString('es-MX')}`, COLORS.accent,
+                `${safeCount} transacciones`);
+
+            cardX += cardWidth + cardSpacing;
+        });
+
+        currentY += (Math.ceil(divisions.length / 3) * (cardHeight + 5)) + 10;
+    }
+
+    // Summary boxes for General and Divisions at the end of first page
+    if (currentY < 220) {
+        currentY = addSectionHeader(doc, 'Resumen Final - Gastos por Categoría y División', currentY);
+
+        // General breakdown summary (only expenses)
+        if (Object.keys(stats.generalBreakdown).length > 0) {
+            doc.setFontSize(12);
+            doc.setTextColor(...COLORS.text);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Gastos por Categoría General:', 20, currentY + 5);
+
+            const generalExpenses = Object.entries(stats.generalBreakdown)
+                .filter(([, data]) => data.salidas > 0)
+                .sort(([, a], [, b]) => b.salidas - a.salidas)
+                .slice(0, 5); // Top 5
+
+            let boxY = currentY + 10;
+            generalExpenses.forEach(([general, data]) => {
+                // Validate data before creating box
+                const safeGeneral = general && general.trim() ? general : 'Sin Categoría';
+                const safeSalidas = data.salidas || 0;
+                const safeCount = data.count || 0;
+
+                // Create small summary box
+                doc.setFillColor(...COLORS.secondary);
+                doc.roundedRect(20, boxY, 80, 8, 1, 1, 'F');
+                doc.setDrawColor(...COLORS.primary);
+                doc.setLineWidth(0.2);
+                doc.roundedRect(20, boxY, 80, 8, 1, 1, 'D');
+
+                doc.setFontSize(9);
+                doc.setTextColor(...COLORS.text);
+                doc.setFont('helvetica', 'normal');
+                doc.text(safeGeneral, 22, boxY + 3);
+                doc.setFont('helvetica', 'bold');
+                doc.text(`$${safeSalidas.toLocaleString('es-MX')}`, 98, boxY + 3, { align: 'right' });
+                doc.setFont('helvetica', 'normal');
+                doc.text(`(${safeCount} transacciones)`, 22, boxY + 6);
+
+                boxY += 10;
+            });
+
+            currentY = boxY + 5;
+        }
+
+        // Division breakdown summary (if space allows)
+        if (Object.keys(stats.divisionBreakdown || {}).length > 0 && currentY < 250) {
+            // Calculate the starting Y position for divisions section
+            const generalExpensesCount = Object.entries(stats.generalBreakdown)
+                .filter(([, data]) => data.salidas > 0).length;
+            const divisionStartY = currentY - Math.min(5, generalExpensesCount) * 10;
+
+            doc.setFontSize(12);
+            doc.setTextColor(...COLORS.text);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Gastos por División:', 110, divisionStartY + 5);
+
+            const divisionExpenses = Object.entries(stats.divisionBreakdown)
+                .sort(([, a], [, b]) => b.amount - a.amount)
+                .slice(0, 5); // Top 5
+
+            let boxY = divisionStartY + 10;
+            divisionExpenses.forEach(([division, data]) => {
+                // Validate data before creating box
+                const safeDivision = division && division.trim() ? division : 'Sin División';
+                const safeAmount = data.amount || 0;
+                const safeCount = data.count || 0;
+
+                // Create small summary box
+                doc.setFillColor(...COLORS.secondary);
+                doc.roundedRect(110, boxY, 80, 8, 1, 1, 'F');
+                doc.setDrawColor(...COLORS.accent);
+                doc.setLineWidth(0.2);
+                doc.roundedRect(110, boxY, 80, 8, 1, 1, 'D');
+
+                doc.setFontSize(9);
+                doc.setTextColor(...COLORS.text);
+                doc.setFont('helvetica', 'normal');
+                doc.text(safeDivision, 112, boxY + 3);
+                doc.setFont('helvetica', 'bold');
+                doc.text(`$${safeAmount.toLocaleString('es-MX')}`, 188, boxY + 3, { align: 'right' });
+                doc.setFont('helvetica', 'normal');
+                doc.text(`(${safeCount} transacciones)`, 112, boxY + 6);
+
+                boxY += 10;
+            });
+
+            currentY = Math.max(currentY, boxY + 5);
+        }
     }
 
     // Transactions detail (limited to first 100 for performance)
