@@ -1,8 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-basePath: '/administrativo',
-  assetPrefix: '/administrativo',
+ 
   // Configuración de headers para cache
   async headers() {
     return [
