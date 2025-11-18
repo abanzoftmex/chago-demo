@@ -7,7 +7,7 @@ A-2
 - ✅ **Vista de pantalla completa**: Aprovecha todo el espacio disponibles
 - ✅ **Input fijo en la parte inferior**: Similar a ChatGPT, siempre visibles
 - ✅ **Scroll automático**: Los mensajes nuevos aparecen automáticamente en la vista
-a
+aa
 ### 2. **Interfaz Profesional y Minimalista**aa
 - ✅ **Colores neutros**: Fondo blanco/gris claro, sin colores llamativos
 - ✅ **Acentos en verde esmeralda**: Color profesional y moderno (emerald-500 to teal-600)
