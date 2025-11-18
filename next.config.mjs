@@ -1,38 +1,35 @@
-// next.config.mjs o next.config.js (ESM)
-const basePath = '/administrativo';
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  basePath,              // ✅ solo basePath
-  assetPrefix: basePath,
-  // ❌ QUITAMOS assetPrefix para evitar rutas raras
 
+  // Configuración de headers para cache
   async headers() {
     return [
       {
         // Archivos estáticos de Next.js (JS, CSS)
-        source: `${basePath}/_next/static/(.*)`,
+        source: "/_next/static/(.*)",
         headers: [
           {
             key: "Cache-Control",
+            // Cache por 1 hora, revalidar después
             value: "public, max-age=3600, stale-while-revalidate=86400",
           },
         ],
       },
       {
         // Chunks de JavaScript específicos
-        source: `${basePath}/_next/static/chunks/(.*)`,
+        source: "/_next/static/chunks/(.*)",
         headers: [
           {
             key: "Cache-Control",
+            // Cache por 1 hora, forzar revalidación
             value: "public, max-age=3600, must-revalidate",
           },
         ],
       },
       {
         // Páginas compiladas
-        source: `${basePath}/_next/static/chunks/pages/(.*)`,
+        source: "/_next/static/chunks/pages/(.*)",
         headers: [
           {
             key: "Cache-Control",
@@ -42,7 +39,7 @@ const nextConfig = {
       },
       {
         // Archivos JavaScript en general
-        source: `${basePath}/(.*).js`,
+        source: "/(.*).js",
         headers: [
           {
             key: "Cache-Control",
@@ -51,8 +48,8 @@ const nextConfig = {
         ],
       },
       {
-        // API routes - sin cache
-        source: `${basePath}/api/(.*)`,
+        // API routes - sin cache para evitar problemas
+        source: "/api/(.*)",
         headers: [
           {
             key: "Cache-Control",
@@ -63,14 +60,17 @@ const nextConfig = {
     ];
   },
 
+  // Configuración de build ID para invalidar cache con cada deploy
   generateBuildId: async () => {
+    // Usar timestamp redondeado a la hora más cercana
     const now = new Date();
     const hour = Math.floor(now.getTime() / (1000 * 60 * 60));
     return `build-${hour}`;
   },
 
+  // Optimizaciones adicionales
   compiler: {
-    removeConsole: false,
+    removeConsole: false, // Set to true in production builds
   },
 };
 
