@@ -78,11 +78,12 @@ const Sidebar = ({
       >
         <div className="flex flex-col w-full bg-white border-r border-gray-200">
           {/* Logo */}
-          <div className="flex items-center justify-center mb-8">
-            <img src="/demo-button-label-filled-icon.jpg" alt="Logo" className="w-10 h-auto" />
-            {!collapsed && (
-              <h1 className="ml-2 text-2xl font-bold text-gray-900">CHAGO</h1>
-            )}
+          <div className="flex items-center justify-center mb-4 mt-4 px-2">
+            <img 
+              src="/logo.jpg" 
+              alt="Logo" 
+              className={`h-auto rounded-2xl shadow-md ${collapsed ? 'w-full' : 'max-w-[120px]'}`}
+            />
           </div>
 
           {/* Navigation */}
@@ -130,7 +131,7 @@ const Sidebar = ({
                             handleNavigation("/admin/transacciones/entradas")
                           }
                           className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/entradas"
-                            ? "bg-orange-50 text-primary"
+                            ? "bg-red-50 text-primary"
                             : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                             }`}
                         >
@@ -147,7 +148,7 @@ const Sidebar = ({
                           }
                           className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/salidas"
                             ? "bg-blue-50 text-primary"
-                            : "text-gray-600 hover:text-gray-900 hover:bg-orange-50"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                             }`}
                         >
                           <MinusIcon className="h-5 w-5 flex-shrink-0" />
@@ -422,14 +423,11 @@ const Sidebar = ({
       >
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-6 border-b border-gray-200">
-            <div className="flex items-center space-x-2">
-              <img src="/demo-button-label-filled-icon.jpg" alt="Logo" className="w-8 h-8" />
-              <h1 className="text-xl font-bold text-gray-900">CHAGO</h1>
-            </div>
+          <div className="flex items-center justify-center px-4 py-6 border-b border-gray-200 relative">
+            <img src="/logo.jpg" alt="Logo" className="max-w-[120px] h-auto rounded-2xl shadow-md" />
             <button
               onClick={onClose}
-              className="p-2 rounded-lg text-gray-500 hover:text-gray-700"
+              className="absolute top-6 right-4 p-2 rounded-lg text-gray-500 hover:text-gray-700"
             >
               <XMarkIcon className="h-6 w-6" />
             </button>

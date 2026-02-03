@@ -33,7 +33,10 @@ const FinancialChatbotV2 = () => {
   };
 
   useEffect(() => {
-    scrollToBottom();
+    // Solo hacer scroll si hay mensajes en la conversación
+    if (conversationHistory.length > 0) {
+      scrollToBottom();
+    }
   }, [conversationHistory, isLoading]);
 
   // Auto-resize textarea
@@ -353,6 +356,40 @@ const FinancialChatbotV2 = () => {
         </div>
       </div>
 
+      {/* Seccion de preguntar al CHATBOT - Input Area */}
+      <div className="border-b bg-gradient-to-br from-purple-500 to-blue-600 border-gray-200 bg-white">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="text-2xl font-bold text-white mb-2">Haz una pregunta:</div>
+          <div className="flex items-end space-x-3">
+            <div className="flex-1 relative">
+              <textarea
+                ref={textareaRef}
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Escribe tu pregunta aquí..."
+                className="w-full px-4 py-3 pr-12 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none text-sm text-gray-900 placeholder-gray-400"
+                rows={1}
+                style={{ maxHeight: "120px" }}
+                disabled={isLoading}
+              />
+              {inputMessage && (
+                <button
+                  onClick={() => handleSendMessage()}
+                  disabled={isLoading || !inputMessage.trim()}
+                  className="absolute right-2 bottom-2 p-2 bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-xl hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+          <p className="text-xs text-white mt-2 text-center">
+            Presiona Enter para enviar • Shift + Enter para nueva línea
+          </p>
+        </div>
+      </div>
+
       {/* Messages Container */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto px-4 py-8">
@@ -527,40 +564,6 @@ const FinancialChatbotV2 = () => {
           )}
 
           <div ref={messagesEndRef} />
-        </div>
-      </div>
-
-      {/* Input Area */}
-      <div className="border-t bg-gradient-to-br from-purple-500 to-blue-600 border-gray-200 bg-white sticky bottom-0">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="text-2xl font-bold text-white mb-2">Haz una pregunta:</div>
-          <div className="flex items-end space-x-3">
-            <div className="flex-1 relative">
-              <textarea
-                ref={textareaRef}
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Escribe tu pregunta aquí..."
-                className="w-full px-4 py-3 pr-12 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none text-sm text-gray-900 placeholder-gray-400"
-                rows={1}
-                style={{ maxHeight: "120px" }}
-                disabled={isLoading}
-              />
-              {inputMessage && (
-                <button
-                  onClick={() => handleSendMessage()}
-                  disabled={isLoading || !inputMessage.trim()}
-                  className="absolute right-2 bottom-2 p-2 bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-xl hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          </div>
-          <p className="text-xs text-white mt-2 text-center">
-            Presiona Enter para enviar • Shift + Enter para nueva línea
-          </p>
         </div>
       </div>
     </div>

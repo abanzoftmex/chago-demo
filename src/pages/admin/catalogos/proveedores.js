@@ -163,7 +163,7 @@ const Proveedores = () => {
             <div className="flex space-x-3">
               <button
                 onClick={() => setIsCsvModalOpen(true)}
-                className="inline-flex items-center px-4 py-2 border border-orange-300 rounded-md shadow-sm text-sm font-medium text-orange-700 bg-orange-50 hover:bg-orange-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+                className="inline-flex items-center px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
               >
                 <ArrowUpOnSquareIcon className="h-5 w-5 mr-1.5" />
                 Importar CSV
@@ -262,7 +262,7 @@ const Proveedores = () => {
                             setSelectedProvider(provider);
                             setShowDetailModal(true);
                           }}
-                            className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors"
+                            className="bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-800 py-1.5 px-2.5 rounded-md transition-colors"
                             title="Ver detalles"
                             cursor="pointer"
                         >
@@ -270,7 +270,7 @@ const Proveedores = () => {
                         </button>
                         <button
                           onClick={() => handleEditProvider(provider)}
-                            className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center"
+                            className="bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center"
                             title="Editar ingreso"
                             cursor="pointer"
                         >
@@ -282,7 +282,7 @@ const Proveedores = () => {
                               setSelectedProvider(provider);
                               setShowDeleteModal(true);
                             }}
-                              className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors"
+                              className="bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-800 py-1.5 px-2.5 rounded-md transition-colors"
                               title="Eliminar proveedor"
                               cursor="pointer"
                           >

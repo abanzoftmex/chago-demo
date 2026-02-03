@@ -162,7 +162,7 @@ export const addLogoToPDF = async (doc, x = 15, y = 8, width = 25, height = 25) 
       doc.setFillColor(255, 255, 255);
       doc.roundedRect(x, y, width, height, 3, 3, 'F');
       doc.setFontSize(12);
-      doc.setTextColor(255, 107, 0); // Santiago FC orange
+      doc.setTextColor(220, 38, 38); // Red
       doc.setFont('helvetica', 'bold');
       doc.text('SFC', x + width / 2, y + height / 2 + 2, { align: 'center' });
 
@@ -187,7 +187,7 @@ export const addLogoToPDF = async (doc, x = 15, y = 8, width = 25, height = 25) 
     doc.setFillColor(255, 255, 255);
     doc.roundedRect(x, y, width, height, 3, 3, 'F');
     doc.setFontSize(12);
-    doc.setTextColor(255, 107, 0); // Santiago FC orange
+    doc.setTextColor(220, 38, 38); // Red
     doc.setFont('helvetica', 'bold');
     doc.text('SFC', x + width / 2, y + height / 2 + 2, { align: 'center' });
 

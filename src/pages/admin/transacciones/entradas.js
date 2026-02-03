@@ -405,7 +405,7 @@ const Ingresos = () => {
                                   {canManageTransactions && (
                                     <button
                                       onClick={() => handleEditTransaction(transaction)}
-                                      className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center"
+                                      className="bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center"
                                       title="Editar ingreso"
                                       cursor="pointer"
                                     >
@@ -416,7 +416,7 @@ const Ingresos = () => {
                                     onClick={() =>
                                       handleViewDetails(transaction.id)
                                     }
-                                    className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors"
+                                    className="bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-800 py-1.5 px-2.5 rounded-md transition-colors"
                                     title="Ver detalles"
                                     cursor="pointer"
                                   >

@@ -139,13 +139,13 @@ export default function ConceptosPage() {
 
             <button
               onClick={() => setIsMassiveImportModalOpen(true)}
-              className="inline-flex items-center px-4 py-2 border border-orange-300 rounded-md shadow-sm text-sm font-medium text-orange-700 bg-orange-50 hover:bg-orange-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+              className="inline-flex items-center px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
             ><ArrowUpOnSquareIcon className="h-5 w-5 mr-1.5" />
               Importar CSV
             </button>
             <button
               onClick={handleCreateConcept}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
             >
               <PlusIcon className="h-5 w-5 mr-1.5" />
               Nuevo Concepto
@@ -168,7 +168,7 @@ export default function ConceptosPage() {
                   id="filterGeneral"
                   value={filterGeneral}
                   onChange={(e) => setFilterGeneral(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500"
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-blue-500"
                 >
                   <option value="all">Todos los generales</option>
                   {generals.map((general) => (
@@ -189,7 +189,7 @@ export default function ConceptosPage() {
                   id="filterType"
                   value={filterType}
                   onChange={(e) => setFilterType(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500"
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-blue-500"
                 >
                   <option value="all">Todos los tipos</option>
                   <option value="entrada">Ingresos</option>
@@ -211,7 +211,7 @@ export default function ConceptosPage() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Buscar conceptos..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-blue-500"
               />
             </div>
           </div>
@@ -248,7 +248,7 @@ export default function ConceptosPage() {
               <p className="text-gray-600 mb-4">{error}</p>
               <button
                 onClick={loadData}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-orange-700"
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-red-700"
               >
                 Reintentar
               </button>
@@ -343,7 +343,7 @@ export default function ConceptosPage() {
                             <div className="flex items-center justify-end space-x-2">
                               <button
                                 onClick={() => handleEditConcept(concept)}
-                                className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center"
+                                className="bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center"
                                 title="Editar concepto"
                                 cursor="pointer"
                               >
@@ -352,7 +352,7 @@ export default function ConceptosPage() {
                               {canDeleteCatalogItems && (
                                 <button
                                   onClick={() => handleDeleteConcept(concept)}
-                                  className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center"
+                                  className="bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center"
                                   title="Eliminar concepto"
                                   cursor="pointer"
                                 >

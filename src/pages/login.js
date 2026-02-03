@@ -34,18 +34,17 @@ const LoginPage = () => {
       <div className="relative flex-1 min-h-[30vh] lg:min-h-auto lg:order-2">
         <img
           className="absolute inset-0 h-full w-full object-cover"
-          src="/soccer-ball-goal.webp"
-          alt="Football field"
+          src="/login_back.jpg"
+          alt="Demo"
         />
         <div className="absolute inset-0 bg-primary/30"></div>
         <div className="absolute inset-4 lg:bottom-8 lg:left-8 lg:right-8 lg:top-auto flex items-center lg:items-end">
           <div className="bg-white/50 backdrop-blur-sm rounded-lg p-4 lg:p-6 w-full shadow-2xl">
             <h3 className="text-lg lg:text-xl font-semibold text-gray-900 mb-2">
-              Humildad, Responsabilidad, Agradecimiento y Lealtad
+              Sistema de Gestión Administrativa
             </h3>
-            <p className="text-sm lg:text-base text-gray-700">
-              Valores fundamentales que guían nuestra gestión administrativa
-              hacia el éxito y la excelencia.
+            <p className="text-sm lg:text-base text-gray-800">
+              Administra tus entradas, salidas, proveedores y reportes de manera eficiente y segura.
             </p>
           </div>
         </div>
@@ -56,12 +55,12 @@ const LoginPage = () => {
         <div className="mx-auto w-full max-w-sm lg:w-96">
           <div className="text-center">
             <img
-              className="mx-auto h-24 lg:h-32 w-auto"
-              src="/demo-button-label-filled-icon.jpg"
+              className="rounded-2xl mx-auto h-24 lg:h-32 w-auto shadow-2xl"
+              src="/logo.jpg"
               alt="Logo"
             />
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mt-3 lg:mt-5">
-              Bienvenido <br /> <span className="text-primary">Sistema CHAGO</span>
+              Bienvenido <br /> <span className="text-primary">Sistema Administrativo</span>
             </h2>
           </div>
 

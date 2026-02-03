@@ -52,20 +52,20 @@ export const TRANSACTION_COLORS = {
   }
 };
 
-// Chart colors - Orange and Gray alternating scheme
+// Chart colors - Red and Gray alternating scheme
 export const CHART_COLORS = {
-  PRIMARY_ORANGE: 'rgba(249, 115, 22, 0.8)',     // orange-500
+  PRIMARY_ORANGE: 'rgba(220, 38, 38, 0.8)',     // red-600
   SECONDARY_GRAY: 'rgba(107, 114, 128, 0.8)',    // gray-500
-  PRIMARY_ORANGE_SOLID: 'rgb(249, 115, 22)',     // orange-500 solid
+  PRIMARY_ORANGE_SOLID: 'rgb(220, 38, 38)',     // red-600 solid
   SECONDARY_GRAY_SOLID: 'rgb(107, 114, 128)',    // gray-500 solid
-  PRIMARY_ORANGE_LIGHT: 'rgba(249, 115, 22, 0.1)', // orange-500 light
+  PRIMARY_ORANGE_LIGHT: 'rgba(220, 38, 38, 0.1)', // red-600 light
   SECONDARY_GRAY_LIGHT: 'rgba(107, 114, 128, 0.1)', // gray-500 light
   
   // Function to generate alternating colors
   generateAlternating: (count) => {
     const colors = [];
     for (let i = 0; i < count; i++) {
-      colors.push(i % 2 === 0 ? 'rgba(249, 115, 22, 0.8)' : 'rgba(107, 114, 128, 0.8)');
+      colors.push(i % 2 === 0 ? 'rgba(220, 38, 38, 0.8)' : 'rgba(107, 114, 128, 0.8)');
     }
     return colors;
   }

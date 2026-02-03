@@ -9,9 +9,9 @@ import { addLogoToPDF } from '../utils/logoUtils';
 
 // Define colors matching email template
 const COLORS = {
-    primary: [255, 107, 0],      // #FF6B00 - Santiago FC Orange
+    primary: [220, 38, 38],      // #dc2626 - Red
     secondary: [245, 245, 245],  // Light gray
-    accent: [224, 90, 0],        // Darker orange
+    accent: [185, 28, 28],       // Darker red
     text: [51, 51, 51],          // Dark gray
     success: [0, 153, 51],       // Green
     danger: [220, 53, 69],       // Red

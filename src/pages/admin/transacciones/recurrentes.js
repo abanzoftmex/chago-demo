@@ -385,7 +385,7 @@ const GastosRecurrentes = () => {
                               <button
                                 onClick={() => handleViewDetails(expense)}
                                 title="Ver detalles de recurrente"
-                                className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors"
+                                className="bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-800 py-1.5 px-2.5 rounded-md transition-colors"
                               >
                                  <EyeIcon className="h-4 w-4" />
                               </button>

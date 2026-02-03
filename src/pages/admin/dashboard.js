@@ -233,7 +233,7 @@ const Dashboard = () => {
     >
       <div className="space-y-6">
         {/* Month navigation section */}
-        <div className="bg-orange-100 rounded-lg border border-border p-6">
+        <div className="bg-red-100 rounded-lg border border-border p-6">
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-2">
