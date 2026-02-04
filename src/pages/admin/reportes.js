@@ -1293,7 +1293,7 @@ const Reportes = () => {
                 <table className="min-w-full divide-y divide-border">
                   <thead className="bg-muted">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" style={{width: '200px', minWidth: '200px'}}>
                         Categoría General
                       </th>
                       {showIncomeInBreakdown && (
@@ -1302,7 +1302,7 @@ const Reportes = () => {
                         </th>
                       )}
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Gastos
+                        Monto
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Pagado
@@ -1314,7 +1314,7 @@ const Reportes = () => {
                         Cantidad
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        {showIncomeInBreakdown ? "% de Gastos/Ingresos" : "% de Gastos"}
+                        {getFilteredTransactionType() === 'entrada' ? "% de Ingresos" : "% de Gastos"}
                       </th>
                     </tr>
                   </thead>
@@ -1325,8 +1325,8 @@ const Reportes = () => {
                       )
                       .map(([general, data]) => (
                         <tr key={general}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
-                            {general}
+                          <td className="px-6 py-4 text-sm font-medium text-foreground" style={{width: '200px', minWidth: '200px'}}>
+                            <div className="truncate">{general}</div>
                           </td>
                           {showIncomeInBreakdown && (
                             <td className={`px-6 py-4 whitespace-nowrap text-sm ${data.entradas === 0 ? 'text-foreground' : 'text-green-600'
@@ -1334,9 +1334,15 @@ const Reportes = () => {
                               {formatCurrency(data.entradas)}
                             </td>
                           )}
-                          <td className={`px-6 py-4 whitespace-nowrap text-sm ${data.salidas === 0 ? 'text-foreground' : 'text-red-600'
+                          <td className={`px-6 py-4 whitespace-nowrap text-sm ${
+                            getFilteredTransactionType() === 'entrada' 
+                              ? (data.entradas === 0 ? 'text-foreground' : 'text-green-600')
+                              : (data.salidas === 0 ? 'text-foreground' : 'text-red-600')
                             }`}>
-                            {formatCurrency(data.salidas)}
+                            {getFilteredTransactionType() === 'entrada' 
+                              ? formatCurrency(data.entradas) 
+                              : formatCurrency(data.salidas)
+                            }
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
                             {formatCurrency(data.paid || 0)}
@@ -1347,12 +1353,11 @@ const Reportes = () => {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                             {data.count}
                           </td>
-                          <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${showIncomeInBreakdown && isMainlyIncome(data)
-                              ? 'text-green-600'
-                              : 'text-red-600'
+                          <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${
+                            getFilteredTransactionType() === 'entrada' ? 'text-green-600' : 'text-red-600'
                             }`}>
-                            {showIncomeInBreakdown
-                              ? formatSmartPercentage(data, stats.totalSalidas, stats.totalEntradas)
+                            {getFilteredTransactionType() === 'entrada'
+                              ? formatPercentage(data.entradas, stats.totalEntradas)
                               : formatPercentage(data.salidas, stats.totalSalidas)
                             }
                           </td>
@@ -1383,7 +1388,7 @@ const Reportes = () => {
                 <table className="min-w-full divide-y divide-border">
                   <thead className="bg-muted">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" style={{width: '200px', minWidth: '200px'}}>
                         Concepto
                       </th>
                       {showIncomeInBreakdown && (
@@ -1392,7 +1397,7 @@ const Reportes = () => {
                         </th>
                       )}
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Gastos
+                        Monto
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Pagado
@@ -1404,7 +1409,7 @@ const Reportes = () => {
                         Cantidad
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        {showIncomeInBreakdown ? "% de Gastos/Ingresos" : "% de Gastos"}
+                        {getFilteredTransactionType() === 'entrada' ? "% de Ingresos" : "% de Gastos"}
                       </th>
                     </tr>
                   </thead>
@@ -1415,8 +1420,8 @@ const Reportes = () => {
                       )
                       .map(([concept, data]) => (
                         <tr key={concept}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
-                            {concept}
+                          <td className="px-6 py-4 text-sm font-medium text-foreground" style={{width: '200px', minWidth: '200px'}}>
+                            <div className="truncate">{concept}</div>
                           </td>
                           {showIncomeInBreakdown && (
                             <td className={`px-6 py-4 whitespace-nowrap text-sm ${data.entradas === 0 ? 'text-foreground' : 'text-green-600'
@@ -1424,9 +1429,15 @@ const Reportes = () => {
                               {formatCurrency(data.entradas)}
                             </td>
                           )}
-                          <td className={`px-6 py-4 whitespace-nowrap text-sm ${data.salidas === 0 ? 'text-foreground' : 'text-red-600'
+                          <td className={`px-6 py-4 whitespace-nowrap text-sm ${
+                            getFilteredTransactionType() === 'entrada' 
+                              ? (data.entradas === 0 ? 'text-foreground' : 'text-green-600')
+                              : (data.salidas === 0 ? 'text-foreground' : 'text-red-600')
                             }`}>
-                            {formatCurrency(data.salidas)}
+                            {getFilteredTransactionType() === 'entrada' 
+                              ? formatCurrency(data.entradas) 
+                              : formatCurrency(data.salidas)
+                            }
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
                             {formatCurrency(data.paid || 0)}
@@ -1437,12 +1448,11 @@ const Reportes = () => {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                             {data.count}
                           </td>
-                          <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${showIncomeInBreakdown && isMainlyIncome(data)
-                              ? 'text-green-600'
-                              : 'text-red-600'
+                          <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${
+                            getFilteredTransactionType() === 'entrada' ? 'text-green-600' : 'text-red-600'
                             }`}>
-                            {showIncomeInBreakdown
-                              ? formatSmartPercentage(data, stats.totalSalidas, stats.totalEntradas)
+                            {getFilteredTransactionType() === 'entrada'
+                              ? formatPercentage(data.entradas, stats.totalEntradas)
                               : formatPercentage(data.salidas, stats.totalSalidas)
                             }
                           </td>
@@ -1474,7 +1484,7 @@ const Reportes = () => {
                 <table className="min-w-full divide-y divide-border">
                   <thead className="bg-muted">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" style={{width: '200px', minWidth: '200px'}}>
                         Subconcepto
                       </th>
                       {showIncomeInBreakdown && (
@@ -1483,7 +1493,7 @@ const Reportes = () => {
                         </th>
                       )}
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Gastos
+                        Monto
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Pagado
@@ -1495,7 +1505,7 @@ const Reportes = () => {
                         Cantidad
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        {showIncomeInBreakdown ? "% de Gastos/Ingresos" : "% de Gastos"}
+                        {getFilteredTransactionType() === 'entrada' ? "% de Ingresos" : "% de Gastos"}
                       </th>
                     </tr>
                   </thead>
@@ -1506,8 +1516,8 @@ const Reportes = () => {
                       )
                       .map(([subconcept, data]) => (
                         <tr key={subconcept}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
-                            {subconcept}
+                          <td className="px-6 py-4 text-sm font-medium text-foreground" style={{width: '200px', minWidth: '200px'}}>
+                            <div className="truncate">{subconcept}</div>
                           </td>
                           {showIncomeInBreakdown && (
                             <td className={`px-6 py-4 whitespace-nowrap text-sm ${data.entradas === 0 ? 'text-foreground' : 'text-green-600'
@@ -1515,9 +1525,15 @@ const Reportes = () => {
                               {formatCurrency(data.entradas)}
                             </td>
                           )}
-                          <td className={`px-6 py-4 whitespace-nowrap text-sm ${data.salidas === 0 ? 'text-foreground' : 'text-red-600'
+                          <td className={`px-6 py-4 whitespace-nowrap text-sm ${
+                            getFilteredTransactionType() === 'entrada' 
+                              ? (data.entradas === 0 ? 'text-foreground' : 'text-green-600')
+                              : (data.salidas === 0 ? 'text-foreground' : 'text-red-600')
                             }`}>
-                            {formatCurrency(data.salidas)}
+                            {getFilteredTransactionType() === 'entrada' 
+                              ? formatCurrency(data.entradas) 
+                              : formatCurrency(data.salidas)
+                            }
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
                             {formatCurrency(data.paid || 0)}
@@ -1528,12 +1544,11 @@ const Reportes = () => {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                             {data.count}
                           </td>
-                          <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${showIncomeInBreakdown && isMainlyIncome(data)
-                              ? 'text-green-600'
-                              : 'text-red-600'
+                          <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${
+                            getFilteredTransactionType() === 'entrada' ? 'text-green-600' : 'text-red-600'
                             }`}>
-                            {showIncomeInBreakdown
-                              ? formatSmartPercentage(data, stats.totalSalidas, stats.totalEntradas)
+                            {getFilteredTransactionType() === 'entrada'
+                              ? formatPercentage(data.entradas, stats.totalEntradas)
                               : formatPercentage(data.salidas, stats.totalSalidas)
                             }
                           </td>
@@ -1547,11 +1562,11 @@ const Reportes = () => {
           )}
 
         {/* Provider Breakdown (for salidas) */}
-        {stats && Object.keys(stats.providerBreakdown).length > 0 && (
+        {stats && getFilteredTransactionType() === 'salida' && Object.keys(stats.providerBreakdown).length > 0 && (
           <div className="bg-background rounded-lg border border-border p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-foreground">
-                Desglose por Proveedor (Gastos)
+                Desglose por Proveedor
               </h3>
               <p className="text-sm text-muted-foreground italic">
                 Solo período: {currentMonthName}
@@ -1562,14 +1577,17 @@ const Reportes = () => {
               <table className="min-w-full divide-y divide-border">
                 <thead className="bg-muted">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" style={{width: '200px', minWidth: '200px'}}>
                       Proveedor
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Monto Total
+                      Monto
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Saldo Pendiente
+                      Pagado
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Por Pagar
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Transacciones
@@ -1583,14 +1601,17 @@ const Reportes = () => {
                   {Object.entries(stats.providerBreakdown).map(
                     ([provider, data]) => (
                       <tr key={provider}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
-                          {provider}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
-                          {formatCurrency(data.amount)}
+                        <td className="px-6 py-4 text-sm font-medium text-foreground" style={{width: '200px', minWidth: '200px'}}>
+                          <div className="truncate">{provider}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
-                          {formatCurrency(data.pendingAmount)}
+                          {formatCurrency(data.amount)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
+                          {formatCurrency(data.amount - (data.pendingAmount || 0))}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">
+                          {formatCurrency(data.pendingAmount || 0)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                           {data.count}
