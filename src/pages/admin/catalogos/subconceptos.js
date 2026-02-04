@@ -4,6 +4,7 @@ import AdminLayout from "../../../components/layout/AdminLayout";
 import SubconceptModal from "../../../components/forms/SubconceptModal";
 import { subconceptService } from "../../../lib/services/subconceptService";
 import { conceptService } from "../../../lib/services/conceptService";
+import { generalService } from "../../../lib/services/generalService";
 import { useAuth } from "../..//..//context/AuthContext";
 import { 
   PencilIcon,
@@ -18,6 +19,7 @@ export default function SubconceptosPage() {
 
   const [subconcepts, setSubconcepts] = useState([]);
   const [concepts, setConcepts] = useState([]);
+  const [generals, setGenerals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -43,13 +45,15 @@ export default function SubconceptosPage() {
       setError(null);
 
       // Load both subconcepts and concepts
-      const [subconceptsData, conceptsData] = await Promise.all([
+      const [subconceptsData, conceptsData, generalsData] = await Promise.all([
         subconceptService.getAll(),
-        conceptService.getAll()
+        conceptService.getAll(),
+        generalService.getAll()
       ]);
 
       setSubconcepts(subconceptsData);
       setConcepts(conceptsData);
+      setGenerals(generalsData);
     } catch (err) {
       setError(err.message);
       console.error("Error loading data:", err);
@@ -228,6 +232,9 @@ export default function SubconceptosPage() {
                       Nombre
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      General
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Concepto
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -241,7 +248,7 @@ export default function SubconceptosPage() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredSubconcepts.length === 0 ? (
                     <tr>
-                      <td colSpan="4" className="px-6 py-12 text-center">
+                      <td colSpan="5" className="px-6 py-12 text-center">
                         <div className="text-gray-500">
                           <svg
                             className="mx-auto h-12 w-12 mb-4"
@@ -270,11 +277,17 @@ export default function SubconceptosPage() {
                   ) : (
                     filteredSubconcepts.map((subconcept) => {
                       const concept = concepts.find(c => c.id === subconcept.conceptId);
+                      const general = concept ? generals.find(g => g.id === concept.generalId) : null;
                       return (
                         <tr key={subconcept.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">
+                            <div className="text-sm font-bold text-gray-900">
                               {subconcept.name}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-600">
+                              {general ? general.name : 'N/A'}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">

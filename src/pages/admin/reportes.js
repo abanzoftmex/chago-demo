@@ -121,6 +121,13 @@ const Reportes = () => {
     }
   };
 
+  // Determinar el tipo de transacción basado en los filtros seleccionados
+  // Ahora es simple porque los filtros están en cascada y siempre tenemos el tipo
+  const getFilteredTransactionType = () => {
+    // Si hay filtro de tipo, retornarlo (siempre debe estar si hay general/concepto/subconcepto)
+    return filters.type || null;
+  };
+
   const generateReport = async () => {
     try {
       setLoading(true);
@@ -283,25 +290,46 @@ const Reportes = () => {
     setFilters((prev) => {
       const newFilters = { ...prev, [field]: value };
 
-      // If changing concept, clear subconcept if it doesn't belong to the new concept
-      if (field === "conceptId") {
-        if (value && prev.subconceptId) {
-          const selectedSubconcept = subconcepts.find(
-            (sc) => sc.id === prev.subconceptId
-          );
-          if (selectedSubconcept && selectedSubconcept.conceptId !== value) {
-            newFilters.subconceptId = "";
-          }
-        }
+      // Limpiar filtros dependientes en cascada
+      if (field === "type") {
+        // Si cambia el tipo, limpiar general, concepto y subconcepto
+        newFilters.generalId = "";
+        newFilters.conceptId = "";
+        newFilters.subconceptId = "";
+      } else if (field === "generalId") {
+        // Si cambia el general, limpiar concepto y subconcepto
+        newFilters.conceptId = "";
+        newFilters.subconceptId = "";
+      } else if (field === "conceptId") {
+        // Si cambia el concepto, limpiar subconcepto
+        newFilters.subconceptId = "";
       }
 
       return newFilters;
     });
   };
 
+  // Filtrar generals por tipo seleccionado
+  const getFilteredGenerals = () => {
+    if (!filters.type) {
+      return [];
+    }
+    return generals.filter((general) => general.type === filters.type);
+  };
+
+  // Filtrar concepts por general seleccionado
+  const getFilteredConcepts = () => {
+    if (!filters.generalId) {
+      return [];
+    }
+    return concepts.filter((concept) => concept.generalId === filters.generalId);
+  };
+
+  // Filtrar subconcepts por concepto seleccionado
+
   const getFilteredSubconcepts = () => {
     if (!filters.conceptId) {
-      return subconcepts;
+      return [];
     }
     return subconcepts.filter(
       (subconcept) => subconcept.conceptId === filters.conceptId
@@ -459,12 +487,13 @@ const Reportes = () => {
                 onChange={(e) =>
                   handleFilterChange("generalId", e.target.value)
                 }
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                disabled={!filters.type}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
-                <option value="">Todos</option>
-                {generals.map((general) => (
+                <option value="">{!filters.type ? 'Selecciona un tipo primero' : 'Todos'}</option>
+                {getFilteredGenerals().map((general) => (
                   <option key={general.id} value={general.id}>
-                    {general.name} ({general.type})
+                    {general.name}
                   </option>
                 ))}
               </select>
@@ -480,10 +509,11 @@ const Reportes = () => {
                 onChange={(e) =>
                   handleFilterChange("conceptId", e.target.value)
                 }
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                disabled={!filters.generalId}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
-                <option value="">Todos</option>
-                {concepts.map((concept) => (
+                <option value="">{!filters.generalId ? 'Selecciona un general primero' : 'Todos'}</option>
+                {getFilteredConcepts().map((concept) => (
                   <option key={concept.id} value={concept.id}>
                     {concept.name}
                   </option>
@@ -501,9 +531,10 @@ const Reportes = () => {
                 onChange={(e) =>
                   handleFilterChange("subconceptId", e.target.value)
                 }
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                disabled={!filters.conceptId}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
-                <option value="">Todos</option>
+                <option value="">{!filters.conceptId ? 'Selecciona un concepto primero' : 'Todos'}</option>
                 {getFilteredSubconcepts().map((subconcept) => (
                   <option key={subconcept.id} value={subconcept.id}>
                     {subconcept.name}
@@ -512,8 +543,8 @@ const Reportes = () => {
               </select>
             </div>
 
-            {/* Division Filter */}
-            <div>
+            {/* Division Filter - OCULTO POR AHORA */}
+            {/* <div>
               <label className="block text-sm font-medium text-foreground mb-1">
                 División
               </label>
@@ -531,7 +562,7 @@ const Reportes = () => {
                   </option>
                 ))}
               </select>
-            </div>
+            </div> */}
           </div>
 
           <div className="flex justify-between items-center mt-4">
@@ -670,6 +701,190 @@ const Reportes = () => {
               </div>
             </div>
 
+            {/* Weekly Breakdown for Entradas - PRIMERO */}
+            {stats && (!getFilteredTransactionType() || getFilteredTransactionType() === 'entrada') && (
+              <div className="bg-background rounded-lg border border-border p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-green-700">
+                    Resumen Mes {currentMonthName} - Ingresos
+                  </h3>
+                </div>
+
+                {stats.weeklyBreakdown && stats.weeklyBreakdown.weeks ? (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-border">
+                      <thead className="bg-green-100">
+                        <tr>
+                          <th rowSpan={2} className="px-6 py-3 text-center text-sm font-bold text-green-800 tracking-wider border-r-2 border-green-200">
+                            Concepto
+                          </th>
+                          <th colSpan={stats.weeklyBreakdown.weeks.length} className="px-6 py-3 text-center text-sm font-bold text-green-800 tracking-wider border-r-2 border-green-200">
+                            Semanas
+                          </th>
+                          <th rowSpan={2} className="px-6 py-3 text-center text-sm font-bold text-white tracking-wider bg-green-400">
+                            Totales
+                          </th>
+                        </tr>
+                        <tr>
+                          {stats.weeklyBreakdown.weeks.map((week, index) => (
+                            <th key={index} className="px-6 py-3 text-center text-xs font-medium text-green-800 tracking-wider bg-green-50">
+                              {week.weekNumber || (index + 1)}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="bg-background divide-y divide-border">
+                        {Object.entries(stats.weeklyBreakdown.entradas || {}).map(([subconcept, weekData]) => {
+                          const parts = subconcept.split(' > ');
+                          return (
+                          <tr key={subconcept} className="hover:bg-muted/50">
+                            <td className="px-6 py-4 text-sm text-foreground min-w-[250px] max-w-[350px]">
+                              <div className="break-words">
+                                {parts.length === 3 ? (
+                                  <>
+                                    <span className="font-normal">{parts[0]}</span>
+                                    <span className="font-normal"> / {parts[1]}</span>
+                                    <span className="font-bold"> / {parts[2]}</span>
+                                  </>
+                                ) : (
+                                  <span className="font-semibold">{subconcept}</span>
+                                )}
+                              </div>
+                            </td>
+                            {stats.weeklyBreakdown.weeks.map((week, index) => (
+                              <td key={index} className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600">
+                                {weekData[`week${index + 1}`] ? formatCurrency(weekData[`week${index + 1}`]) : '-'}
+                              </td>
+                            ))}
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-green-700 bg-green-100">
+                              {formatCurrency(weekData.total || 0)}
+                            </td>
+                          </tr>
+                          );
+                        })}
+                        <tr className="bg-gray-200 font-bold border-t-2 border-gray-400">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                            {/* Vacío para totales */}
+                          </td>
+                          {stats.weeklyBreakdown.weeks.map((week, index) => {
+                            const weekTotal = Object.values(stats.weeklyBreakdown.entradas || {}).reduce(
+                              (sum, data) => sum + (data[`week${index + 1}`] || 0),
+                              0
+                            );
+                            return (
+                              <td key={index} className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-700">
+                                {formatCurrency(weekTotal)}
+                              </td>
+                            );
+                          })}
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-green-800 bg-green-200">
+                            {formatCurrency(stats.totalEntradas || 0)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>No hay datos de desglose semanal disponibles.</p>
+                    <p className="text-sm mt-2">El backend necesita proporcionar la estructura <code>weeklyBreakdown</code> con semanas y subconceptos.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Weekly Breakdown for Salidas - SEGUNDO */}
+            {stats && (!getFilteredTransactionType() || getFilteredTransactionType() === 'salida') && (
+              <div className="bg-background rounded-lg border border-border p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-red-700">
+                    Resumen Mes {currentMonthName} - Gastos
+                  </h3>
+                </div>
+
+                {stats.weeklyBreakdown && stats.weeklyBreakdown.weeks ? (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-border">
+                      <thead className="bg-red-100">
+                        <tr>
+                          <th rowSpan={2} className="px-6 py-3 text-center text-sm font-bold text-red-800 tracking-wider border-r-2 border-red-200">
+                            Concepto
+                          </th>
+                          <th colSpan={stats.weeklyBreakdown.weeks.length} className="px-6 py-3 text-center text-sm font-bold text-red-800 tracking-wider border-r-2 border-red-200">
+                            Semanas
+                          </th>
+                          <th rowSpan={2} className="px-6 py-3 text-center text-sm font-bold text-white tracking-wider bg-red-400">
+                            Totales
+                          </th>
+                        </tr>
+                        <tr>
+                          {stats.weeklyBreakdown.weeks.map((week, index) => (
+                            <th key={index} className="px-6 py-3 text-center text-xs font-medium text-red-800 uppercase tracking-wider bg-red-50">
+                              {week.weekNumber || (index + 1)}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="bg-background divide-y divide-border">
+                        {Object.entries(stats.weeklyBreakdown.salidas || {}).map(([subconcept, weekData]) => {
+                          const parts = subconcept.split(' > ');
+                          return (
+                          <tr key={subconcept} className="hover:bg-muted/50">
+                            <td className="px-6 py-4 text-sm text-foreground min-w-[250px] max-w-[350px]">
+                              <div className="break-words">
+                                {parts.length === 3 ? (
+                                  <>
+                                    <span className="font-normal">{parts[0]}</span>
+                                    <span className="font-normal"> / {parts[1]}</span>
+                                    <span className="font-bold"> / {parts[2]}</span>
+                                  </>
+                                ) : (
+                                  <span className="font-semibold">{subconcept}</span>
+                                )}
+                              </div>
+                            </td>
+                            {stats.weeklyBreakdown.weeks.map((week, index) => (
+                              <td key={index} className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600">
+                                {weekData[`week${index + 1}`] ? formatCurrency(weekData[`week${index + 1}`]) : '-'}
+                              </td>
+                            ))}
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-red-700 bg-red-100">
+                              {formatCurrency(weekData.total || 0)}
+                            </td>
+                          </tr>
+                          );
+                        })}
+                        <tr className="bg-gray-200 font-bold border-t-2 border-gray-400">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                            {/* Vacío para totales */}
+                          </td>
+                          {stats.weeklyBreakdown.weeks.map((week, index) => {
+                            const weekTotal = Object.values(stats.weeklyBreakdown.salidas || {}).reduce(
+                              (sum, data) => sum + (data[`week${index + 1}`] || 0),
+                              0
+                            );
+                            return (
+                              <td key={index} className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-700">
+                                {formatCurrency(weekTotal)}
+                              </td>
+                            );
+                          })}
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-red-800 bg-red-200">
+                            {formatCurrency(stats.totalSalidas || 0)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>No hay datos de desglose semanal disponibles.</p>
+                    <p className="text-sm mt-2">El backend necesita proporcionar la estructura <code>weeklyBreakdown</code> con semanas y subconceptos.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Balance Breakdown */}
             {(stats.carryoverBalance !== 0 ||
               stats.carryoverIncome !== 0 ||
@@ -796,7 +1011,7 @@ const Reportes = () => {
         )}
 
         {/* Payment Status (for salidas) */}
-        {stats && stats.salidasCount > 0 && (
+        {stats && getFilteredTransactionType() === 'salida' && stats.salidasCount > 0 && (
           <div className="bg-background rounded-lg border border-border p-6">
             <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center">
               <ClockIcon className="h-5 w-5 mr-2" />
@@ -805,105 +1020,226 @@ const Reportes = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex justify-between items-start">
-                  <h4 className="font-medium text-green-800">Pagados</h4>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs text-green-700 hover:bg-green-100 -mt-1 -mr-1"
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          "¿Estás seguro de reiniciar el contador de pagados? Esto no afectará los datos históricos."
-                        )
-                      ) {
-                        setStats((prev) => ({
-                          ...prev,
-                          paymentStatus: {
-                            ...prev.paymentStatus,
-                            pagado: { count: 0, amount: 0, carryover: 0 },
-                          },
-                        }));
-                        success("Contador de pagados reiniciado");
-                      }
-                    }}
-                  >
-                    Reiniciar
-                  </Button>
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-semibold text-green-800">Pagados totalmente</h4>
                 </div>
-                <p className="text-2xl font-bold text-green-600">
+                <p className="text-2xl font-bold text-green-600 mb-2">
                   {stats.paymentStatus.pagado.count}
                 </p>
+                <p className="text-xs text-gray-500 mb-2">
+                  {stats.paymentStatus.pagado.count > 0 
+                    ? `${stats.paymentStatus.pagado.count} transacciones cubiertas`
+                    : 'Sin transacciones pagadas'}
+                </p>
                 <div className="space-y-1">
-                  <p className="text-sm text-green-600">
-                    Período: {formatCurrency(stats.paymentStatus.pagado.amount)}
-                  </p>
-                  {stats.paymentStatus.pagado.carryover > 0 && (
-                    <p className="text-xs text-green-500">
-                      Arrastre:{" "}
-                      {formatCurrency(stats.paymentStatus.pagado.carryover)}
-                    </p>
-                  )}
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-green-700">Monto pagado:</span>
+                    <span className="font-semibold text-green-600">
+                      {formatCurrency(stats.paymentStatus.pagado.amount)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-green-700">Saldo por cubrir:</span>
+                    <span className="font-semibold text-green-600">
+                      {formatCurrency(0)}
+                    </span>
+                  </div>
                 </div>
               </div>
 
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <h4 className="font-medium text-yellow-800">Parciales</h4>
-                <p className="text-2xl font-bold text-yellow-600">
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-semibold text-yellow-800">Parcialmente pagados</h4>
+                </div>
+                <p className="text-2xl font-bold text-yellow-600 mb-2">
                   {stats.paymentStatus.parcial.count}
                 </p>
+                <p className="text-xs text-gray-500 mb-2">
+                  {stats.paymentStatus.parcial.count > 0 
+                    ? `${stats.paymentStatus.parcial.count} transacciones parciales`
+                    : 'Sin pagos parciales'}
+                </p>
                 <div className="space-y-1">
-                  <p className="text-sm text-yellow-600">
-                    Período:{" "}
-                    {formatCurrency(stats.paymentStatus.parcial.amount)}
-                  </p>
-                  {stats.paymentStatus.parcial.carryover > 0 && (
-                    <p className="text-xs text-yellow-500">
-                      Arrastre:{" "}
-                      {formatCurrency(stats.paymentStatus.parcial.carryover)}
-                    </p>
-                  )}
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-yellow-700">Monto pagado:</span>
+                    <span className="font-semibold text-blue-600">
+                      {formatCurrency(stats.paymentStatus.parcial.amount)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-yellow-700">Saldo por cubrir:</span>
+                    <span className="font-semibold text-orange-600">
+                      {formatCurrency(stats.paymentStatus.parcial.balance || 0)}
+                    </span>
+                  </div>
                 </div>
               </div>
 
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="flex justify-between items-start">
-                  <h4 className="font-medium text-red-800">Pendientes</h4>
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-semibold text-red-800">Pendientes (período actual)</h4>
                 </div>
-                <p className="text-2xl font-bold text-red-600">
+                <p className="text-2xl font-bold text-red-600 mb-2">
                   {stats.paymentStatus.pendiente.count}
                 </p>
+                <p className="text-xs text-gray-500 mb-2">
+                  {stats.paymentStatus.pendiente.count > 0 
+                    ? `${stats.paymentStatus.pendiente.count} transacciones sin cubrir`
+                    : 'Sin pendientes'}
+                </p>
                 <div className="space-y-1">
-                  <p className="text-sm text-red-600">
-                    Período:{" "}
-                    {formatCurrency(stats.paymentStatus.pendiente.amount)}
-                  </p>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-red-700">Monto pagado:</span>
+                    <span className="font-semibold text-blue-600">
+                      {formatCurrency(0)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-red-700">Saldo por cubrir:</span>
+                    <span className="font-semibold text-orange-600">
+                      {formatCurrency(stats.paymentStatus.pendiente.amount)}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                <div className="flex justify-between items-start">
-                  <h4 className="font-medium text-orange-800">Del mes anterior</h4>
-                  {stats.paymentStatus.pendienteAnterior.count > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs text-orange-700 hover:bg-orange-100 -mt-1 -mr-1"
-                      onClick={loadCarryoverTransactions}
-                    >
-                      <EyeIcon className="h-3 w-3 mr-1" />
-                      Ver detalles
-                    </Button>
-                  )}
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-semibold text-purple-800">Pendientes anteriores</h4>
                 </div>
-                <p className="text-2xl font-bold text-orange-600">
+                <p className="text-2xl font-bold text-purple-600 mb-2">
                   {stats.paymentStatus.pendienteAnterior.count}
                 </p>
+                <p className="text-xs text-gray-500 mb-2">
+                  {stats.paymentStatus.pendienteAnterior.count > 0 
+                    ? `${stats.paymentStatus.pendienteAnterior.count} transacciones no cubiertas`
+                    : 'Sin pendientes'}
+                </p>
                 <div className="space-y-1">
-                  <p className="text-sm text-orange-600">
-                    Meses anteriores:{" "}
-                    {formatCurrency(stats.paymentStatus.pendienteAnterior.carryover)}
-                  </p>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-purple-700">Por pagar:</span>
+                    <span className="font-semibold text-purple-600">
+                      {formatCurrency(stats.paymentStatus.pendienteAnterior.carryover)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Payment Status (for entradas) */}
+        {stats && getFilteredTransactionType() === 'entrada' && stats.entradasCount > 0 && (
+          <div className="bg-background rounded-lg border border-border p-6">
+            <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center">
+              <ClockIcon className="h-5 w-5 mr-2" />
+              Estado de Ingresos
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-semibold text-green-800">Recibidos totalmente</h4>
+                </div>
+                <p className="text-2xl font-bold text-green-600 mb-2">
+                  {stats.paymentStatus.pagado.count}
+                </p>
+                <p className="text-xs text-gray-500 mb-2">
+                  {stats.paymentStatus.pagado.count > 0 
+                    ? `${stats.paymentStatus.pagado.count} transacciones cubiertas`
+                    : 'Sin transacciones recibidas'}
+                </p>
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-green-700">Monto recibido:</span>
+                    <span className="font-semibold text-green-600">
+                      {formatCurrency(stats.paymentStatus.pagado.amount)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-green-700">Saldo por recibir:</span>
+                    <span className="font-semibold text-green-600">
+                      {formatCurrency(0)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-semibold text-yellow-800">Parcialmente recibidos</h4>
+                </div>
+                <p className="text-2xl font-bold text-yellow-600 mb-2">
+                  {stats.paymentStatus.parcial.count}
+                </p>
+                <p className="text-xs text-gray-500 mb-2">
+                  {stats.paymentStatus.parcial.count > 0 
+                    ? `${stats.paymentStatus.parcial.count} transacciones parciales`
+                    : 'Sin cobros parciales'}
+                </p>
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-yellow-700">Monto recibido:</span>
+                    <span className="font-semibold text-blue-600">
+                      {formatCurrency(stats.paymentStatus.parcial.amount)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-yellow-700">Saldo por recibir:</span>
+                    <span className="font-semibold text-orange-600">
+                      {formatCurrency(stats.paymentStatus.parcial.balance || 0)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-semibold text-red-800">Pendientes (período actual)</h4>
+                </div>
+                <p className="text-2xl font-bold text-red-600 mb-2">
+                  {stats.paymentStatus.pendiente.count}
+                </p>
+                <p className="text-xs text-gray-500 mb-2">
+                  {stats.paymentStatus.pendiente.count > 0 
+                    ? `${stats.paymentStatus.pendiente.count} transacciones sin cubrir`
+                    : 'Sin pendientes'}
+                </p>
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-red-700">Monto recibido:</span>
+                    <span className="font-semibold text-blue-600">
+                      {formatCurrency(0)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-red-700">Saldo por recibir:</span>
+                    <span className="font-semibold text-orange-600">
+                      {formatCurrency(stats.paymentStatus.pendiente.amount)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-semibold text-purple-800">Pendientes anteriores</h4>
+                </div>
+                <p className="text-2xl font-bold text-purple-600 mb-2">
+                  {stats.paymentStatus.pendienteAnterior.count}
+                </p>
+                <p className="text-xs text-gray-500 mb-2">
+                  {stats.paymentStatus.pendienteAnterior.count > 0 
+                    ? `${stats.paymentStatus.pendienteAnterior.count} transacciones no cubiertas`
+                    : 'Sin pendientes'}
+                </p>
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-purple-700">Por cobrar:</span>
+                    <span className="font-semibold text-purple-600">
+                      {formatCurrency(stats.paymentStatus.pendienteAnterior.carryover)}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -939,8 +1275,10 @@ const Reportes = () => {
         )}
 
         {/* General Breakdown */}
-        {stats && Object.keys(stats.generalBreakdown).length > 0 &&
-          Object.entries(stats.generalBreakdown).some(([general, data]) => showIncomeInBreakdown || data.salidas > 0) && (
+        {stats && getFilteredTransactionType() && Object.keys(stats.generalBreakdown).length > 0 &&
+          Object.entries(stats.generalBreakdown).some(([general, data]) => 
+            getFilteredTransactionType() === 'entrada' ? data.entradas > 0 : data.salidas > 0
+          ) && (
             <div className="bg-background rounded-lg border border-border p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-foreground">
@@ -967,6 +1305,12 @@ const Reportes = () => {
                         Gastos
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Pagado
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Por Pagar
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Cantidad
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -976,7 +1320,9 @@ const Reportes = () => {
                   </thead>
                   <tbody className="bg-background divide-y divide-border">
                     {Object.entries(stats.generalBreakdown)
-                      .filter(([general, data]) => showIncomeInBreakdown || data.salidas > 0)
+                      .filter(([general, data]) => 
+                        getFilteredTransactionType() === 'entrada' ? data.entradas > 0 : data.salidas > 0
+                      )
                       .map(([general, data]) => (
                         <tr key={general}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
@@ -991,6 +1337,12 @@ const Reportes = () => {
                           <td className={`px-6 py-4 whitespace-nowrap text-sm ${data.salidas === 0 ? 'text-foreground' : 'text-red-600'
                             }`}>
                             {formatCurrency(data.salidas)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
+                            {formatCurrency(data.paid || 0)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">
+                            {formatCurrency(data.pending || 0)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                             {data.count}
@@ -1013,8 +1365,10 @@ const Reportes = () => {
             </div>
           )}
         {/* Concept Breakdown */}
-        {stats && Object.keys(stats.conceptBreakdown).length > 0 &&
-          Object.entries(stats.conceptBreakdown).some(([concept, data]) => showIncomeInBreakdown || data.salidas > 0) && (
+        {stats && getFilteredTransactionType() && Object.keys(stats.conceptBreakdown).length > 0 &&
+          Object.entries(stats.conceptBreakdown).some(([concept, data]) => 
+            getFilteredTransactionType() === 'entrada' ? data.entradas > 0 : data.salidas > 0
+          ) && (
             <div className="bg-background rounded-lg border border-border p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-foreground">
@@ -1041,6 +1395,12 @@ const Reportes = () => {
                         Gastos
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Pagado
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Por Pagar
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Cantidad
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -1050,7 +1410,9 @@ const Reportes = () => {
                   </thead>
                   <tbody className="bg-background divide-y divide-border">
                     {Object.entries(stats.conceptBreakdown)
-                      .filter(([concept, data]) => showIncomeInBreakdown || data.salidas > 0)
+                      .filter(([concept, data]) => 
+                        getFilteredTransactionType() === 'entrada' ? data.entradas > 0 : data.salidas > 0
+                      )
                       .map(([concept, data]) => (
                         <tr key={concept}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
@@ -1065,6 +1427,103 @@ const Reportes = () => {
                           <td className={`px-6 py-4 whitespace-nowrap text-sm ${data.salidas === 0 ? 'text-foreground' : 'text-red-600'
                             }`}>
                             {formatCurrency(data.salidas)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
+                            {formatCurrency(data.paid || 0)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">
+                            {formatCurrency(data.pending || 0)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                            {data.count}
+                          </td>
+                          <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${showIncomeInBreakdown && isMainlyIncome(data)
+                              ? 'text-green-600'
+                              : 'text-red-600'
+                            }`}>
+                            {showIncomeInBreakdown
+                              ? formatSmartPercentage(data, stats.totalSalidas, stats.totalEntradas)
+                              : formatPercentage(data.salidas, stats.totalSalidas)
+                            }
+                          </td>
+                        </tr>
+                      )
+                      )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+        {/* Subconcept Breakdown */}
+        {stats && getFilteredTransactionType() && Object.keys(stats.subconceptBreakdown).length > 0 &&
+          Object.entries(stats.subconceptBreakdown).some(([subconcept, data]) => 
+            getFilteredTransactionType() === 'entrada' ? data.entradas > 0 : data.salidas > 0
+          ) && (
+            <div className="bg-background rounded-lg border border-border p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-foreground">
+                  Desglose por Subconcepto
+                </h3>
+                <p className="text-sm text-muted-foreground italic">
+                  Solo período: {currentMonthName}
+                </p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-border">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Subconcepto
+                      </th>
+                      {showIncomeInBreakdown && (
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Ingreso
+                        </th>
+                      )}
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Gastos
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Pagado
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Por Pagar
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Cantidad
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        {showIncomeInBreakdown ? "% de Gastos/Ingresos" : "% de Gastos"}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-background divide-y divide-border">
+                    {Object.entries(stats.subconceptBreakdown)
+                      .filter(([subconcept, data]) => 
+                        getFilteredTransactionType() === 'entrada' ? data.entradas > 0 : data.salidas > 0
+                      )
+                      .map(([subconcept, data]) => (
+                        <tr key={subconcept}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
+                            {subconcept}
+                          </td>
+                          {showIncomeInBreakdown && (
+                            <td className={`px-6 py-4 whitespace-nowrap text-sm ${data.entradas === 0 ? 'text-foreground' : 'text-green-600'
+                              }`}>
+                              {formatCurrency(data.entradas)}
+                            </td>
+                          )}
+                          <td className={`px-6 py-4 whitespace-nowrap text-sm ${data.salidas === 0 ? 'text-foreground' : 'text-red-600'
+                            }`}>
+                            {formatCurrency(data.salidas)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
+                            {formatCurrency(data.paid || 0)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">
+                            {formatCurrency(data.pending || 0)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                             {data.count}
@@ -1148,8 +1607,8 @@ const Reportes = () => {
           </div>
         )}
 
-        {/* Division Breakdown (for salidas) */}
-        {stats && stats.divisionBreakdown && Object.keys(stats.divisionBreakdown).length > 0 && (
+        {/* Division Breakdown (for salidas) - OCULTO POR AHORA */}
+        {/* {stats && stats.divisionBreakdown && Object.keys(stats.divisionBreakdown).length > 0 && (
           <div className="bg-background rounded-lg border border-border p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-foreground">
@@ -1207,7 +1666,7 @@ const Reportes = () => {
               </table>
             </div>
           </div>
-        )}
+        )} */}
 
         {/* Loading State */}
         {loading && (

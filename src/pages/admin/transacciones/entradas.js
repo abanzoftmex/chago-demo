@@ -9,6 +9,9 @@ import { useAuth } from "../../../context/AuthContext";
 import { useToast } from "../../../components/ui/Toast";
 import { transactionService } from "../../../lib/services/transactionService";
 import { conceptService } from "../../../lib/services/conceptService";
+import { generalService } from "../../../lib/services/generalService";
+import { subconceptService } from "../../../lib/services/subconceptService";
+import { paymentService } from "../../../lib/services/paymentService";
 import { 
   PlusIcon,
   ArrowTrendingUpIcon,
@@ -23,6 +26,9 @@ const Ingresos = () => {
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [concepts, setConcepts] = useState([]);
+  const [generals, setGenerals] = useState([]);
+  const [subconcepts, setSubconcepts] = useState([]);
+  const [paymentsMap, setPaymentsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -48,14 +54,31 @@ const Ingresos = () => {
         endDate: endOfMonth
       };
 
-      const [transactionsData, conceptsData] = await Promise.all(
+      const [transactionsData, conceptsData, generalsData, subconceptsData] = await Promise.all(
         [
           transactionService.getAll(transactionQuery),
           conceptService.getAll(),
+          generalService.getAll(),
+          subconceptService.getAll(),
         ]
       );
       setTransactions(transactionsData);
       setConcepts(conceptsData);
+      setGenerals(generalsData);
+      setSubconcepts(subconceptsData);
+
+      // Cargar pagos para todas las transacciones
+      const paymentsData = {};
+      for (const transaction of transactionsData) {
+        try {
+          const payments = await paymentService.getByTransaction(transaction.id);
+          paymentsData[transaction.id] = payments || [];
+        } catch (err) {
+          console.error(`Error loading payments for transaction ${transaction.id}:`, err);
+          paymentsData[transaction.id] = [];
+        }
+      }
+      setPaymentsMap(paymentsData);
     } catch (error) {
       console.error("Error loading transactions:", error);
       toast.error("Error al cargar las transacciones");
@@ -107,9 +130,58 @@ const Ingresos = () => {
     router.push(`/admin/transacciones/editar/${transaction.id}`);
   };
 
-  const getConceptName = (conceptId) => {
+  const getGeneralName = (generalId, transaction = null) => {
+    if (!generalId) return "N/A";
+    const general = generals.find((g) => g.id === generalId);
+    return general ? general.name : "N/A";
+  };
+
+  const getConceptName = (conceptId, transaction = null) => {
     const concept = concepts.find((c) => c.id === conceptId);
     return concept ? concept.name : "N/A";
+  };
+
+  const getSubconceptName = (subconceptId, transaction = null) => {
+    if (!subconceptId) return null;
+    const subconcept = subconcepts.find((s) => s.id === subconceptId);
+    return subconcept ? subconcept.name : null;
+  };
+
+  const getConceptHierarchy = (transaction) => {
+    const generalName = getGeneralName(transaction.generalId, transaction);
+    const conceptName = getConceptName(transaction.conceptId, transaction);
+    const subconceptName = getSubconceptName(transaction.subconceptId, transaction);
+
+    // Construir el árbol jerárquico
+    const hierarchy = [];
+    
+    if (generalName && generalName !== "N/A") {
+      hierarchy.push(generalName);
+    }
+    
+    if (conceptName && conceptName !== "N/A") {
+      hierarchy.push(conceptName);
+    }
+    
+    if (subconceptName) {
+      hierarchy.push(subconceptName);
+    }
+
+    return hierarchy.length > 0 ? hierarchy : ["N/A"];
+  };
+
+  const getRemainingAmount = (transaction) => {
+    const totalAmount = transaction.amount || 0;
+    const payments = paymentsMap[transaction.id] || [];
+    const paidAmount = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+    const remainingAmount = Math.max(0, totalAmount - paidAmount);
+    return remainingAmount;
+  };
+
+  const getPaidAmount = (transaction) => {
+    const payments = paymentsMap[transaction.id] || [];
+    const paidAmount = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+    return paidAmount;
   };
 
 
@@ -136,21 +208,88 @@ const Ingresos = () => {
     return adjustedDate.toLocaleDateString("es-MX");
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status, transaction = null) => {
     const statusConfig = {
-      pendiente: { color: "bg-red-100 text-red-800", text: "Pendiente" },
-      parcial: { color: "bg-yellow-100 text-yellow-800", text: "Parcial" },
-      pagado: { color: "bg-green-100 text-green-800", text: "Pagado" },
+      pendiente: {
+        color: "bg-red-100 text-red-800 border border-red-200",
+        text: "Pendiente",
+        icon: (
+          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+            <path
+              fillRule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+              clipRule="evenodd"
+            />
+          </svg>
+        ),
+      },
+      parcial: {
+        color: "bg-yellow-100 text-yellow-800 border border-yellow-200",
+        text: "Parcial",
+        icon: (
+          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+            <path
+              fillRule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+              clipRule="evenodd"
+            />
+          </svg>
+        ),
+      },
+      pagado: {
+        color: "bg-green-50 text-green-700 border border-green-200",
+        text: "Pagado",
+        icon: (
+          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+            <path
+              fillRule="evenodd"
+              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+              clipRule="evenodd"
+            />
+          </svg>
+        ),
+      },
     };
 
     const config = statusConfig[status] || statusConfig.pendiente;
+    
+    if (!transaction) {
+      return (
+        <span
+          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}
+        >
+          {config.icon}
+          {config.text}
+        </span>
+      );
+    }
+
+    const paidAmount = getPaidAmount(transaction);
+    const remainingAmount = getRemainingAmount(transaction);
 
     return (
-      <span
-        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}
-      >
-        {config.text}
-      </span>
+      <div className="flex flex-col items-start gap-1">
+        <span
+          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${config.color}`}
+        >
+          {config.icon}
+          {config.text}
+        </span>
+        
+        {/* Mostrar monto pagado para estado parcial y pagado */}
+        {(status === "parcial" || status === "pagado") && paidAmount > 0 && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+            Recibido: {formatCurrency(paidAmount)}
+          </span>
+        )}
+        
+        {/* Mostrar saldo pendiente para estado pendiente y parcial */}
+        {(status === "pendiente" || status === "parcial") && remainingAmount > 0 && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-700 border border-gray-300">
+            Saldo pendiente: {formatCurrency(remainingAmount)}
+          </span>
+        )}
+      </div>
     );
   };
 
@@ -162,11 +301,22 @@ const Ingresos = () => {
     // Si hay un término de búsqueda, filtrar por él
     if (searchTerm) {
       const query = searchTerm.toLowerCase();
-      const conceptName = getConceptName(transaction.conceptId).toLowerCase();
+      
+      // Buscar en el árbol jerárquico completo
+      const generalName = getGeneralName(transaction.generalId, transaction).toLowerCase();
+      const conceptName = getConceptName(transaction.conceptId, transaction).toLowerCase();
+      const subconceptName = (getSubconceptName(transaction.subconceptId, transaction) || "").toLowerCase();
+      
+      // Otros campos
+      const description = (transaction.description || "").toLowerCase();
       const amountStr = (transaction.amount ?? "").toString();
       const statusStr = (transaction.status ?? "").toString().toLowerCase();
+      
       return (
+        generalName.includes(query) ||
         conceptName.includes(query) ||
+        subconceptName.includes(query) ||
+        description.includes(query) ||
         amountStr.includes(query) ||
         statusStr.includes(query)
       );
@@ -307,7 +457,7 @@ const Ingresos = () => {
                           type="text"
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
-                          placeholder="Buscar por concepto, monto o estado..."
+                          placeholder="Buscar por general, concepto, subconcepto, descripción, monto o estado..."
                           className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
                         />
                         <svg
@@ -391,14 +541,27 @@ const Ingresos = () => {
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                                 {formatDate(transaction.date)}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
-                                {getConceptName(transaction.conceptId)}
+                              <td className="px-6 py-4 text-sm text-foreground">
+                                <div className="flex items-center space-x-1 flex-wrap">
+                                  {getConceptHierarchy(transaction).map((level, index, array) => (
+                                    <div key={index} className="flex items-center space-x-1">
+                                      <span className={index === array.length - 1 ? "font-medium text-gray-900" : "text-gray-600"}>
+                                        {level}
+                                      </span>
+                                      {index < array.length - 1 && (
+                                        <svg className="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
                                 {formatCurrency(transaction.amount)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                {getStatusBadge(transaction.status)}
+                                {getStatusBadge(transaction.status, transaction)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                 <div className="flex items-center space-x-3">
@@ -442,15 +605,28 @@ const Ingresos = () => {
                       <div key={transaction.id} className="p-4">
                         <div className="flex justify-between items-start mb-2">
                           <div>
-                            <div className="flex items-center space-x-2 mb-1">
+                            <div className="flex items-center space-x-2 mb-1 flex-wrap">
                               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                 Ingreso
                               </span>
-                              {getStatusBadge(transaction.status)}
+                              {getStatusBadge(transaction.status, transaction)}
                             </div>
-                            <p className="text-sm font-medium text-foreground">
-                              {getConceptName(transaction.conceptId)}
-                            </p>
+                            <div className="text-sm font-medium text-foreground mb-1">
+                              <div className="flex items-center space-x-1 flex-wrap">
+                                {getConceptHierarchy(transaction).map((level, index, array) => (
+                                  <div key={index} className="flex items-center space-x-1">
+                                    <span className={index === array.length - 1 ? "font-semibold" : "text-gray-600 font-normal"}>
+                                      {level}
+                                    </span>
+                                    {index < array.length - 1 && (
+                                      <svg className="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                      </svg>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                           </div>
                           <div className="text-right">
                             <p className="text-lg font-semibold text-foreground">

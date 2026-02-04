@@ -3,6 +3,7 @@ import { providerService } from './providerService';
 import { conceptService } from './conceptService';
 import { descriptionService } from './descriptionService';
 import { generalService } from './generalService';
+import { subconceptService } from './subconceptService';
 import { carryoverService } from './carryoverService';
 import { createEnhancedPDFReport } from './pdfTemplates';
 import { formatDivision } from '../constants/divisions';
@@ -174,14 +175,15 @@ export const reportService = {
         carryoverIncome: 0, // Ingresos arrastrados del mes anterior
         currentPeriodBalance: 0, // Balance del período actual
         paymentStatus: {
-          pendiente: { count: 0, amount: 0, carryover: 0 },
-          parcial: { count: 0, amount: 0, carryover: 0 },
-          pagado: { count: 0, amount: 0, carryover: 0 },
+          pendiente: { count: 0, amount: 0, balance: 0, carryover: 0 },
+          parcial: { count: 0, amount: 0, balance: 0, carryover: 0 },
+          pagado: { count: 0, amount: 0, balance: 0, carryover: 0 },
           // Nueva categoría para gastos pendientes de meses anteriores
           pendienteAnterior: { count: 0, amount: 0, carryover: 0 }
         },
         conceptBreakdown: {},
         generalBreakdown: {},
+        subconceptBreakdown: {},
         divisionBreakdown: {},
         providerBreakdown: {},
         monthlyBreakdown: {}
@@ -229,11 +231,12 @@ export const reportService = {
       }
 
       // Get reference data
-      const [concepts, providers, descriptions, generals] = await Promise.all([
+      const [concepts, providers, descriptions, generals, subconcepts] = await Promise.all([
         conceptService.getAll(),
         providerService.getAll(),
         descriptionService.getAll(),
-        generalService.getAll()
+        generalService.getAll(),
+        subconceptService.getAll()
       ]);
 
       const conceptMap = {};
@@ -256,6 +259,37 @@ export const reportService = {
         generalMap[general.id] = general.name;
       });
 
+      const subconceptMap = {};
+      subconcepts.forEach(subconcept => {
+        subconceptMap[subconcept.id] = subconcept.name;
+      });
+
+      // Crear mapa de jerarquía completa para subconceptos
+      const subconceptHierarchyMap = {};
+      subconcepts.forEach(subconcept => {
+        const concept = concepts.find(c => c.id === subconcept.conceptId);
+        if (concept) {
+          const general = generals.find(g => g.id === concept.generalId);
+          const generalName = general ? general.name : 'Sin General';
+          const conceptName = concept.name;
+          const subconceptName = subconcept.name;
+          
+          subconceptHierarchyMap[subconcept.id] = {
+            full: `${generalName} > ${conceptName} > ${subconceptName}`,
+            general: generalName,
+            concept: conceptName,
+            subconcept: subconceptName
+          };
+        } else {
+          subconceptHierarchyMap[subconcept.id] = {
+            full: subconcept.name,
+            general: '',
+            concept: '',
+            subconcept: subconcept.name
+          };
+        }
+      });
+
       // Use the already declared hasDateFilter and define date range variables
       const startDate = hasDateFilter ? new Date(filters.startDate) : null;
       let endDate = null;
@@ -272,6 +306,7 @@ export const reportService = {
         const conceptName = conceptMap[transaction.conceptId] || 'Sin concepto';
         const providerName = providerMap[transaction.providerId] || 'Sin proveedor';
         const generalName = generalMap[transaction.generalId] || 'Sin categoría general';
+        const subconceptName = subconceptMap[transaction.subconceptId] || 'Sin subconcepto';
         const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
         const month = transactionDate.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
 
@@ -316,6 +351,40 @@ export const reportService = {
           else if (isInPeriod && transaction.isCarryover) {
             stats.currentPeriodBalance += amount;
           }
+
+          // Payment status para entradas (igual que salidas)
+          const totalPaid = transaction.totalPaid || 0;
+          const status = transaction.status || 'pendiente';
+
+          // Las entradas usan el mismo paymentStatus que las salidas
+          if (stats.paymentStatus[status]) {
+            stats.paymentStatus[status].count++;
+            
+            if (status === 'pagado') {
+              // Recibido completamente: amount = total de la transacción, balance = 0
+              stats.paymentStatus[status].amount += amount;
+              stats.paymentStatus[status].balance += 0;
+            } else if (status === 'parcial') {
+              // Recibido parcialmente: amount = lo recibido hasta ahora, balance = lo que falta
+              stats.paymentStatus[status].amount += totalPaid;
+              stats.paymentStatus[status].balance += (transaction.balance || 0);
+            } else if (status === 'pendiente') {
+              // Sin recibir: amount = 0 (nada recibido), balance = total de la transacción
+              stats.paymentStatus[status].amount += 0;
+              stats.paymentStatus[status].balance += (transaction.balance || amount);
+            }
+          }
+
+          // Arrastre de ingresos pendientes de meses anteriores
+          const isCarryoverEntrada = transaction.status === 'pendiente' &&
+            transaction.type === 'entrada' &&
+            hasDateFilter &&
+            transactionDate < startDate;
+
+          if (isCarryoverEntrada && status === 'pendiente') {
+            stats.paymentStatus.pendienteAnterior.count++;
+            stats.paymentStatus.pendienteAnterior.carryover += transaction.balance || amount;
+          }
         } else if (transaction.type === 'salida') {
           if (isInPeriod && !isCarryover) {
             // Salidas del período actual (incluye pendientes del período)
@@ -354,9 +423,23 @@ export const reportService = {
           } else if (stats.paymentStatus[status]) {
             // Gastos del período actual (incluye pendientes del período)
             stats.paymentStatus[status].count++;
-            // Para transacciones pagadas, usar amount; para pendientes, usar balance
-            const amountToAdd = status === 'pagado' ? amount : (transaction.balance || amount);
-            stats.paymentStatus[status].amount += amountToAdd;
+            
+            // Para todas las categorías:
+            // - amount = lo que se ha pagado (totalPaid)
+            // - balance = lo que falta por pagar (transaction.balance)
+            if (status === 'pagado') {
+              // Pagado completamente: amount = total de la transacción, balance = 0
+              stats.paymentStatus[status].amount += amount;
+              stats.paymentStatus[status].balance += 0;
+            } else if (status === 'parcial') {
+              // Parcial: amount = lo pagado hasta ahora, balance = lo que falta
+              stats.paymentStatus[status].amount += totalPaid;
+              stats.paymentStatus[status].balance += (transaction.balance || 0);
+            } else if (status === 'pendiente') {
+              // Pendiente: amount = 0 (nada pagado), balance = total de la transacción
+              stats.paymentStatus[status].amount += 0;
+              stats.paymentStatus[status].balance += (transaction.balance || amount);
+            }
           }
         }
 
@@ -367,9 +450,14 @@ export const reportService = {
               entradas: 0,
               salidas: 0,
               total: 0,
-              count: 0
+              count: 0,
+              paid: 0,
+              pending: 0
             };
           }
+
+          const totalPaid = transaction.totalPaid || 0;
+          const balance = transaction.balance || 0;
 
           if (transaction.type === 'entrada') {
             stats.conceptBreakdown[conceptName].entradas += amount;
@@ -378,6 +466,8 @@ export const reportService = {
           }
           stats.conceptBreakdown[conceptName].total += amount;
           stats.conceptBreakdown[conceptName].count++;
+          stats.conceptBreakdown[conceptName].paid += totalPaid;
+          stats.conceptBreakdown[conceptName].pending += balance;
         }
 
         // General breakdown - solo para transacciones del período actual
@@ -387,9 +477,14 @@ export const reportService = {
               entradas: 0,
               salidas: 0,
               total: 0,
-              count: 0
+              count: 0,
+              paid: 0,
+              pending: 0
             };
           }
+
+          const totalPaid = transaction.totalPaid || 0;
+          const balance = transaction.balance || 0;
 
           if (transaction.type === 'entrada') {
             stats.generalBreakdown[generalName].entradas += amount;
@@ -398,6 +493,35 @@ export const reportService = {
           }
           stats.generalBreakdown[generalName].total += amount;
           stats.generalBreakdown[generalName].count++;
+          stats.generalBreakdown[generalName].paid += totalPaid;
+          stats.generalBreakdown[generalName].pending += balance;
+        }
+
+        // Subconcept breakdown - solo para transacciones del período actual
+        if (isInPeriod && !isCarryover && transaction.subconceptId) {
+          if (!stats.subconceptBreakdown[subconceptName]) {
+            stats.subconceptBreakdown[subconceptName] = {
+              entradas: 0,
+              salidas: 0,
+              total: 0,
+              count: 0,
+              paid: 0,
+              pending: 0
+            };
+          }
+
+          const totalPaid = transaction.totalPaid || 0;
+          const balance = transaction.balance || 0;
+
+          if (transaction.type === 'entrada') {
+            stats.subconceptBreakdown[subconceptName].entradas += amount;
+          } else {
+            stats.subconceptBreakdown[subconceptName].salidas += amount;
+          }
+          stats.subconceptBreakdown[subconceptName].total += amount;
+          stats.subconceptBreakdown[subconceptName].count++;
+          stats.subconceptBreakdown[subconceptName].paid += totalPaid;
+          stats.subconceptBreakdown[subconceptName].pending += balance;
         }
 
         // Division breakdown (solo para salidas) - solo para transacciones del período actual
@@ -484,11 +608,138 @@ export const reportService = {
         providerBreakdownCount: Object.keys(stats.providerBreakdown).length
       });
 
+      // Generar Weekly Breakdown si hay filtro de fechas
+      if (hasDateFilter && filters.startDate && filters.endDate) {
+        stats.weeklyBreakdown = await this.generateWeeklyBreakdown(
+          transactions,
+          filters.startDate,
+          filters.endDate,
+          subconceptHierarchyMap
+        );
+      }
+
       return stats;
     } catch (error) {
       console.error('Error generating report stats:', error);
       throw new Error('Error al generar estadísticas del reporte');
     }
+  },
+
+  // Generar desglose semanal por subconceptos
+  async generateWeeklyBreakdown(transactions, startDate, endDate, subconceptHierarchyMap) {
+    try {
+      // Parsear fechas
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      // Obtener el primer día del mes y el último
+      const firstDay = new Date(start.getFullYear(), start.getMonth(), 1);
+      const lastDay = new Date(end.getFullYear(), end.getMonth() + 1, 0);
+
+      // Calcular semanas del mes
+      const weeks = [];
+      let currentWeekStart = new Date(firstDay);
+      let weekNumber = this.getWeekNumber(firstDay);
+
+      while (currentWeekStart <= lastDay) {
+        const weekEnd = new Date(currentWeekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        
+        // Si el fin de semana pasa el último día del mes, ajustar
+        if (weekEnd > lastDay) {
+          weekEnd.setTime(lastDay.getTime());
+        }
+
+        weeks.push({
+          weekNumber: weekNumber,
+          startDate: currentWeekStart.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
+          endDate: weekEnd.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
+          startTimestamp: currentWeekStart.getTime(),
+          endTimestamp: weekEnd.getTime()
+        });
+
+        // Avanzar a la siguiente semana
+        currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+        weekNumber++;
+      }
+
+      // Inicializar estructura de datos
+      const salidas = {};
+      const entradas = {};
+
+      // Procesar cada transacción
+      transactions.forEach(transaction => {
+        const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
+        const transactionTime = transactionDate.getTime();
+
+        // Encontrar en qué semana cae esta transacción
+        const weekIndex = weeks.findIndex(week => 
+          transactionTime >= week.startTimestamp && transactionTime <= week.endTimestamp
+        );
+
+        if (weekIndex === -1) return; // Transacción fuera del rango de semanas
+
+        // Obtener la jerarquía completa del subconcepto
+        const hierarchy = subconceptHierarchyMap[transaction.subconceptId];
+        const subconceptKey = hierarchy ? hierarchy.full : 'Sin Subconcepto';
+        const amount = parseFloat(transaction.amount) || 0;
+
+        if (transaction.type === 'salida') {
+          // Inicializar si no existe
+          if (!salidas[subconceptKey]) {
+            salidas[subconceptKey] = { total: 0 };
+            weeks.forEach((_, index) => {
+              salidas[subconceptKey][`week${index + 1}`] = 0;
+            });
+          }
+
+          // Agregar monto a la semana correspondiente
+          salidas[subconceptKey][`week${weekIndex + 1}`] += amount;
+          salidas[subconceptKey].total += amount;
+
+        } else if (transaction.type === 'entrada') {
+          // Inicializar si no existe
+          if (!entradas[subconceptKey]) {
+            entradas[subconceptKey] = { total: 0 };
+            weeks.forEach((_, index) => {
+              entradas[subconceptKey][`week${index + 1}`] = 0;
+            });
+          }
+
+          // Agregar monto a la semana correspondiente
+          entradas[subconceptKey][`week${weekIndex + 1}`] += amount;
+          entradas[subconceptKey].total += amount;
+        }
+      });
+
+      console.log('📅 Weekly Breakdown generado:', {
+        weeks: weeks.length,
+        salidas: Object.keys(salidas).length,
+        entradas: Object.keys(entradas).length
+      });
+
+      return {
+        weeks,
+        salidas,
+        entradas
+      };
+    } catch (error) {
+      console.error('Error generando weekly breakdown:', error);
+      return {
+        weeks: [],
+        salidas: {},
+        entradas: {}
+      };
+    }
+  },
+
+  // Obtener el número de semana del año
+  getWeekNumber(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
   },
 
   // Export to Excel

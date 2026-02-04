@@ -9,6 +9,9 @@ import { useToast } from "../../../components/ui/Toast";
 import { transactionService } from "../../../lib/services/transactionService";
 import { conceptService } from "../../../lib/services/conceptService";
 import { providerService } from "../../../lib/services/providerService";
+import { generalService } from "../../../lib/services/generalService";
+import { subconceptService } from "../../../lib/services/subconceptService";
+import { paymentService } from "../../../lib/services/paymentService";
 import Link from "next/link";
 import { 
   PlusIcon,
@@ -27,6 +30,9 @@ const SolicitudesPago = () => {
   const [transactions, setTransactions] = useState([]);
   const [concepts, setConcepts] = useState([]);
   const [providers, setProviders] = useState([]);
+  const [generals, setGenerals] = useState([]);
+  const [subconcepts, setSubconcepts] = useState([]);
+  const [paymentsMap, setPaymentsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -54,11 +60,13 @@ const SolicitudesPago = () => {
         endDate: endOfMonth
       };
 
-      const [transactionsData, conceptsData, providersData] = await Promise.all(
+      const [transactionsData, conceptsData, providersData, generalsData, subconceptsData] = await Promise.all(
         [
           transactionService.getAll(transactionQuery),
           conceptService.getAll(),
           providerService.getAll(),
+          generalService.getAll(),
+          subconceptService.getAll(),
         ]
       );
       
@@ -71,6 +79,21 @@ const SolicitudesPago = () => {
       setTransactions(transactionsData);
       setConcepts(conceptsData);
       setProviders(providersData);
+      setGenerals(generalsData);
+      setSubconcepts(subconceptsData);
+
+      // Cargar pagos para todas las transacciones
+      const paymentsData = {};
+      for (const transaction of transactionsData) {
+        try {
+          const payments = await paymentService.getByTransaction(transaction.id);
+          paymentsData[transaction.id] = payments || [];
+        } catch (err) {
+          console.error(`Error loading payments for transaction ${transaction.id}:`, err);
+          paymentsData[transaction.id] = [];
+        }
+      }
+      setPaymentsMap(paymentsData);
     } catch (error) {
       console.error("Error loading transactions:", error);
       toast.error("Error al cargar las transacciones");
@@ -123,6 +146,12 @@ const SolicitudesPago = () => {
     router.push(`/admin/transacciones/editar/${transaction.id}`);
   };
 
+  const getGeneralName = (generalId, transaction = null) => {
+    if (!generalId) return "N/A";
+    const general = generals.find((g) => g.id === generalId);
+    return general ? general.name : "N/A";
+  };
+
   const getConceptName = (conceptId, transaction = null) => {
     // Si es un gasto inicial con conceptName, usar ese nombre
     if (transaction?.isInitialExpense && transaction?.conceptName) {
@@ -131,6 +160,49 @@ const SolicitudesPago = () => {
     
     const concept = concepts.find((c) => c.id === conceptId);
     return concept ? concept.name : "N/A";
+  };
+
+  const getSubconceptName = (subconceptId, transaction = null) => {
+    if (!subconceptId) return null;
+    const subconcept = subconcepts.find((s) => s.id === subconceptId);
+    return subconcept ? subconcept.name : null;
+  };
+
+  const getConceptHierarchy = (transaction) => {
+    const generalName = getGeneralName(transaction.generalId, transaction);
+    const conceptName = getConceptName(transaction.conceptId, transaction);
+    const subconceptName = getSubconceptName(transaction.subconceptId, transaction);
+
+    // Construir el árbol jerárquico
+    const hierarchy = [];
+    
+    if (generalName && generalName !== "N/A") {
+      hierarchy.push(generalName);
+    }
+    
+    if (conceptName && conceptName !== "N/A") {
+      hierarchy.push(conceptName);
+    }
+    
+    if (subconceptName) {
+      hierarchy.push(subconceptName);
+    }
+
+    return hierarchy.length > 0 ? hierarchy : ["N/A"];
+  };
+
+  const getRemainingAmount = (transaction) => {
+    const totalAmount = transaction.amount || 0;
+    const payments = paymentsMap[transaction.id] || [];
+    const paidAmount = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+    const remainingAmount = Math.max(0, totalAmount - paidAmount);
+    return remainingAmount;
+  };
+
+  const getPaidAmount = (transaction) => {
+    const payments = paymentsMap[transaction.id] || [];
+    const paidAmount = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+    return paidAmount;
   };
 
   const getProviderName = (providerId, transaction = null) => {
@@ -180,7 +252,7 @@ const SolicitudesPago = () => {
     return adjustedDate.toLocaleDateString("es-MX");
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status, transaction = null) => {
     const statusConfig = {
       pendiente: {
         color: "bg-red-100 text-red-800 border border-red-200",
@@ -224,14 +296,44 @@ const SolicitudesPago = () => {
     };
 
     const config = statusConfig[status] || statusConfig.pendiente;
+    
+    if (!transaction) {
+      return (
+        <span
+          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${config.color}`}
+        >
+          {config.icon}
+          {config.text}
+        </span>
+      );
+    }
+
+    const paidAmount = getPaidAmount(transaction);
+    const remainingAmount = getRemainingAmount(transaction);
 
     return (
-      <span
-        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${config.color}`}
-      >
-        {config.icon}
-        {config.text}
-      </span>
+      <div className="flex flex-col items-start gap-1">
+        <span
+          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${config.color}`}
+        >
+          {config.icon}
+          {config.text}
+        </span>
+        
+        {/* Mostrar monto pagado para estado parcial y pagado */}
+        {(status === "parcial" || status === "pagado") && paidAmount > 0 && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+            Pagado: {formatCurrency(paidAmount)}
+          </span>
+        )}
+        
+        {/* Mostrar saldo pendiente para estado pendiente y parcial */}
+        {(status === "pendiente" || status === "parcial") && remainingAmount > 0 && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-700 border border-gray-300">
+            Saldo pendiente: {formatCurrency(remainingAmount)}
+          </span>
+        )}
+      </div>
     );
   };
 
@@ -243,13 +345,24 @@ const SolicitudesPago = () => {
     // Si hay un término de búsqueda, filtrar por él
     if (searchTerm) {
       const query = searchTerm.toLowerCase();
+      
+      // Buscar en el árbol jerárquico completo
+      const generalName = getGeneralName(transaction.generalId, transaction).toLowerCase();
       const conceptName = getConceptName(transaction.conceptId, transaction).toLowerCase();
+      const subconceptName = (getSubconceptName(transaction.subconceptId, transaction) || "").toLowerCase();
+      
+      // Otros campos
       const providerName = getProviderName(transaction.providerId, transaction).toLowerCase();
+      const description = (transaction.description || "").toLowerCase();
       const amountStr = (transaction.amount ?? "").toString();
       const statusStr = (transaction.status ?? "").toString().toLowerCase();
+      
       return (
+        generalName.includes(query) ||
         conceptName.includes(query) ||
+        subconceptName.includes(query) ||
         providerName.includes(query) ||
+        description.includes(query) ||
         amountStr.includes(query) ||
         statusStr.includes(query)
       );
@@ -446,7 +559,7 @@ const SolicitudesPago = () => {
                           type="text"
                           value={searchTerm}
                           onChange={handleSearchChange}
-                          placeholder="Buscar por concepto, proveedor, monto o estado..."
+                          placeholder="Buscar por general, concepto, subconcepto, proveedor, descripción, monto o estado..."
                           className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
                         />
                         <svg
@@ -572,8 +685,21 @@ const SolicitudesPago = () => {
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                                 {formatDate(transaction.date)}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
-                                {getConceptName(transaction.conceptId, transaction)}
+                              <td className="px-6 py-4 text-sm text-foreground">
+                                <div className="flex items-center space-x-1 flex-wrap">
+                                  {getConceptHierarchy(transaction).map((level, index, array) => (
+                                    <div key={index} className="flex items-center space-x-1">
+                                      <span className={index === array.length - 1 ? "font-medium text-gray-900" : "text-gray-600"}>
+                                        {level}
+                                      </span>
+                                      {index < array.length - 1 && (
+                                        <svg className="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                                 {getProviderName(transaction.providerId, transaction)}
@@ -582,7 +708,7 @@ const SolicitudesPago = () => {
                                 {formatCurrency(transaction.amount)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                {getStatusBadge(transaction.status)}
+                                {getStatusBadge(transaction.status, transaction)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 {transaction.isRecurring ? (
@@ -644,11 +770,24 @@ const SolicitudesPago = () => {
                                 </span>
                               )}
                               {getInitialExpenseBadge(transaction)}
-                              {getStatusBadge(transaction.status)}
+                              {getStatusBadge(transaction.status, transaction)}
                             </div>
-                            <p className="text-sm font-medium text-foreground">
-                              {getConceptName(transaction.conceptId, transaction)}
-                            </p>
+                            <div className="text-sm font-medium text-foreground mb-1">
+                              <div className="flex items-center space-x-1 flex-wrap">
+                                {getConceptHierarchy(transaction).map((level, index, array) => (
+                                  <div key={index} className="flex items-center space-x-1">
+                                    <span className={index === array.length - 1 ? "font-semibold" : "text-gray-600 font-normal"}>
+                                      {level}
+                                    </span>
+                                    {index < array.length - 1 && (
+                                      <svg className="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                      </svg>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                             <p className="text-sm text-muted-foreground">
                               {getProviderName(transaction.providerId, transaction)}
                             </p>
