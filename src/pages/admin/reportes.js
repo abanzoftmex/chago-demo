@@ -651,10 +651,10 @@ const Reportes = () => {
                       Total de Ingresos
                     </h3>
                     <p className="text-2xl font-bold text-green-600">
-                      {formatCurrency(stats.totalEntradas)}
+                      {formatCurrency(getFilteredTransactionType() === 'salida' ? 0 : stats.totalEntradas)}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {stats.entradasCount} transacciones
+                      {getFilteredTransactionType() === 'salida' ? 0 : stats.entradasCount} transacciones
                     </p>
                   </div>
                   <CurrencyDollarIcon className="h-8 w-8 text-green-600" />
@@ -669,10 +669,10 @@ const Reportes = () => {
                       Total de Gastos
                     </h3>
                     <p className="text-2xl font-bold text-red-600">
-                      {formatCurrency(stats.totalSalidas)}
+                      {formatCurrency(getFilteredTransactionType() === 'entrada' ? 0 : stats.totalSalidas)}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {stats.salidasCount} transacciones
+                      {getFilteredTransactionType() === 'entrada' ? 0 : stats.salidasCount} transacciones
                     </p>
                   </div>
                   <CurrencyDollarIcon className="h-8 w-8 text-red-600" />
@@ -708,7 +708,12 @@ const Reportes = () => {
                       Total de Transacciones
                     </h3>
                     <p className="text-2xl font-bold text-purple-600">
-                      {stats.totalTransactions}
+                      {getFilteredTransactionType() === 'entrada' 
+                        ? stats.entradasCount 
+                        : getFilteredTransactionType() === 'salida' 
+                          ? stats.salidasCount 
+                          : stats.entradasCount + stats.salidasCount
+                      }
                     </p>
                     <p className="text-sm text-muted-foreground">
                       En el período
@@ -1790,7 +1795,7 @@ const Reportes = () => {
         )}
 
         {/* No Data State */}
-        {!loading && stats && stats.totalTransactions === 0 && (
+        {!loading && stats && (stats.entradasCount + stats.salidasCount) === 0 && (
           <div className="bg-background rounded-lg border border-border p-6">
             <div className="border-2 border-dashed border-border rounded-lg h-32 flex items-center justify-center">
               <div className="text-center">
