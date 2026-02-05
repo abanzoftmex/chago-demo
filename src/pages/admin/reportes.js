@@ -27,6 +27,7 @@ import {
   CheckCircleIcon,
   ArrowUpIcon,
   ArrowDownIcon,
+  QuestionMarkCircleIcon,
 } from "@heroicons/react/24/outline";
 
 const Reportes = () => {
@@ -47,6 +48,7 @@ const Reportes = () => {
     canExecute: false,
     data: null
   });
+  const [showPaymentStatusInfo, setShowPaymentStatusInfo] = useState(false);
 
   const [filters, setFilters] = useState({
     startDate: "",
@@ -1127,9 +1129,16 @@ const Reportes = () => {
         {/* Payment Status (for salidas) */}
         {stats && getFilteredTransactionType() === 'salida' && stats.salidasCount > 0 && (
           <div className="bg-background rounded-lg border border-border p-6">
-            <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center">
+            <h3 className="text-lg font-semibold text-foreground flex items-center mb-4">
               <ClockIcon className="h-5 w-5 mr-2" />
               Estado de Salidas
+              <button
+                onClick={() => setShowPaymentStatusInfo(true)}
+                className="ml-2 p-1 rounded-full hover:bg-blue-50 transition-colors"
+                title="Información sobre el estado de pagos"
+              >
+                <QuestionMarkCircleIcon className="h-6 w-6 text-blue-500 hover:text-blue-600" />
+              </button>
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1233,9 +1242,16 @@ const Reportes = () => {
         {/* Payment Status (for entradas) */}
         {stats && getFilteredTransactionType() === 'entrada' && stats.entradasCount > 0 && (
           <div className="bg-background rounded-lg border border-border p-6">
-            <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center">
+            <h3 className="text-lg font-semibold text-foreground flex items-center mb-4">
               <ClockIcon className="h-5 w-5 mr-2" />
               Estado de Entradas
+              <button
+                onClick={() => setShowPaymentStatusInfo(true)}
+                className="ml-2 p-1 rounded-full hover:bg-blue-50 transition-colors"
+                title="Información sobre el estado de pagos"
+              >
+                <QuestionMarkCircleIcon className="h-6 w-6 text-blue-500 hover:text-blue-600" />
+              </button>
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1807,6 +1823,139 @@ const Reportes = () => {
       </div>
 
       {/* Carryover Transactions Side Panel */}
+      {/* Payment Status Info Modal */}
+      {showPaymentStatusInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowPaymentStatusInfo(false)} />
+          <div className="relative bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <QuestionMarkCircleIcon className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white">
+                      ¿Cómo interpretar el Estado de {getFilteredTransactionType() === 'entrada' ? 'Entradas' : 'Salidas'}?
+                    </h3>
+                    <p className="text-blue-100 text-sm mt-0.5">
+                      {currentMonthName}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowPaymentStatusInfo(false)}
+                  className="p-1 rounded-lg hover:bg-white/20 transition-colors"
+                >
+                  <XMarkIcon className="h-6 w-6 text-white" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="px-6 py-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+              <p className="text-gray-700 mb-6 leading-relaxed">
+                A continuación se muestra el detalle de los movimientos del mes de <span className="font-semibold">{currentMonthName}</span>, donde podrás visualizar el estado de las transacciones según su nivel de cobertura:
+              </p>
+
+              <div className="space-y-4">
+                {/* Tarjeta Verde */}
+                <div className="bg-green-50 border-l-4 border-green-500 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                        <CheckCircleIcon className="h-6 w-6 text-white" />
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-green-900 font-semibold text-lg mb-1">
+                        Cubiertos totalmente
+                      </h4>
+                      <p className="text-green-800 text-sm leading-relaxed">
+                        Transacciones que se han cubierto en su totalidad. Estos movimientos están completamente pagados y no requieren seguimiento adicional.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tarjeta Amarilla */}
+                <div className="bg-yellow-50 border-l-4 border-yellow-500 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 bg-yellow-500 rounded-full flex items-center justify-center">
+                        <ClockIcon className="h-6 w-6 text-white" />
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-yellow-900 font-semibold text-lg mb-1">
+                        Parcialmente cubiertos
+                      </h4>
+                      <p className="text-yellow-800 text-sm leading-relaxed">
+                        Transacciones que han recibido pagos parciales. Aún existe un saldo pendiente por cubrir. Es importante dar seguimiento a estos movimientos.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tarjeta Roja */}
+                <div className="bg-red-50 border-l-4 border-red-500 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center">
+                        <XMarkIcon className="h-6 w-6 text-white" />
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-red-900 font-semibold text-lg mb-1">
+                        Pendientes por cubrir
+                      </h4>
+                      <p className="text-red-800 text-sm leading-relaxed">
+                        Transacciones del mes actual a las cuales no se ha realizado ningún pago. Requieren atención inmediata para su cobertura.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tarjeta Morada */}
+                <div className="bg-purple-50 border-l-4 border-purple-500 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center">
+                        <ArrowPathIcon className="h-6 w-6 text-white" />
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-purple-900 font-semibold text-lg mb-1">
+                        Pendientes anteriores
+                      </h4>
+                      <p className="text-purple-800 text-sm leading-relaxed">
+                        Transacciones de meses anteriores que no se han cubierto en su totalidad. Esto incluye tanto pagos parciales como movimientos sin ningún pago. Estas deudas se arrastran al mes actual.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Nota adicional */}
+              <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <svg className="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <div className="flex-1">
+                    <h4 className="text-blue-900 font-medium text-sm mb-1">Nota importante</h4>
+                    <p className="text-blue-800 text-sm leading-relaxed">
+                      Los montos mostrados reflejan el estado actual de las transacciones. Los saldos pendientes se actualizan automáticamente conforme se registran los pagos en el sistema.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showCarryoverPanel && (
         <div className="fixed inset-0 z-50 overflow-hidden">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-xs" onClick={() => setShowCarryoverPanel(false)} />
