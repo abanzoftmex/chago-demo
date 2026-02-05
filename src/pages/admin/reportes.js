@@ -798,13 +798,12 @@ const Reportes = () => {
                           const parts = subconcept.split(' > ');
                           return (
                           <tr key={subconcept} className="hover:bg-muted/50">
-                            <td className="px-6 py-4 text-sm text-foreground min-w-[250px] max-w-[350px]">
+                            <td className="px-6 py-4 text-sm text-foreground min-w-[200px] max-w-[230px]">
                               <div className="break-words">
                                 {parts.length === 3 ? (
                                   <>
-                                    <span className="font-normal">{parts[0]}</span>
-                                    <span className="font-normal"> / {parts[1]}</span>
-                                    <span className="font-bold"> / {parts[2]}</span>
+                                    <div className="font-bold text-foreground">{parts[2]}</div>
+                                    <div className="font-normal text-xs text-muted-foreground mt-0.5">{parts[0]} / {parts[1]}</div>
                                   </>
                                 ) : (
                                   <span className="font-semibold">{subconcept}</span>
@@ -932,13 +931,12 @@ const Reportes = () => {
                           const parts = subconcept.split(' > ');
                           return (
                           <tr key={subconcept} className="hover:bg-muted/50">
-                            <td className="px-6 py-4 text-sm text-foreground min-w-[250px] max-w-[350px]">
+                            <td className="px-6 py-4 text-sm text-foreground min-w-[200px] max-w-[230px]">
                               <div className="break-words">
                                 {parts.length === 3 ? (
                                   <>
-                                    <span className="font-normal">{parts[0]}</span>
-                                    <span className="font-normal"> / {parts[1]}</span>
-                                    <span className="font-bold"> / {parts[2]}</span>
+                                    <div className="font-bold text-foreground">{parts[2]}</div>
+                                    <div className="font-normal text-xs text-muted-foreground mt-0.5">{parts[0]} / {parts[1]}</div>
                                   </>
                                 ) : (
                                   <span className="font-semibold">{subconcept}</span>
