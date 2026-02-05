@@ -82,11 +82,19 @@ const Reportes = () => {
     // Update month name
     updateMonthName(newDate);
 
+    // Format dates to YYYY-MM-DD without timezone conversion
+    const formatDateLocal = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
     // Update filters with proper time handling
     setFilters((prev) => ({
       ...prev,
-      startDate: startOfMonth.toISOString().split("T")[0],
-      endDate: endOfMonth.toISOString().split("T")[0],
+      startDate: formatDateLocal(startOfMonth),
+      endDate: formatDateLocal(endOfMonth),
     }));
   };
 
@@ -141,7 +149,7 @@ const Reportes = () => {
       const year = parseInt(startDateParts[0]);
       const month = parseInt(startDateParts[1]);
 
-      console.log(`🔄 Calculando arrastre manualmente para ${month}/${year}`);
+      console.log(`Calculando arrastre manualmente para ${month}/${year}`);
       
       // Calcular y guardar el arrastre
       const carryoverData = await carryoverService.calculateAndSaveCarryover(year, month);
@@ -178,12 +186,13 @@ const Reportes = () => {
 
       if (filters.startDate) {
         const startParts = filters.startDate.split('-');
-        startDate = new Date(parseInt(startParts[0]), parseInt(startParts[1]) - 1, parseInt(startParts[2]));
+        startDate = new Date(parseInt(startParts[0]), parseInt(startParts[1]) - 1, parseInt(startParts[2]), 0, 0, 0, 0);
       }
 
       if (filters.endDate) {
         const endParts = filters.endDate.split('-');
-        endDate = new Date(parseInt(endParts[0]), parseInt(endParts[1]) - 1, parseInt(endParts[2]));
+        // Set endDate to end of day (23:59:59.999) to include all transactions of that day
+        endDate = new Date(parseInt(endParts[0]), parseInt(endParts[1]) - 1, parseInt(endParts[2]), 23, 59, 59, 999);
       }
 
       const filterData = {
@@ -264,7 +273,7 @@ const Reportes = () => {
           (transactionYear === reportYear && transactionMonth <= reportMonth);
       });
 
-      console.log('🔍 Frontend - Filtrado de gastos pendientes:', {
+      console.log('Frontend - Filtrado de gastos pendientes:', {
         reportMonth: `${reportYear}-${String(reportMonth + 1).padStart(2, '0')}`,
         totalPendingInSystem: allTransactions.length,
         pendingUntilReportMonth: pendingFromPrevious.length,
@@ -307,10 +316,10 @@ const Reportes = () => {
         const year = parseInt(startDateParts[0]);
         const month = parseInt(startDateParts[1]);
 
-        console.log(`🔍 checkCarryoverStatus: startDate=${startDateStr}, year=${year}, month=${month}`);
+        console.log(`checkCarryoverStatus: startDate=${startDateStr}, year=${year}, month=${month}`);
 
         const status = await reportService.getCarryoverStatus(year, month);
-        console.log(`📊 checkCarryoverStatus: status recibido:`, status);
+        console.log(`checkCarryoverStatus: status recibido:`, status);
 
         setCarryoverStatus(status);
         setCarryoverInfo(status.data);

@@ -4,8 +4,9 @@
 
 /**
  * Convert image URL to base64 for PDF embedding with transparency handling
+ * Also returns image dimensions
  * @param {string} imageUrl - URL of the image
- * @returns {Promise<string>} Base64 encoded image
+ * @returns {Promise<{dataURL: string, width: number, height: number}>} Base64 encoded image with dimensions
  */
 export const imageToBase64 = (imageUrl) => {
   return new Promise((resolve, reject) => {
@@ -18,7 +19,7 @@ export const imageToBase64 = (imageUrl) => {
 
     // Set timeout for loading
     const timeout = setTimeout(() => {
-      reject(new Error(`Timeout loading image from: ${imageUrl}`));
+      reject(new Error('Timeout loading image from: ' + imageUrl));
     }, 10000); // 10 second timeout for external URLs
 
     img.onload = () => {
@@ -40,15 +41,15 @@ export const imageToBase64 = (imageUrl) => {
 
         // Convert to PNG for better transparency support
         const dataURL = canvas.toDataURL('image/png');
-        resolve(dataURL);
+        resolve({ dataURL: dataURL, width: img.width, height: img.height });
       } catch (error) {
-        reject(new Error(`Canvas error for ${imageUrl}: ${error.message}`));
+        reject(new Error('Canvas error for ' + imageUrl + ': ' + error.message));
       }
     };
 
     img.onerror = (error) => {
       clearTimeout(timeout);
-      reject(new Error(`Failed to load image from: ${imageUrl}`));
+      reject(new Error('Failed to load image from: ' + imageUrl));
     };
 
     // Try without CORS first, then with CORS if needed
@@ -56,22 +57,23 @@ export const imageToBase64 = (imageUrl) => {
       img.src = imageUrl;
     } catch (error) {
       clearTimeout(timeout);
-      reject(new Error(`Error setting image source: ${error.message}`));
+      reject(new Error('Error setting image source: ' + error.message));
     }
   });
 };
 
 /**
  * Alternative image loading without CORS for local files
+ * Also returns image dimensions
  * @param {string} imageUrl - URL of the image
- * @returns {Promise<string>} Base64 encoded image
+ * @returns {Promise<{dataURL: string, width: number, height: number}>} Base64 encoded image with dimensions
  */
 export const imageToBase64NoCORS = (imageUrl) => {
   return new Promise((resolve, reject) => {
     const img = new Image();
 
     const timeout = setTimeout(() => {
-      reject(new Error(`Timeout loading image (no CORS) from: ${imageUrl}`));
+      reject(new Error('Timeout loading image (no CORS) from: ' + imageUrl));
     }, 5000);
 
     img.onload = () => {
@@ -92,15 +94,15 @@ export const imageToBase64NoCORS = (imageUrl) => {
         ctx.drawImage(img, 0, 0);
 
         const dataURL = canvas.toDataURL('image/png');
-        resolve(dataURL);
+        resolve({ dataURL: dataURL, width: img.width, height: img.height });
       } catch (error) {
-        reject(new Error(`Canvas error (no CORS) for ${imageUrl}: ${error.message}`));
+        reject(new Error('Canvas error (no CORS) for ' + imageUrl + ': ' + error.message));
       }
     };
 
     img.onerror = () => {
       clearTimeout(timeout);
-      reject(new Error(`Failed to load image (no CORS) from: ${imageUrl}`));
+      reject(new Error('Failed to load image (no CORS) from: ' + imageUrl));
     };
 
     img.src = imageUrl;
@@ -108,90 +110,84 @@ export const imageToBase64NoCORS = (imageUrl) => {
 };
 
 /**
- * Add logo to PDF document
+ * Add logo to PDF document maintaining aspect ratio
  * @param {jsPDF} doc - PDF document instance
  * @param {number} x - X position
  * @param {number} y - Y position
- * @param {number} width - Logo width
- * @param {number} height - Logo height
+ * @param {number} maxHeight - Maximum height for the logo
  */
-export const addLogoToPDF = async (doc, x = 15, y = 8, width = 25, height = 25) => {
+export const addLogoToPDF = async (doc, x = 15, y = 8, maxHeight = 25) => {
   try {
     // Try multiple logo paths in order of preference
     const logoUrls = [
+      '/logo.jpg',
+      window.location.origin + '/logo.jpg',
+      './logo.jpg',
       'https://www.chagofc.com/demo-button-label-filled-icon.jpg',
       '/demo-button-label-filled-icon.jpg',
-      // Try with protocol
-      `${window.location.protocol}//${window.location.host}/demo-button-label-filled-icon.jpg`,
-      `${window.location.origin}/demo-button-label-filled-icon.jpg`,
-      // Try relative path
-      `${window.location.origin}/public/demo-button-label-filled-icon.jpg`,
+      window.location.protocol + '//' + window.location.host + '/demo-button-label-filled-icon.jpg',
+      window.location.origin + '/demo-button-label-filled-icon.jpg',
+      window.location.origin + '/public/demo-button-label-filled-icon.jpg',
       './demo-button-label-filled-icon.jpg',
       './logo.png'
     ];
 
-    let base64Logo = null;
+    let logoData = null;
     let logoLoaded = false;
 
     for (const logoUrl of logoUrls) {
       try {
-        // Try with CORS first
-        base64Logo = await imageToBase64(logoUrl);
+        logoData = await imageToBase64(logoUrl);
         logoLoaded = true;
-        console.log(`✅ Logo cargado exitosamente desde: ${logoUrl}`);
+        console.log('Logo loaded successfully from: ' + logoUrl);
         break;
       } catch (error) {
-        console.log(`❌ Error con CORS desde: ${logoUrl} - ${error.message}`);
+        console.log('Error with CORS from: ' + logoUrl + ' - ' + error.message);
 
-        // Try without CORS for local files
         try {
-          base64Logo = await imageToBase64NoCORS(logoUrl);
+          logoData = await imageToBase64NoCORS(logoUrl);
           logoLoaded = true;
-          console.log(`✅ Logo cargado sin CORS desde: ${logoUrl}`);
+          console.log('Logo loaded without CORS from: ' + logoUrl);
           break;
         } catch (noCorsError) {
-          console.log(`❌ Error sin CORS desde: ${logoUrl} - ${noCorsError.message}`);
+          console.log('Error without CORS from: ' + logoUrl + ' - ' + noCorsError.message);
           continue;
         }
       }
     }
 
     if (!logoLoaded) {
-      console.warn('⚠️ No se pudo cargar el logo desde ninguna ubicación, usando fallback...');
-      // Use fallback instead of throwing error
-      doc.setFillColor(255, 255, 255);
-      doc.roundedRect(x, y, width, height, 3, 3, 'F');
-      doc.setFontSize(12);
-      doc.setTextColor(220, 38, 38); // Red
+      console.warn('Could not load logo from any location, using fallback...');
+      // Use fallback text logo
+      doc.setFontSize(14);
+      doc.setTextColor(220, 38, 38);
       doc.setFont('helvetica', 'bold');
-      doc.text('SFC', x + width / 2, y + height / 2 + 2, { align: 'center' });
-
-      console.log('⚠️ Logo fallback aplicado (texto SFC)');
+      doc.text('SISTEMA FINANCIERO', x, y + 10);
+      console.log('Logo fallback applied (text)');
       return false;
     }
 
-    // Create a white background circle/rectangle for the logo to remove black background
-    doc.setFillColor(255, 255, 255);
-    doc.roundedRect(x, y, width, height, 3, 3, 'F');
+    // Calculate proportional width based on fixed height
+    const aspectRatio = logoData.width / logoData.height;
+    const logoHeight = maxHeight;
+    const logoWidth = logoHeight * aspectRatio;
 
-    // Add the logo image to PDF with transparent background handling
-    doc.addImage(base64Logo, 'PNG', x + 2, y + 2, width - 4, height - 4);
+    // Add the logo image directly without container, maintaining aspect ratio
+    doc.addImage(logoData.dataURL, 'PNG', x, y, logoWidth, logoHeight);
 
-    console.log('✅ Logo añadido exitosamente al PDF');
+    console.log('Logo added successfully to PDF with proportional dimensions');
     return true;
   } catch (error) {
-    console.error('❌ Error adding logo to PDF:', error);
-    console.log('🔄 Usando fallback de texto estilizado...');
+    console.error('Error adding logo to PDF:', error);
+    console.log('Using text fallback...');
 
-    // Fallback: Create a styled text logo
-    doc.setFillColor(255, 255, 255);
-    doc.roundedRect(x, y, width, height, 3, 3, 'F');
-    doc.setFontSize(12);
-    doc.setTextColor(220, 38, 38); // Red
+    // Fallback: Create a text logo
+    doc.setFontSize(14);
+    doc.setTextColor(220, 38, 38);
     doc.setFont('helvetica', 'bold');
-    doc.text('SFC', x + width / 2, y + height / 2 + 2, { align: 'center' });
+    doc.text('SISTEMA FINANCIERO', x, y + 10);
 
-    console.log('⚠️ Logo fallback aplicado (texto SFC)');
+    console.log('Logo fallback applied (text)');
     return false;
   }
 };
@@ -200,7 +196,7 @@ export const addLogoToPDF = async (doc, x = 15, y = 8, width = 25, height = 25) 
  * Test function to verify logo loading works
  */
 export const testLogoLoading = async () => {
-  console.log('🧪 Testing logo loading...');
+  console.log('Testing logo loading...');
 
   const logoUrls = [
     'https://www.chagofc.com/demo-button-label-filled-icon.jpg',
@@ -210,11 +206,11 @@ export const testLogoLoading = async () => {
 
   for (const logoUrl of logoUrls) {
     try {
-      const base64 = await imageToBase64(logoUrl);
-      console.log(`✅ Successfully loaded: ${logoUrl}`);
-      return { success: true, url: logoUrl, base64 };
+      const logoData = await imageToBase64(logoUrl);
+      console.log('Successfully loaded: ' + logoUrl);
+      return { success: true, url: logoUrl, data: logoData };
     } catch (error) {
-      console.log(`❌ Failed to load: ${logoUrl} - ${error.message}`);
+      console.log('Failed to load: ' + logoUrl + ' - ' + error.message);
     }
   }
 

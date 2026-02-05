@@ -162,7 +162,7 @@ export const reportService = {
       console.log(`🔍 generateReportStats: filters recibidos:`, filters);
 
       const stats = {
-        totalTransactions: transactions.length,
+        totalTransactions: 0, // Se calculará después como entradasCount + salidasCount
         totalEntradas: 0,
         totalSalidas: 0,
         totalPaid: 0, // Total pagado de todos los gastos
@@ -616,6 +616,9 @@ export const reportService = {
       });
       stats.averageEntrada = stats.entradasCount > 0 ? stats.totalEntradas / stats.entradasCount : 0;
       stats.averageSalida = stats.salidasCount > 0 ? stats.totalSalidas / stats.salidasCount : 0;
+
+      // Calcular totalTransactions correctamente como suma de entradas y salidas
+      stats.totalTransactions = stats.entradasCount + stats.salidasCount;
 
       // Log final de estadísticas
       console.log('📊 Stats finales:', {
@@ -1090,7 +1093,9 @@ export const reportService = {
         stats,
         filters,
         conceptService,
-        providerService
+        providerService,
+        generalService,
+        subconceptService
       );
 
       // Generate filename with better naming
