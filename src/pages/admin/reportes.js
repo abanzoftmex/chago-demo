@@ -10,6 +10,7 @@ import { conceptService } from "../../lib/services/conceptService";
 import { subconceptService } from "../../lib/services/subconceptService";
 import { transactionService } from "../../lib/services/transactionService";
 import { providerService } from "../../lib/services/providerService";
+import { carryoverService } from "../../lib/services/carryoverService";
 import { DIVISIONS, formatDivision } from "../../lib/constants/divisions";
 import { useAuth } from "../../context/AuthContext";
 import useReportStore from "../../lib/stores/reportStore";
@@ -34,6 +35,7 @@ const Reportes = () => {
   const { showIncomeInBreakdown, toggleShowIncomeInBreakdown } = useReportStore();
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [calculatingCarryover, setCalculatingCarryover] = useState(false);
   const [transactions, setTransactions] = useState([]);
   const [stats, setStats] = useState(null);
   const [generals, setGenerals] = useState([]);
@@ -126,6 +128,42 @@ const Reportes = () => {
   const getFilteredTransactionType = () => {
     // Si hay filtro de tipo, retornarlo (siempre debe estar si hay general/concepto/subconcepto)
     return filters.type || null;
+  };
+
+  const calculateCarryoverManually = async () => {
+    try {
+      setCalculatingCarryover(true);
+      
+      // Obtener año y mes del reporte actual
+      const startDateParts = filters.startDate.split('-');
+      const year = parseInt(startDateParts[0]);
+      const month = parseInt(startDateParts[1]);
+
+      console.log(`🔄 Calculando arrastre manualmente para ${month}/${year}`);
+      
+      // Calcular y guardar el arrastre
+      const carryoverData = await carryoverService.calculateAndSaveCarryover(year, month);
+      
+      success(`Arrastre calculado: ${carryoverData.saldoArrastre.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })} para ${month}/${year}`);
+      
+      // Actualizar el estado
+      setCarryoverStatus({
+        calculated: true,
+        executed: true,
+        canExecute: false,
+        data: carryoverData
+      });
+      
+      // Regenerar el reporte para mostrar el nuevo arrastre
+      if (stats) {
+        await generateReport();
+      }
+    } catch (err) {
+      console.error('Error calculando arrastre:', err);
+      error('Error al calcular el arrastre: ' + err.message);
+    } finally {
+      setCalculatingCarryover(false);
+    }
   };
 
   const generateReport = async () => {
@@ -423,7 +461,7 @@ const Reportes = () => {
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-foreground flex items-center">
               <ChartBarIcon className="h-5 w-5 mr-2" />
-              Filtros de Reporte
+              Filtros de Reporte: {currentMonthName}
             </h2>
             <AdvancedDateSelector
               currentDate={currentDate}
@@ -566,35 +604,15 @@ const Reportes = () => {
           </div>
 
           <div className="flex justify-between items-center mt-4">
-            <div className="flex items-center space-x-4">
-              <Button
-                onClick={generateReport}
-                disabled={loading}
-                variant="primary"
-                size="md"
-                className="inline-flex items-center"
-              >
-                {loading ? "Generando..." : "Generar Reporte"}
-              </Button>
-
-              {/* Switch para mostrar/ocultar ingresos */}
-              <div className="flex items-center space-x-2">
-                <label className="text-sm font-medium text-foreground">
-                  Incluir Ingresos en Desgloses
-                </label>
-                <button
-                  type="button"
-                  onClick={toggleShowIncomeInBreakdown}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${showIncomeInBreakdown ? 'bg-blue-600' : 'bg-gray-200'
-                    }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${showIncomeInBreakdown ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                  />
-                </button>
-              </div>
-            </div>
+            <Button
+              onClick={generateReport}
+              disabled={loading}
+              variant="primary"
+              size="md"
+              className="inline-flex items-center"
+            >
+              {loading ? "Generando..." : "Generar Reporte"}
+            </Button>
 
             <div className="flex space-x-2">
               <Button
@@ -626,11 +644,11 @@ const Reportes = () => {
           <div className="space-y-6">
             {/* Current Period Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="bg-background rounded-lg border border-border p-6">
+              <div className="bg-lime-50 rounded-lg border border-border p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">
-                      Total Ingreso
+                      Total de Ingresos
                     </h3>
                     <p className="text-2xl font-bold text-green-600">
                       {formatCurrency(stats.totalEntradas)}
@@ -644,11 +662,11 @@ const Reportes = () => {
               </div>
 
 
-              <div className="bg-background rounded-lg border border-border p-6">
+              <div className="bg-red-50 rounded-lg border border-border p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">
-                      Total Gasto
+                      Total de Gastos
                     </h3>
                     <p className="text-2xl font-bold text-red-600">
                       {formatCurrency(stats.totalSalidas)}
@@ -683,20 +701,20 @@ const Reportes = () => {
                 </div>
               </div> */}
 
-              <div className="bg-background rounded-lg border border-border p-6">
+              <div className="bg-purple-50 rounded-lg border border-border p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">
-                      Total Transacciones
+                      Total de Transacciones
                     </h3>
-                    <p className="text-2xl font-bold text-primary">
+                    <p className="text-2xl font-bold text-purple-600">
                       {stats.totalTransactions}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       En el período
                     </p>
                   </div>
-                  <DocumentTextIcon className="h-8 w-8 text-primary" />
+                  <DocumentTextIcon className="h-8 w-8 text-purple-600" />
                 </div>
               </div>
             </div>
@@ -705,7 +723,7 @@ const Reportes = () => {
             {stats && (!getFilteredTransactionType() || getFilteredTransactionType() === 'entrada') && (
               <div className="bg-background rounded-lg border border-border p-6">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold text-green-700">
+                  <h3 className="text-lg font-semibold text-lime-700">
                     Resumen Mes {currentMonthName} - Ingresos
                   </h3>
                 </div>
@@ -713,24 +731,66 @@ const Reportes = () => {
                 {stats.weeklyBreakdown && stats.weeklyBreakdown.weeks ? (
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-border">
-                      <thead className="bg-green-100">
+                      <thead className="bg-lime-100">
                         <tr>
-                          <th rowSpan={2} className="px-6 py-3 text-center text-sm font-bold text-green-800 tracking-wider border-r-2 border-green-200">
+                          <th rowSpan={2} className="px-6 py-3 text-center text-sm font-bold text-lime-800 bg-lime-200 tracking-wider border-r-2 border-lime-200">
                             Concepto
                           </th>
-                          <th colSpan={stats.weeklyBreakdown.weeks.length} className="px-6 py-3 text-center text-sm font-bold text-green-800 tracking-wider border-r-2 border-green-200">
+                          <th colSpan={stats.weeklyBreakdown.weeks.length} className="px-6 py-3 text-center text-sm font-bold bg-lime-200 text-lime-800 tracking-wider border-r-2 border-lime-200">
                             Semanas
                           </th>
-                          <th rowSpan={2} className="px-6 py-3 text-center text-sm font-bold text-white tracking-wider bg-green-400">
+                          <th rowSpan={2} className="px-6 py-3 text-center text-sm font-bold tracking-wider text-lime-800 bg-lime-200">
                             Totales
                           </th>
                         </tr>
                         <tr>
-                          {stats.weeklyBreakdown.weeks.map((week, index) => (
-                            <th key={index} className="px-6 py-3 text-center text-xs font-medium text-green-800 tracking-wider bg-green-50">
-                              {week.weekNumber || (index + 1)}
+                          {stats.weeklyBreakdown.weeks.map((week, index) => {
+                            return (
+                            <th key={index} className="px-6 py-3 text-center text-xs font-medium text-lime-800 tracking-wider bg-lime-50">
+                              <div>{week.weekNumber || (index + 1)}</div>
+                              {(() => {
+                                try {
+                                  if (!week.startDate || !week.endDate) {
+                                    return null;
+                                  }
+                                  
+                                  // Parse dates - handle both Firestore Timestamp and "dd/MM" string format
+                                  let startDate, endDate;
+                                  
+                                  if (typeof week.startDate === 'string' && week.startDate.includes('/')) {
+                                    // Format "dd/MM" - need to add year
+                                    const currentYear = new Date(filters.startDate || currentDate).getFullYear();
+                                    const [dayStart, monthStart] = week.startDate.split('/');
+                                    startDate = new Date(currentYear, parseInt(monthStart) - 1, parseInt(dayStart));
+                                  } else {
+                                    startDate = week.startDate?.toDate ? week.startDate.toDate() : new Date(week.startDate);
+                                  }
+                                  
+                                  if (typeof week.endDate === 'string' && week.endDate.includes('/')) {
+                                    // Format "dd/MM" - need to add year
+                                    const currentYear = new Date(filters.startDate || currentDate).getFullYear();
+                                    const [dayEnd, monthEnd] = week.endDate.split('/');
+                                    endDate = new Date(currentYear, parseInt(monthEnd) - 1, parseInt(dayEnd));
+                                  } else {
+                                    endDate = week.endDate?.toDate ? week.endDate.toDate() : new Date(week.endDate);
+                                  }
+                                  
+                                  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+                                    return null;
+                                  }
+                                  
+                                  return (
+                                    <div className="text-xs font-normal text-lime-700 mt-1">
+                                      {startDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })} - {endDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}
+                                    </div>
+                                  );
+                                } catch (error) {
+                                  return null;
+                                }
+                              })()}
                             </th>
-                          ))}
+                            );
+                          })}
                         </tr>
                       </thead>
                       <tbody className="bg-background divide-y divide-border">
@@ -752,11 +812,11 @@ const Reportes = () => {
                               </div>
                             </td>
                             {stats.weeklyBreakdown.weeks.map((week, index) => (
-                              <td key={index} className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600">
+                              <td key={index} className="px-6 py-4 whitespace-nowrap text-sm text-right text-lime-600">
                                 {weekData[`week${index + 1}`] ? formatCurrency(weekData[`week${index + 1}`]) : '-'}
                               </td>
                             ))}
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-green-700 bg-green-100">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-lime-800 bg-lime-100">
                               {formatCurrency(weekData.total || 0)}
                             </td>
                           </tr>
@@ -772,12 +832,12 @@ const Reportes = () => {
                               0
                             );
                             return (
-                              <td key={index} className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-700">
+                              <td key={index} className="px-6 py-4 whitespace-nowrap text-sm text-right text-lime-700">
                                 {formatCurrency(weekTotal)}
                               </td>
                             );
                           })}
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-green-800 bg-green-200">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-lime-800 bg-lime-200">
                             {formatCurrency(stats.totalEntradas || 0)}
                           </td>
                         </tr>
@@ -813,16 +873,58 @@ const Reportes = () => {
                           <th colSpan={stats.weeklyBreakdown.weeks.length} className="px-6 py-3 text-center text-sm font-bold text-red-800 tracking-wider border-r-2 border-red-200">
                             Semanas
                           </th>
-                          <th rowSpan={2} className="px-6 py-3 text-center text-sm font-bold text-white tracking-wider bg-red-400">
+                          <th rowSpan={2} className="px-6 py-3 text-center text-sm font-bold tracking-wider bg-red-200 text-red-800">
                             Totales
                           </th>
                         </tr>
                         <tr>
-                          {stats.weeklyBreakdown.weeks.map((week, index) => (
+                          {stats.weeklyBreakdown.weeks.map((week, index) => {
+                            return (
                             <th key={index} className="px-6 py-3 text-center text-xs font-medium text-red-800 uppercase tracking-wider bg-red-50">
-                              {week.weekNumber || (index + 1)}
+                              <div>{week.weekNumber || (index + 1)}</div>
+                              {(() => {
+                                try {
+                                  if (!week.startDate || !week.endDate) {
+                                    return null;
+                                  }
+                                  
+                                  // Parse dates - handle both Firestore Timestamp and "dd/MM" string format
+                                  let startDate, endDate;
+                                  
+                                  if (typeof week.startDate === 'string' && week.startDate.includes('/')) {
+                                    // Format "dd/MM" - need to add year
+                                    const currentYear = new Date(filters.startDate || currentDate).getFullYear();
+                                    const [dayStart, monthStart] = week.startDate.split('/');
+                                    startDate = new Date(currentYear, parseInt(monthStart) - 1, parseInt(dayStart));
+                                  } else {
+                                    startDate = week.startDate?.toDate ? week.startDate.toDate() : new Date(week.startDate);
+                                  }
+                                  
+                                  if (typeof week.endDate === 'string' && week.endDate.includes('/')) {
+                                    // Format "dd/MM" - need to add year
+                                    const currentYear = new Date(filters.startDate || currentDate).getFullYear();
+                                    const [dayEnd, monthEnd] = week.endDate.split('/');
+                                    endDate = new Date(currentYear, parseInt(monthEnd) - 1, parseInt(dayEnd));
+                                  } else {
+                                    endDate = week.endDate?.toDate ? week.endDate.toDate() : new Date(week.endDate);
+                                  }
+                                  
+                                  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+                                    return null;
+                                  }
+                                  
+                                  return (
+                                    <div className="text-xs font-normal text-red-700 mt-1">
+                                      {startDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })} - {endDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}
+                                    </div>
+                                  );
+                                } catch (error) {
+                                  return null;
+                                }
+                              })()}
                             </th>
-                          ))}
+                            );
+                          })}
                         </tr>
                       </thead>
                       <tbody className="bg-background divide-y divide-border">
@@ -897,6 +999,18 @@ const Reportes = () => {
                     </h3>
                     {/* Estado del arrastre automático */}
                     <div className="flex items-center space-x-2">
+                      {filters.startDate && (
+                        <Button
+                          onClick={calculateCarryoverManually}
+                          disabled={calculatingCarryover}
+                          variant="outline"
+                          size="sm"
+                          className="inline-flex items-center border-blue-500 text-blue-600 hover:bg-blue-50"
+                        >
+                          <ArrowPathIcon className={`h-4 w-4 mr-1 ${calculatingCarryover ? 'animate-spin' : ''}`} />
+                          {calculatingCarryover ? 'Calculando...' : 'Calcular Arrastre'}
+                        </Button>
+                      )}
                       {carryoverStatus.calculated && (
                         <span className="text-xs text-green-600 flex items-center">
                           <CheckCircleIcon className="h-4 w-4 mr-1" />
@@ -952,7 +1066,7 @@ const Reportes = () => {
                         className={`text-2xl font-bold ${(() => {
                           // Calcular balance real sin gastos pendientes:
                           // Arrastre + Ingresos del período - Solo gastos PAGADOS del período
-                          const gastosPagados = (stats.paymentStatus?.pagado?.amount || 0) + (stats.paymentStatus?.liquidado?.amount || 0);
+                          const gastosPagados = (stats.paymentStatusSalidas?.pagado?.amount || 0) + (stats.paymentStatusSalidas?.liquidado?.amount || 0);
                           const balanceSinPendientes = stats.carryoverIncome + stats.totalEntradas - gastosPagados;
                           console.log('🧮 Balance sin pendientes:', {
                             carryoverIncome: stats.carryoverIncome,
@@ -967,7 +1081,7 @@ const Reportes = () => {
                         {(() => {
                           // Calcular balance real sin gastos pendientes:
                           // Arrastre + Ingresos del período - Solo gastos PAGADOS del período
-                          const gastosPagados = (stats.paymentStatus?.pagado?.amount || 0) + (stats.paymentStatus?.liquidado?.amount || 0);
+                          const gastosPagados = (stats.paymentStatusSalidas?.pagado?.amount || 0) + (stats.paymentStatusSalidas?.liquidado?.amount || 0);
                           const balanceSinPendientes = stats.carryoverIncome + stats.totalEntradas - gastosPagados;
                           return formatCurrency(balanceSinPendientes);
                         })()}
@@ -986,8 +1100,8 @@ const Reportes = () => {
                       >
                         {(() => {
                           // Sumar gastos pendientes del período actual + meses anteriores
-                          const pendientesActuales = stats.paymentStatus?.pendiente?.amount || 0;
-                          const pendientesAnteriores = stats.paymentStatus?.pendienteAnterior?.carryover || 0;
+                          const pendientesActuales = stats.paymentStatusSalidas?.pendiente?.amount || 0;
+                          const pendientesAnteriores = stats.paymentStatusSalidas?.pendienteAnterior?.carryover || 0;
                           const totalPendientes = pendientesActuales + pendientesAnteriores;
                           console.log('💰 Calculando gastos pendientes totales:', {
                             pendientesActuales,
@@ -1024,24 +1138,18 @@ const Reportes = () => {
                   <h4 className="font-semibold text-green-800">Pagados totalmente</h4>
                 </div>
                 <p className="text-2xl font-bold text-green-600 mb-2">
-                  {stats.paymentStatus.pagado.count}
+                  {stats.paymentStatusSalidas.pagado.count}
                 </p>
                 <p className="text-xs text-gray-500 mb-2">
-                  {stats.paymentStatus.pagado.count > 0 
-                    ? `${stats.paymentStatus.pagado.count} transacciones cubiertas`
+                  {stats.paymentStatusSalidas.pagado.count > 0 
+                    ? `${stats.paymentStatusSalidas.pagado.count} transacciones cubiertas`
                     : 'Sin transacciones pagadas'}
                 </p>
                 <div className="space-y-1">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-green-700">Monto pagado:</span>
                     <span className="font-semibold text-green-600">
-                      {formatCurrency(stats.paymentStatus.pagado.amount)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-green-700">Saldo por cubrir:</span>
-                    <span className="font-semibold text-green-600">
-                      {formatCurrency(0)}
+                      {formatCurrency(stats.paymentStatusSalidas.pagado.amount)}
                     </span>
                   </div>
                 </div>
@@ -1052,24 +1160,24 @@ const Reportes = () => {
                   <h4 className="font-semibold text-yellow-800">Parcialmente pagados</h4>
                 </div>
                 <p className="text-2xl font-bold text-yellow-600 mb-2">
-                  {stats.paymentStatus.parcial.count}
+                  {stats.paymentStatusSalidas.parcial.count}
                 </p>
                 <p className="text-xs text-gray-500 mb-2">
-                  {stats.paymentStatus.parcial.count > 0 
-                    ? `${stats.paymentStatus.parcial.count} transacciones parciales`
+                  {stats.paymentStatusSalidas.parcial.count > 0 
+                    ? `${stats.paymentStatusSalidas.parcial.count} transacciones parciales`
                     : 'Sin pagos parciales'}
                 </p>
                 <div className="space-y-1">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-yellow-700">Monto pagado:</span>
                     <span className="font-semibold text-blue-600">
-                      {formatCurrency(stats.paymentStatus.parcial.amount)}
+                      {formatCurrency(stats.paymentStatusSalidas.parcial.amount)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-yellow-700">Saldo por cubrir:</span>
                     <span className="font-semibold text-orange-600">
-                      {formatCurrency(stats.paymentStatus.parcial.balance || 0)}
+                      {formatCurrency(stats.paymentStatusSalidas.parcial.balance || 0)}
                     </span>
                   </div>
                 </div>
@@ -1077,27 +1185,21 @@ const Reportes = () => {
 
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                 <div className="flex justify-between items-start mb-2">
-                  <h4 className="font-semibold text-red-800">Pendientes (período actual)</h4>
+                  <h4 className="font-semibold text-red-800">Pendientes por pagar</h4>
                 </div>
                 <p className="text-2xl font-bold text-red-600 mb-2">
-                  {stats.paymentStatus.pendiente.count}
+                  {stats.paymentStatusSalidas.pendiente.count}
                 </p>
                 <p className="text-xs text-gray-500 mb-2">
-                  {stats.paymentStatus.pendiente.count > 0 
-                    ? `${stats.paymentStatus.pendiente.count} transacciones sin cubrir`
+                  {stats.paymentStatusSalidas.pendiente.count > 0 
+                    ? `${stats.paymentStatusSalidas.pendiente.count} transacciones sin cubrir`
                     : 'Sin pendientes'}
                 </p>
                 <div className="space-y-1">
                   <div className="flex justify-between items-center text-sm">
-                    <span className="text-red-700">Monto pagado:</span>
-                    <span className="font-semibold text-blue-600">
-                      {formatCurrency(0)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
                     <span className="text-red-700">Saldo por cubrir:</span>
                     <span className="font-semibold text-orange-600">
-                      {formatCurrency(stats.paymentStatus.pendiente.amount)}
+                      {formatCurrency(stats.paymentStatusSalidas.pendiente.balance || 0)}
                     </span>
                   </div>
                 </div>
@@ -1108,18 +1210,18 @@ const Reportes = () => {
                   <h4 className="font-semibold text-purple-800">Pendientes anteriores</h4>
                 </div>
                 <p className="text-2xl font-bold text-purple-600 mb-2">
-                  {stats.paymentStatus.pendienteAnterior.count}
+                  {stats.paymentStatusSalidas.pendienteAnterior.count}
                 </p>
                 <p className="text-xs text-gray-500 mb-2">
-                  {stats.paymentStatus.pendienteAnterior.count > 0 
-                    ? `${stats.paymentStatus.pendienteAnterior.count} transacciones no cubiertas`
+                  {stats.paymentStatusSalidas.pendienteAnterior.count > 0 
+                    ? `${stats.paymentStatusSalidas.pendienteAnterior.count} transacciones no cubiertas`
                     : 'Sin pendientes'}
                 </p>
                 <div className="space-y-1">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-purple-700">Por pagar:</span>
                     <span className="font-semibold text-purple-600">
-                      {formatCurrency(stats.paymentStatus.pendienteAnterior.carryover)}
+                      {formatCurrency(stats.paymentStatusSalidas.pendienteAnterior.carryover)}
                     </span>
                   </div>
                 </div>
@@ -1139,27 +1241,21 @@ const Reportes = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <div className="flex justify-between items-start mb-2">
-                  <h4 className="font-semibold text-green-800">Recibidos totalmente</h4>
+                  <h4 className="font-semibold text-green-800">Cubiertos totalmente</h4>
                 </div>
                 <p className="text-2xl font-bold text-green-600 mb-2">
-                  {stats.paymentStatus.pagado.count}
+                  {stats.paymentStatusEntradas.pagado.count}
                 </p>
                 <p className="text-xs text-gray-500 mb-2">
-                  {stats.paymentStatus.pagado.count > 0 
-                    ? `${stats.paymentStatus.pagado.count} transacciones cubiertas`
+                  {stats.paymentStatusEntradas.pagado.count > 0 
+                    ? `${stats.paymentStatusEntradas.pagado.count} transacciones cubiertas`
                     : 'Sin transacciones recibidas'}
                 </p>
                 <div className="space-y-1">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-green-700">Monto recibido:</span>
                     <span className="font-semibold text-green-600">
-                      {formatCurrency(stats.paymentStatus.pagado.amount)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-green-700">Saldo por recibir:</span>
-                    <span className="font-semibold text-green-600">
-                      {formatCurrency(0)}
+                      {formatCurrency(stats.paymentStatusEntradas.pagado.amount)}
                     </span>
                   </div>
                 </div>
@@ -1167,27 +1263,27 @@ const Reportes = () => {
 
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                 <div className="flex justify-between items-start mb-2">
-                  <h4 className="font-semibold text-yellow-800">Parcialmente recibidos</h4>
+                  <h4 className="font-semibold text-yellow-800">Parcialmente cubiertos</h4>
                 </div>
                 <p className="text-2xl font-bold text-yellow-600 mb-2">
-                  {stats.paymentStatus.parcial.count}
+                  {stats.paymentStatusEntradas.parcial.count}
                 </p>
                 <p className="text-xs text-gray-500 mb-2">
-                  {stats.paymentStatus.parcial.count > 0 
-                    ? `${stats.paymentStatus.parcial.count} transacciones parciales`
+                  {stats.paymentStatusEntradas.parcial.count > 0 
+                    ? `${stats.paymentStatusEntradas.parcial.count} transacciones parciales`
                     : 'Sin cobros parciales'}
                 </p>
                 <div className="space-y-1">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-yellow-700">Monto recibido:</span>
                     <span className="font-semibold text-blue-600">
-                      {formatCurrency(stats.paymentStatus.parcial.amount)}
+                      {formatCurrency(stats.paymentStatusEntradas.parcial.amount)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-yellow-700">Saldo por recibir:</span>
                     <span className="font-semibold text-orange-600">
-                      {formatCurrency(stats.paymentStatus.parcial.balance || 0)}
+                      {formatCurrency(stats.paymentStatusEntradas.parcial.balance || 0)}
                     </span>
                   </div>
                 </div>
@@ -1195,27 +1291,21 @@ const Reportes = () => {
 
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                 <div className="flex justify-between items-start mb-2">
-                  <h4 className="font-semibold text-red-800">Pendientes (período actual)</h4>
+                  <h4 className="font-semibold text-red-800">Pendientes por cubrir</h4>
                 </div>
                 <p className="text-2xl font-bold text-red-600 mb-2">
-                  {stats.paymentStatus.pendiente.count}
+                  {stats.paymentStatusEntradas.pendiente.count}
                 </p>
                 <p className="text-xs text-gray-500 mb-2">
-                  {stats.paymentStatus.pendiente.count > 0 
-                    ? `${stats.paymentStatus.pendiente.count} transacciones sin cubrir`
+                  {stats.paymentStatusEntradas.pendiente.count > 0 
+                    ? `${stats.paymentStatusEntradas.pendiente.count} transacciones sin cubrir`
                     : 'Sin pendientes'}
                 </p>
                 <div className="space-y-1">
                   <div className="flex justify-between items-center text-sm">
-                    <span className="text-red-700">Monto recibido:</span>
-                    <span className="font-semibold text-blue-600">
-                      {formatCurrency(0)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
                     <span className="text-red-700">Saldo por recibir:</span>
                     <span className="font-semibold text-orange-600">
-                      {formatCurrency(stats.paymentStatus.pendiente.amount)}
+                      {formatCurrency(stats.paymentStatusEntradas.pendiente.balance || 0)}
                     </span>
                   </div>
                 </div>
@@ -1226,18 +1316,18 @@ const Reportes = () => {
                   <h4 className="font-semibold text-purple-800">Pendientes anteriores</h4>
                 </div>
                 <p className="text-2xl font-bold text-purple-600 mb-2">
-                  {stats.paymentStatus.pendienteAnterior.count}
+                  {stats.paymentStatusEntradas.pendienteAnterior.count}
                 </p>
                 <p className="text-xs text-gray-500 mb-2">
-                  {stats.paymentStatus.pendienteAnterior.count > 0 
-                    ? `${stats.paymentStatus.pendienteAnterior.count} transacciones no cubiertas`
+                  {stats.paymentStatusEntradas.pendienteAnterior.count > 0 
+                    ? `${stats.paymentStatusEntradas.pendienteAnterior.count} transacciones no cubiertas`
                     : 'Sin pendientes'}
                 </p>
                 <div className="space-y-1">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-purple-700">Por cobrar:</span>
                     <span className="font-semibold text-purple-600">
-                      {formatCurrency(stats.paymentStatus.pendienteAnterior.carryover)}
+                      {formatCurrency(stats.paymentStatusEntradas.pendienteAnterior.carryover)}
                     </span>
                   </div>
                 </div>

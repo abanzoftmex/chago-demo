@@ -174,11 +174,18 @@ export const reportService = {
         carryoverBalance: 0, // Balance arrastrado de gastos pendientes
         carryoverIncome: 0, // Ingresos arrastrados del mes anterior
         currentPeriodBalance: 0, // Balance del período actual
-        paymentStatus: {
+        // Estado de pago para INGRESOS
+        paymentStatusEntradas: {
           pendiente: { count: 0, amount: 0, balance: 0, carryover: 0 },
           parcial: { count: 0, amount: 0, balance: 0, carryover: 0 },
           pagado: { count: 0, amount: 0, balance: 0, carryover: 0 },
-          // Nueva categoría para gastos pendientes de meses anteriores
+          pendienteAnterior: { count: 0, amount: 0, carryover: 0 }
+        },
+        // Estado de pago para GASTOS
+        paymentStatusSalidas: {
+          pendiente: { count: 0, amount: 0, balance: 0, carryover: 0 },
+          parcial: { count: 0, amount: 0, balance: 0, carryover: 0 },
+          pagado: { count: 0, amount: 0, balance: 0, carryover: 0 },
           pendienteAnterior: { count: 0, amount: 0, carryover: 0 }
         },
         conceptBreakdown: {},
@@ -352,26 +359,25 @@ export const reportService = {
             stats.currentPeriodBalance += amount;
           }
 
-          // Payment status para entradas (igual que salidas)
+          // Payment status para INGRESOS
           const totalPaid = transaction.totalPaid || 0;
           const status = transaction.status || 'pendiente';
 
-          // Las entradas usan el mismo paymentStatus que las salidas
-          if (stats.paymentStatus[status]) {
-            stats.paymentStatus[status].count++;
+          if (stats.paymentStatusEntradas[status]) {
+            stats.paymentStatusEntradas[status].count++;
             
             if (status === 'pagado') {
               // Recibido completamente: amount = total de la transacción, balance = 0
-              stats.paymentStatus[status].amount += amount;
-              stats.paymentStatus[status].balance += 0;
+              stats.paymentStatusEntradas[status].amount += amount;
+              stats.paymentStatusEntradas[status].balance += 0;
             } else if (status === 'parcial') {
               // Recibido parcialmente: amount = lo recibido hasta ahora, balance = lo que falta
-              stats.paymentStatus[status].amount += totalPaid;
-              stats.paymentStatus[status].balance += (transaction.balance || 0);
+              stats.paymentStatusEntradas[status].amount += totalPaid;
+              stats.paymentStatusEntradas[status].balance += (transaction.balance || 0);
             } else if (status === 'pendiente') {
               // Sin recibir: amount = 0 (nada recibido), balance = total de la transacción
-              stats.paymentStatus[status].amount += 0;
-              stats.paymentStatus[status].balance += (transaction.balance || amount);
+              stats.paymentStatusEntradas[status].amount += 0;
+              stats.paymentStatusEntradas[status].balance += (transaction.balance || amount);
             }
           }
 
@@ -382,8 +388,8 @@ export const reportService = {
             transactionDate < startDate;
 
           if (isCarryoverEntrada && status === 'pendiente') {
-            stats.paymentStatus.pendienteAnterior.count++;
-            stats.paymentStatus.pendienteAnterior.carryover += transaction.balance || amount;
+            stats.paymentStatusEntradas.pendienteAnterior.count++;
+            stats.paymentStatusEntradas.pendienteAnterior.carryover += transaction.balance || amount;
           }
         } else if (transaction.type === 'salida') {
           if (isInPeriod && !isCarryover) {
@@ -413,32 +419,49 @@ export const reportService = {
 
           console.log(`💰 Procesando gasto - totalPaid: ${totalPaid}, stats.totalPaid acumulado: ${stats.totalPaid}`);
 
-          // Payment status (only for salidas)
-          const status = transaction.status || 'pendiente';
+          // Payment status para GASTOS (salidas)
+          // Calcular el status REAL basado en pagos, no en el campo status
+          let status;
+          if (totalPaid === 0) {
+            status = 'pendiente';  // No hay pagos
+          } else if (totalPaid > 0 && (transaction.balance > 0)) {
+            status = 'parcial';  // Hay pagos pero falta
+          } else {
+            status = 'pagado';  // Completamente pagado
+          }
+          
+          console.log(`🔍 DEBUG Transaction:`, {
+            id: transaction.id.substring(0, 8),
+            statusOriginal: transaction.status,
+            statusCalculado: status,
+            totalPaid: transaction.totalPaid,
+            amount: transaction.amount,
+            balance: transaction.balance
+          });
 
           if (isCarryover && status === 'pendiente') {
             // Gastos pendientes de meses anteriores van a categoría especial
-            stats.paymentStatus.pendienteAnterior.count++;
-            stats.paymentStatus.pendienteAnterior.carryover += transaction.balance || amount;
-          } else if (stats.paymentStatus[status]) {
+            stats.paymentStatusSalidas.pendienteAnterior.count++;
+            stats.paymentStatusSalidas.pendienteAnterior.carryover += transaction.balance || amount;
+          } else if (stats.paymentStatusSalidas[status]) {
             // Gastos del período actual (incluye pendientes del período)
-            stats.paymentStatus[status].count++;
+            stats.paymentStatusSalidas[status].count++;
             
             // Para todas las categorías:
             // - amount = lo que se ha pagado (totalPaid)
             // - balance = lo que falta por pagar (transaction.balance)
             if (status === 'pagado') {
               // Pagado completamente: amount = total de la transacción, balance = 0
-              stats.paymentStatus[status].amount += amount;
-              stats.paymentStatus[status].balance += 0;
+              stats.paymentStatusSalidas[status].amount += amount;
+              stats.paymentStatusSalidas[status].balance += 0;
             } else if (status === 'parcial') {
               // Parcial: amount = lo pagado hasta ahora, balance = lo que falta
-              stats.paymentStatus[status].amount += totalPaid;
-              stats.paymentStatus[status].balance += (transaction.balance || 0);
+              stats.paymentStatusSalidas[status].amount += totalPaid;
+              stats.paymentStatusSalidas[status].balance += (transaction.balance || 0);
             } else if (status === 'pendiente') {
-              // Pendiente: amount = 0 (nada pagado), balance = total de la transacción
-              stats.paymentStatus[status].amount += 0;
-              stats.paymentStatus[status].balance += (transaction.balance || amount);
+              // Pendiente: amount = monto total pendiente, balance = mismo valor (nada pagado aún)
+              stats.paymentStatusSalidas[status].amount += (transaction.balance || amount);
+              stats.paymentStatusSalidas[status].balance += (transaction.balance || amount);
             }
           }
         }
@@ -632,35 +655,50 @@ export const reportService = {
       const start = new Date(startDate);
       const end = new Date(endDate);
       
-      // Obtener el primer día del mes y el último
+      // Obtener el primer y último día del mes
       const firstDay = new Date(start.getFullYear(), start.getMonth(), 1);
       const lastDay = new Date(end.getFullYear(), end.getMonth() + 1, 0);
 
-      // Calcular semanas del mes
+      // Calcular semanas del mes según ISO 8601 (lunes a domingo)
       const weeks = [];
+      
+      // Encontrar el primer lunes del mes (o antes si el mes no empieza en lunes)
       let currentWeekStart = new Date(firstDay);
-      let weekNumber = this.getWeekNumber(firstDay);
+      const dayOfWeek = currentWeekStart.getDay(); // 0 = domingo, 1 = lunes, ..., 6 = sábado
+      
+      // Ajustar al lunes de esa semana ISO
+      // Si es domingo (0), retroceder 6 días; si es lunes (1), no retroceder; etc.
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      currentWeekStart.setDate(currentWeekStart.getDate() - daysToMonday);
 
+      // Generar semanas ISO 8601 que intersecten con el mes
       while (currentWeekStart <= lastDay) {
         const weekEnd = new Date(currentWeekStart);
-        weekEnd.setDate(weekEnd.getDate() + 6);
+        weekEnd.setDate(weekEnd.getDate() + 6); // Domingo
         
-        // Si el fin de semana pasa el último día del mes, ajustar
-        if (weekEnd > lastDay) {
-          weekEnd.setTime(lastDay.getTime());
+        // Solo incluir semanas que tengan al menos un día dentro del mes
+        if (weekEnd >= firstDay) {
+          // Mostrar fechas ISO completas (aunque crucen meses) para claridad contable
+          // Pero usar fechas ajustadas para filtrar transacciones
+          const filterStart = currentWeekStart < firstDay ? firstDay : currentWeekStart;
+          const filterEnd = weekEnd > lastDay ? lastDay : weekEnd;
+          
+          // Calcular el número de semana ISO 8601
+          const weekNumber = this.getWeekNumber(currentWeekStart);
+
+          weeks.push({
+            weekNumber: weekNumber,
+            // Mostrar fechas completas ISO (pueden incluir días de otros meses)
+            startDate: currentWeekStart.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
+            endDate: weekEnd.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
+            // Usar timestamps ajustados para filtrar transacciones solo del mes
+            startTimestamp: filterStart.getTime(),
+            endTimestamp: filterEnd.getTime()
+          });
         }
 
-        weeks.push({
-          weekNumber: weekNumber,
-          startDate: currentWeekStart.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
-          endDate: weekEnd.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
-          startTimestamp: currentWeekStart.getTime(),
-          endTimestamp: weekEnd.getTime()
-        });
-
-        // Avanzar a la siguiente semana
+        // Avanzar al siguiente lunes
         currentWeekStart.setDate(currentWeekStart.getDate() + 7);
-        weekNumber++;
       }
 
       // Inicializar estructura de datos
