@@ -21,7 +21,7 @@ const CreateRecurringExpense = () => {
               Sin permisos
             </h2>
             <p className="text-gray-600">
-              No tienes permisos para gestionar gastos recurrentes.
+              No tienes permisos para gestionar salidas recurrentes.
             </p>
           </div>
         </div>
@@ -45,10 +45,10 @@ const CreateRecurringExpense = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              Crear Gasto Recurrente
+              Crear Salida Recurrente
             </h1>
             <p className="text-gray-600 mt-1">
-              Configura un gasto que se generará automáticamente según la frecuencia seleccionada
+              Configura una salida que se generará automáticamente según la frecuencia seleccionada
             </p>
           </div>
           <button
@@ -112,8 +112,8 @@ const CreateRecurringExpense = () => {
                 <h4 className="font-medium text-blue-900 mb-1">Importante</h4>
                 <ul className="text-sm text-blue-700 space-y-1">
                   <li>• Las transacciones se generan automáticamente usando un cron job diario</li>
-                  <li>• Puedes activar/desactivar gastos recurrentes en cualquier momento</li>
-                  <li>• Los gastos se crean como "pendientes" para ser revisados antes del pago</li>
+                  <li>• Puedes activar/desactivar salidas recurrentes en cualquier momento</li>
+                  <li>• Las salidas se crean como "pendientes" para ser revisados antes del pago</li>
                   <li>• La fecha de inicio determina desde cuándo empezar a generar las transacciones</li>
                 </ul>
               </div>

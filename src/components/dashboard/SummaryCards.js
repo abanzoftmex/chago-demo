@@ -83,12 +83,12 @@ const SummaryCards = ({ summary }) => {
                   <div className="mt-2 flex items-center justify-center space-x-4 text-xs">
                     <div className="flex items-center space-x-1">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span className="text-green-600">Ingresos:</span>
+                      <span className="text-green-600">Entradas:</span>
                     <span className="font-medium text-green-600">  <strong>{card.entradasCount}</strong></span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                      <span className="text-red-600">Gastos:</span>
+                      <span className="text-red-600">Salidas:</span>
                       <span className="font-medium text-red-600"> <strong>{card.salidasCount}</strong></span>
                     </div>
                   </div>

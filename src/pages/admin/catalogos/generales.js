@@ -129,7 +129,7 @@ export default function GeneralesPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Generales</h1>
             <p className="mt-1 text-sm text-gray-600">
-              Gestiona las categorías generales para ingresos y gastos
+              Gestiona las categorías generales para entradas y salidas
             </p>
           </div>
           <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row gap-2">
@@ -169,8 +169,8 @@ export default function GeneralesPage() {
                   className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500"
                 >
                   <option value="all">Todos</option>
-                  <option value="entrada">Ingreso</option>
-                  <option value="salida">Gasto</option>
+                  <option value="entrada">Entrada</option>
+                  <option value="salida">Salida</option>
                 </select>
               </div>
             </div>
@@ -296,7 +296,7 @@ export default function GeneralesPage() {
                                 : "bg-red-100 text-red-800"
                             }`}
                           >
-                            {general.type === "entrada" ? "Ingreso" : "Gasto"}
+                            {general.type === "entrada" ? "Entrada" : "Salida"}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

@@ -72,7 +72,7 @@ const BarConceptChart = ({ data, type = 'total', chartType = 'concepto' }) => {
     labels: filteredConcepts,
     datasets: [
       {
-        label: type === 'entradas' ? 'Ingresos' : type === 'salidas' ? 'Gastos' : 'Total',
+        label: type === 'entradas' ? 'Entradas' : type === 'salidas' ? 'Salidas' : 'Total',
         data: displayValues,
         backgroundColor: colors,
         borderColor: colors,
@@ -92,7 +92,7 @@ const BarConceptChart = ({ data, type = 'total', chartType = 'concepto' }) => {
       },
       title: {
         display: true,
-        text: `${type === 'entradas' ? 'Ingresos' : type === 'salidas' ? 'Gastos' : 'Balance'} por ${chartType === 'general' ? 'General' : 'Concepto'}`,
+        text: `${type === 'entradas' ? 'Entradas' : type === 'salidas' ? 'Salidas' : 'Balance'} por ${chartType === 'general' ? 'General' : 'Concepto'}`,
       },
       tooltip: {
         callbacks: {

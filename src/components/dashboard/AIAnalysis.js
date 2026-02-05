@@ -176,7 +176,7 @@ const AIAnalysis = () => {
                 </svg>
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-600">Ingresos</p>
+                <p className="text-sm font-medium text-gray-600">Entradas</p>
                 <p className="text-lg font-semibold text-gray-900">{formatCurrency(metrics.totalIngresos)}</p>
               </div>
             </div>
@@ -190,7 +190,7 @@ const AIAnalysis = () => {
                 </svg>
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-600">Gastos</p>
+                <p className="text-sm font-medium text-gray-600">Salidas</p>
                 <p className="text-lg font-semibold text-gray-900">{formatCurrency(metrics.totalGastos)}</p>
               </div>
             </div>

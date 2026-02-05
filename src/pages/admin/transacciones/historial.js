@@ -88,8 +88,8 @@ const Historial = () => {
   // Options for React Select
   const typeOptions = [
     { value: "", label: "Todos los tipos" },
-    { value: "entrada", label: "Ingresos" },
-    { value: "salida", label: "Gastos" }
+    { value: "entrada", label: "Entradas" },
+    { value: "salida", label: "Salidas" }
   ];
 
   const statusOptions = [
@@ -463,7 +463,7 @@ const Historial = () => {
     if (filters.type) {
       activeFilters.push({
         label: 'Tipo',
-        value: filters.type === 'entrada' ? 'Ingresos' : 'Gastos',
+        value: filters.type === 'entrada' ? 'Entradas' : 'Salidas',
         icon: filters.type === 'entrada' ? TrendingUp : TrendingDown
       });
     }
@@ -849,8 +849,8 @@ const Historial = () => {
                             }`}
                           >
                             {transaction.type === "entrada"
-                              ? "Ingreso"
-                              : "Gasto"}
+                              ? "Entrada"
+                              : "Salida"}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
@@ -902,8 +902,8 @@ const Historial = () => {
                             }`}
                           >
                             {transaction.type === "entrada"
-                              ? "Ingreso"
-                              : "Gasto"}
+                              ? "Entrada"
+                              : "Salida"}
                           </span>
                           {getStatusBadge(transaction.status)}
                         </div>

@@ -231,7 +231,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
 
       const result = await recurringExpenseService.create(recurringData, user);
       
-      toast.success("Gasto recurrente creado exitosamente");
+      toast.success("Salida recurrente creada exitosamente");
       
       // Reset form
       setFormData({
@@ -251,7 +251,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
 
     } catch (error) {
       console.error("Error creating recurring expense:", error);
-      toast.error(error.message || "Error al crear el gasto recurrente");
+      toast.error(error.message || "Error al crear la salida recurrente");
       setErrors({ submit: error.message });
     } finally {
       setLoading(false);
@@ -326,9 +326,9 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
               </svg>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Nuevo Gasto Recurrente</h3>
+              <h3 className="text-lg font-semibold text-gray-900">Nueva Salida Recurrente</h3>
               <p className="text-sm text-gray-600">
-                Configura un gasto que se generará automáticamente según la frecuencia seleccionada
+                Configura una salida que se generará automáticamente según la frecuencia seleccionada
               </p>
             </div>
           </div>
@@ -552,7 +552,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
             className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-rose-500 focus:border-rose-500 ${
               errors.description ? "border-red-300" : "border-gray-300"
             }`}
-            placeholder="Describe el gasto recurrente..."
+            placeholder="Describe la salida recurrente..."
             disabled={loading}
           />
           {errors.description && (
@@ -586,7 +586,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
             disabled={loading}
             className="bg-rose-500 hover:bg-rose-600 text-white px-6 py-2 rounded-md font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? "Creando..." : "Crear Gasto Recurrente"}
+            {loading ? "Creando..." : "Crear Salida Recurrente"}
           </button>
         </div>
       </form>

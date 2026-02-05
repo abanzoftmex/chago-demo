@@ -238,6 +238,9 @@ export default function SubconceptosPage() {
                       Concepto
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Tipo
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Fecha de Creación
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -248,7 +251,7 @@ export default function SubconceptosPage() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredSubconcepts.length === 0 ? (
                     <tr>
-                      <td colSpan="5" className="px-6 py-12 text-center">
+                      <td colSpan="6" className="px-6 py-12 text-center">
                         <div className="text-gray-500">
                           <svg
                             className="mx-auto h-12 w-12 mb-4"
@@ -294,6 +297,21 @@ export default function SubconceptosPage() {
                             <div className="text-sm text-gray-900">
                               {concept ? concept.name : 'Sin asignar'}
                             </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {concept ? (
+                              <span
+                                className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                  concept.type === "entrada"
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-red-100 text-red-800"
+                                }`}
+                              >
+                                {concept.type === "entrada" ? "Entrada" : "Salida"}
+                              </span>
+                            ) : (
+                              <span className="text-sm text-gray-400">N/A</span>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {subconcept.createdAt?.toDate

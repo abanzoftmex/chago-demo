@@ -15,7 +15,7 @@ const NuevaSalida = () => {
   const canManageTransactions = checkPermission("canManageTransactions");
 
   const handleSuccess = () => {
-    toast.success("Gasto creado exitosamente");
+    toast.success("Salida creada exitosamente");
     // Redirect to the transactions list after successful creation
     router.push("/admin/transacciones/salidas");
   };

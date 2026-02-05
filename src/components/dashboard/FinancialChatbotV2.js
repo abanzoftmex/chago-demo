@@ -294,7 +294,7 @@ const FinancialChatbotV2 = () => {
               fecha: t.dateString || new Date(t.date).toLocaleDateString("es-MX"),
               concepto: t.concept || t.concepto,
               monto: t.amount,
-              tipo: t.type === "salida" ? "Gasto" : "Ingreso",
+              tipo: t.type === "salida" ? "Salida" : "Entrada",
             }))}
             columns={[
               { key: "fecha", title: "Fecha" },

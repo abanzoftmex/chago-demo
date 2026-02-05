@@ -145,8 +145,8 @@ const RolePermissionsModal = ({ onClose }) => {
   const getPermissionDisplayName = (permission) => {
     const displayNames = {
       canViewDashboard: "Ver Dashboard",
-      canViewEntradas: "Ver Ingresos",
-      canViewSalidas: "Ver Gastos",
+      canViewEntradas: "Ver Entradas",
+      canViewSalidas: "Ver Salidas",
       canViewHistorial: "Ver Historial",
       canViewReports: "Ver Reportes",
       canViewAnalisisIA: "Ver Análisis IA",

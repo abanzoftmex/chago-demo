@@ -107,7 +107,7 @@ const Ingresos = () => {
       setTransactions((prev) =>
         prev.map((t) => (t.id === transaction.id ? transaction : t))
       );
-      toast.success("Ingreso actualizado exitosamente");
+      toast.success("Entrada actualizada exitosamente");
     } else {
       // Add new transaction to the list
       setTransactions((prev) => [transaction, ...prev]);
@@ -327,11 +327,11 @@ const Ingresos = () => {
   return (
     <ProtectedRoute>
       <AdminLayout
-        title="Ingreso"
+        title="Entrada"
         breadcrumbs={[
           { name: "Dashboard", href: "/admin/dashboard" },
           { name: "Transacciones" },
-          { name: "Ingreso" },
+          { name: "Entrada" },
         ]}
       >
         <div className="space-y-6">
@@ -345,7 +345,7 @@ const Ingresos = () => {
                 <div>
                   <div className="flex items-center space-x-2">
                     <h1 className="text-2xl font-bold text-gray-900">
-                      Ingresos - {currentMonthName}
+                      Entradas - {currentMonthName}
                     </h1>
                     <AdvancedDateSelector
                       currentDate={currentDate}
@@ -355,7 +355,7 @@ const Ingresos = () => {
                     />
                   </div>
                   <p className="text-gray-600 mt-1">
-                    Registra y consulta los ingresos de la organización
+                    Registra y consulta las entradas de la organización
                   </p>
                 </div>
               </div>
@@ -364,7 +364,7 @@ const Ingresos = () => {
                   onClick={handleNewTransaction}
                   className="px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 focus:ring-4 focus:ring-green-500/20 focus:ring-offset-2 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl font-medium"
                 ><PlusIcon className="h-4 w-4 mr-1.5" />
-                  Nuevo Ingreso
+                  Nueva Entrada
                 </button>
               )}
             </div>
@@ -375,7 +375,7 @@ const Ingresos = () => {
             <div className="bg-background rounded-lg border border-border p-6">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-medium text-foreground">
-                  {editingTransaction ? "Editar Ingreso" : "Nuevo Ingreso"}
+                  {editingTransaction ? "Editar Entrada" : "Nueva Entrada"}
                 </h3>
                 <button
                   onClick={handleCancelForm}
@@ -416,11 +416,11 @@ const Ingresos = () => {
                     </div>
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900">
-                        Ingresos Recientes
+                        Entradas Recientes
                       </h3>
                       <p className="text-sm text-gray-600">
                         Últimos {Math.min(filteredTransactions.length, 10)}{" "}
-                        ingresos registrados
+                        entradas registradas
                       </p>
                     </div>
                   </div>
@@ -483,7 +483,7 @@ const Ingresos = () => {
                 <div className="p-8 text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
                   <p className="text-muted-foreground mt-2">
-                    Cargando ingresos...
+                    Cargando entradas...
                   </p>
                 </div>
               ) : transactions.length === 0 ? (
@@ -491,13 +491,13 @@ const Ingresos = () => {
                   <div className="border-2 border-dashed border-border rounded-lg h-32 flex items-center justify-center">
                     <div className="text-center">
                       <p className="text-muted-foreground mb-2">
-                        No hay ingresos registrados
+                        No hay entradas registradas
                       </p>
                       <button
                         onClick={handleNewTransaction}
                         className="text-primary hover:text-primary text-sm font-medium"
                       >
-                        Registrar primer ingreso
+                        Registrar primera entrada
                       </button>
                     </div>
                   </div>
@@ -569,7 +569,7 @@ const Ingresos = () => {
                                     <button
                                       onClick={() => handleEditTransaction(transaction)}
                                       className="bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center"
-                                      title="Editar ingreso"
+                                      title="Editar entrada"
                                       cursor="pointer"
                                     >
                                     <PencilIcon className="h-4 w-4" />
@@ -607,7 +607,7 @@ const Ingresos = () => {
                           <div>
                             <div className="flex items-center space-x-2 mb-1 flex-wrap">
                               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                Ingreso
+                                Entrada
                               </span>
                               {getStatusBadge(transaction.status, transaction)}
                             </div>
@@ -666,7 +666,7 @@ const Ingresos = () => {
                   {filteredTransactions.length > 10 && (
                     <div className="px-6 py-4 border-t border-border text-center">
                       <p className="text-sm text-muted-foreground">
-                        Mostrando los 10 ingresos más recientes.{" "}
+                        Mostrando las 10 entradas más recientes.{" "}
                         <Link
                           href="/admin/transacciones/historial?type=entrada"
                           className="text-primary hover:text-primary/80"

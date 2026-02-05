@@ -503,7 +503,7 @@ const LogsPage = () => {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tipo (Ingreso o Gasto)
+                Tipo (Entrada o Salida)
               </label>
               <select
                 name="transactionType"
@@ -512,8 +512,8 @@ const LogsPage = () => {
                 className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Todos</option>
-                <option value="entrada">Ingreso</option>
-                <option value="salida">Gasto</option>
+                <option value="entrada">Entrada</option>
+                <option value="salida">Salida</option>
               </select>
             </div>
             <div>
@@ -675,12 +675,12 @@ const LogsPage = () => {
                             transactionType === "entrada" ? (
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                 <CheckCircle className="w-3 h-3 mr-1" />
-                                Ingreso
+                                Entrada
                               </span>
                             ) : (
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                 <AlertCircle className="w-3 h-3 mr-1" />
-                                Gasto
+                                Salida
                               </span>
                             )
                           ) : (
@@ -914,12 +914,12 @@ const LogsPage = () => {
                                 {selectedLog.entityData.type === "entrada" ? (
                                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                     <CheckCircle className="w-3 h-3 mr-1" />
-                                    Ingreso
+                                    Entrada
                                   </span>
                                 ) : (
                                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                     <AlertCircle className="w-3 h-3 mr-1" />
-                                    Gasto
+                                    Salida
                                   </span>
                                 )}
                               </p>
@@ -1102,12 +1102,12 @@ const LogsPage = () => {
                                 {selectedLog.previousData.type === "entrada" ? (
                                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                     <CheckCircle className="w-3 h-3 mr-1" />
-                                    Ingreso
+                                    Entrada
                                   </span>
                                 ) : (
                                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                     <AlertCircle className="w-3 h-3 mr-1" />
-                                    Gasto
+                                    Salida
                                   </span>
                                 )}
                               </p>

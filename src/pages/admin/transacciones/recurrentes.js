@@ -97,8 +97,8 @@ const GastosRecurrentes = () => {
     // Si se va a desactivar, mostrar confirmación
     if (currentStatus) {
       const confirmed = confirm(
-        "¿Estás seguro de que deseas desactivar este gasto recurrente?\n\n" +
-        "⚠️ Esto eliminará todas las transacciones futuras generadas por este gasto recurrente.\n" +
+        "¿Estás seguro de que deseas desactivar esta salida recurrente?\n\n" +
+        "⚠️ Esto eliminará todas las transacciones futuras generadas por esta salida recurrente.\n" +
         "Las transacciones del mes actual y anteriores se mantendrán."
       );
       
@@ -119,13 +119,13 @@ const GastosRecurrentes = () => {
       );
       
       if (newStatus) {
-        toast.success("Gasto recurrente activado exitosamente");
+        toast.success("Salida recurrente activada exitosamente");
       } else {
-        toast.success("Gasto recurrente desactivado y transacciones futuras eliminadas");
+        toast.success("Salida recurrente desactivada y transacciones futuras eliminadas");
       }
     } catch (error) {
       console.error("Error toggling expense:", error);
-      toast.error("Error al cambiar el estado del gasto");
+      toast.error("Error al cambiar el estado de la salida");
     } finally {
       setTogglingExpense(null);
     }
@@ -147,17 +147,17 @@ const GastosRecurrentes = () => {
   };
 
   const handleDelete = async (expenseId) => {
-    if (!confirm("¿Estás seguro de que deseas eliminar este gasto recurrente?")) {
+    if (!confirm("¿Estás seguro de que deseas eliminar esta salida recurrente?")) {
       return;
     }
 
     try {
       await recurringExpenseService.delete(expenseId);
       setRecurringExpenses(prev => prev.filter(expense => expense.id !== expenseId));
-      toast.success("Gasto recurrente eliminado exitosamente");
+      toast.success("Salida recurrente eliminada exitosamente");
     } catch (error) {
       console.error("Error deleting expense:", error);
-      toast.error("Error al eliminar el gasto recurrente");
+      toast.error("Error al eliminar la salida recurrente");
     }
   };
 
@@ -187,11 +187,11 @@ const GastosRecurrentes = () => {
   return (
     <ProtectedRoute>
       <AdminLayout
-        title="Gastos Recurrentes"
+        title="Salidas Recurrentes"
         breadcrumbs={[
           { name: "Dashboard", href: "/admin/dashboard" },
           { name: "Transacciones" },
-          { name: "Gastos Recurrentes" },
+          { name: "Salidas Recurrentes" },
         ]}
       >
         <div className="space-y-6">
@@ -203,9 +203,9 @@ const GastosRecurrentes = () => {
                   <ArrowPathIcon className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Gastos Recurrentes</h1>
+                  <h1 className="text-2xl font-bold text-gray-900">Salidas Recurrentes</h1>
                   <p className="text-gray-600 mt-1">
-                    Gestiona los gastos que se generan automáticamente según la frecuencia configurada
+                    Gestiona las salidas que se generan automáticamente según la frecuencia configurada
                   </p>
                   <div className="flex items-center mt-2 text-sm text-gray-500">
                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -221,7 +221,7 @@ const GastosRecurrentes = () => {
                     onClick={() => router.push('/admin/transacciones/recurrentes/nuevo')}
                     className="px-6 py-3 bg-rose-400 text-white rounded-xl hover:bg-rose-500 focus:ring-4 focus:ring-rose-400/20 focus:ring-offset-2 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl font-medium"
                   ><PlusIcon className="h-4 w-4 mr-1.5" />
-                    Nuevo Gasto Recurrente
+                    Nueva Salida Recurrente
                   </button>
                 </div>
               )}
@@ -239,9 +239,9 @@ const GastosRecurrentes = () => {
                     <ArrowPathIcon className="h-4 w-4 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Lista de Gastos Recurrentes</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Lista de Salidas Recurrentes</h3>
                     <p className="text-sm text-gray-600">
-                      {filteredExpenses.length} gastos configurados
+                      {filteredExpenses.length} salidas configuradas
                     </p>
                   </div>
                 </div>
@@ -281,7 +281,7 @@ const GastosRecurrentes = () => {
                       <div className="w-8 h-8 bg-rose-400 rounded-full opacity-20"></div>
                     </div>
                   </div>
-                  <p className="text-gray-600 mt-4 font-medium">Cargando gastos recurrentes...</p>
+                  <p className="text-gray-600 mt-4 font-medium">Cargando salidas recurrentes...</p>
                   <p className="text-gray-500 text-sm mt-1">Por favor espera un momento</p>
                 </div>
               </div>
@@ -293,9 +293,9 @@ const GastosRecurrentes = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No hay gastos recurrentes</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No hay salidas recurrentes</h3>
                   <p className="text-gray-600 mb-6">
-                    Crea tu primer gasto recurrente con la frecuencia que necesites: diaria, semanal, quincenal o mensual
+                    Crea tu primera salida recurrente con la frecuencia que necesites: diaria, semanal, quincenal o mensual
                   </p>
                   <button
                     onClick={() => router.push('/admin/transacciones/recurrentes/nuevo')}
@@ -304,7 +304,7 @@ const GastosRecurrentes = () => {
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
-                    Crear primer gasto recurrente
+                    Crear primera salida recurrente
                   </button>
                 </div>
               </div>
@@ -316,9 +316,7 @@ const GastosRecurrentes = () => {
                     <thead className="bg-muted">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Estado</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">General</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Concepto</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Subconcepto</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" style={{ maxWidth: '230px' }}>Concepto</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Proveedor</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Frecuencia</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Monto</th>
@@ -347,14 +345,17 @@ const GastosRecurrentes = () => {
                               </span>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
-                            {getGeneralName(expense.generalId)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
-                            {getConceptName(expense.conceptId)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
-                            {getSubconceptName(expense.subconceptId)}
+                          <td className="px-6 py-4 text-sm" style={{ maxWidth: '230px' }}>
+                            <div className="flex flex-col">
+                              <div className="text-gray-500 text-xs">
+                                {getGeneralName(expense.generalId)}
+                              </div>
+                              <div className="flex items-center gap-1 text-xs">
+                                <span className="text-gray-600">{getConceptName(expense.conceptId)}</span>
+                                <span className="text-gray-400">/</span>
+                                <span className="font-semibold text-gray-900">{getSubconceptName(expense.subconceptId)}</span>
+                              </div>
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                             {getProviderName(expense.providerId)}
@@ -446,9 +447,14 @@ const GastosRecurrentes = () => {
                               disabled={!canManageTransactions}
                             />
                           </div>
-                          <p className="text-sm font-medium text-foreground">
-                            {getConceptName(expense.conceptId)} - {getSubconceptName(expense.subconceptId)}
-                          </p>
+                          <div className="flex flex-col mb-2">
+                            <div className="text-gray-500 text-xs mb-1">
+                              {getGeneralName(expense.generalId)}
+                            </div>
+                            <p className="text-sm font-medium text-foreground">
+                              {getConceptName(expense.conceptId)} / <span className="font-semibold">{getSubconceptName(expense.subconceptId)}</span>
+                            </p>
+                          </div>
                           <p className="text-sm text-muted-foreground">
                             {getProviderName(expense.providerId)}
                           </p>
@@ -467,10 +473,7 @@ const GastosRecurrentes = () => {
                           </p>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100">
-                        <p className="text-xs text-muted-foreground">
-                          {getGeneralName(expense.generalId)}
-                        </p>
+                      <div className="flex justify-end items-center mt-3 pt-3 border-t border-gray-100">
                         <div className="flex items-center space-x-2">
                           <button
                             onClick={() => handleViewDetails(expense)}

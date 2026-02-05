@@ -192,8 +192,8 @@ export default function ConceptosPage() {
                   className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-blue-500"
                 >
                   <option value="all">Todos los tipos</option>
-                  <option value="entrada">Ingresos</option>
-                  <option value="salida">Gastos</option>
+                  <option value="entrada">Entradas</option>
+                  <option value="salida">Salidas</option>
                 </select>
               </div>
             </div>
@@ -329,7 +329,7 @@ export default function ConceptosPage() {
                                   : "bg-red-100 text-red-800"
                               }`}
                             >
-                              {concept.type === "entrada" ? "Ingreso" : "Gasto"}
+                              {concept.type === "entrada" ? "Entrada" : "Salida"}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

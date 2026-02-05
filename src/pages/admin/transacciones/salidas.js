@@ -123,7 +123,7 @@ const SolicitudesPago = () => {
       setTransactions((prev) =>
         prev.map((t) => (t.id === transaction.id ? transaction : t))
       );
-      toast.success("Gasto actualizado exitosamente");
+      toast.success("Salida actualizada exitosamente");
     } else {
       // Add new transaction to the list
       setTransactions((prev) => [transaction, ...prev]);
@@ -394,11 +394,11 @@ const SolicitudesPago = () => {
   return (
     <ProtectedRoute>
       <AdminLayout
-        title="Gasto"
+        title="Salida"
         breadcrumbs={[
           { name: "Dashboard", href: "/admin/dashboard" },
           { name: "Transacciones" },
-          { name: "Gasto" },
+          { name: "Salida" },
         ]}
       >
         <div className="space-y-6">
@@ -412,7 +412,7 @@ const SolicitudesPago = () => {
                 <div>
                   <div className="flex items-center space-x-2">
                     <h1 className="text-2xl font-bold text-gray-900">
-                      Gastos - {currentMonthName}
+                      Salidas - {currentMonthName}
                     </h1>
                     <AdvancedDateSelector
                       currentDate={currentDate}
@@ -422,22 +422,22 @@ const SolicitudesPago = () => {
                     />
                   </div>
                   <p className="text-gray-600 mt-1">
-                    Gestiona y realiza seguimiento de todos los gastos de la organización
+                    Gestiona y realiza seguimiento de todas las salidas de la organización
                   </p>
                   <div className="flex items-center mt-2 text-sm text-gray-500">
                     <ClipboardIcon className="h-4 w-4 mr-1" />
-                    {transactions.length} gastos registrados
+                    {transactions.length} salidas registradas
                   </div>
                 </div>
               </div>
               {!showForm && canManageTransactions && (
                 <div className="flex flex-col sm:flex-row gap-3">                  
-                  {/* Botón Nuevo Gasto */}
+                  {/* Botón Nueva Salida */}
                   <button
                     onClick={handleNewTransaction}
                     className="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 focus:ring-4 focus:ring-red-500/20 focus:ring-offset-2 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl font-medium"
                   ><PlusIcon className="h-4 w-4 mr-1.5" />
-                    Nuevo Gasto
+                    Nueva Salida
                   </button>
                 </div>
               )}
@@ -519,7 +519,7 @@ const SolicitudesPago = () => {
                     </div>
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900">
-                        Gastos Recientes
+                        Salidas Recientes
                       </h3>
                       <p className="text-sm text-gray-600">
                         {startIndex + 1}-{Math.min(endIndex, sortedTransactions.length)} de {sortedTransactions.length} gastos

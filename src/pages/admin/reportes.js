@@ -510,8 +510,8 @@ const Reportes = () => {
                 className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
               >
                 <option value="">Todos</option>
-                <option value="entrada">Ingreso</option>
-                <option value="salida">Gasto</option>
+                <option value="entrada">Entrada</option>
+                <option value="salida">Salida</option>
               </select>
             </div>
 
@@ -648,7 +648,7 @@ const Reportes = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">
-                      Total de Ingresos
+                      Total de Entradas
                     </h3>
                     <p className="text-2xl font-bold text-green-600">
                       {formatCurrency(getFilteredTransactionType() === 'salida' ? 0 : stats.totalEntradas)}
@@ -666,7 +666,7 @@ const Reportes = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">
-                      Total de Gastos
+                      Total de Salidas
                     </h3>
                     <p className="text-2xl font-bold text-red-600">
                       {formatCurrency(getFilteredTransactionType() === 'entrada' ? 0 : stats.totalSalidas)}
@@ -729,7 +729,7 @@ const Reportes = () => {
               <div className="bg-background rounded-lg border border-border p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-semibold text-lime-700">
-                    Resumen Mes {currentMonthName} - Ingresos
+                    Resumen Mes {currentMonthName} - Entradas
                   </h3>
                 </div>
 
@@ -862,7 +862,7 @@ const Reportes = () => {
               <div className="bg-background rounded-lg border border-border p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-semibold text-red-700">
-                    Resumen Mes {currentMonthName} - Gastos
+                    Resumen Mes {currentMonthName} - Salidas
                   </h3>
                 </div>
 
@@ -1017,7 +1017,7 @@ const Reportes = () => {
                       {carryoverStatus.calculated && (
                         <span className="text-xs text-green-600 flex items-center">
                           <CheckCircleIcon className="h-4 w-4 mr-1" />
-                          Arrastre calculado automáticamente
+                          Arrastre calculado automáticamente<br/>(cada 1° del mes a las 12:00 AM)
                         </span>
                       )}
                       {!carryoverStatus.calculated && (
@@ -1026,9 +1026,6 @@ const Reportes = () => {
                           Se calculará automáticamente el 1° del mes
                         </span>
                       )}
-                      <span className="text-xs text-gray-500 italic">
-                        🤖 Cálculo automático cada 1° del mes a las 12:00 AM
-                      </span>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1036,7 +1033,7 @@ const Reportes = () => {
 
                     <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                       <h4 className="font-medium text-green-800">
-                        Arrastre de Ingresos
+                        Arrastre de Entradas
                       </h4>
                       <p className="text-2xl font-bold text-green-600">
                         {(() => {
@@ -1132,7 +1129,7 @@ const Reportes = () => {
           <div className="bg-background rounded-lg border border-border p-6">
             <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center">
               <ClockIcon className="h-5 w-5 mr-2" />
-              Estado de Gastos
+              Estado de Salidas
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1238,7 +1235,7 @@ const Reportes = () => {
           <div className="bg-background rounded-lg border border-border p-6">
             <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center">
               <ClockIcon className="h-5 w-5 mr-2" />
-              Estado de Ingresos
+              Estado de Entradas
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1355,11 +1352,11 @@ const Reportes = () => {
                 <div className="mt-2 text-sm text-blue-700">
                   <p className="flex items-center">
                     • Los porcentajes en <span className="text-red-600 font-semibold mx-1">rojo</span>
-                    con <ArrowDownIcon className="h-4 w-4 mx-1 text-red-600" /> representan el % del total de gastos
+                    con <ArrowDownIcon className="h-4 w-4 mx-1 text-red-600" /> representan el % del total de salidas
                   </p>
                   <p className="flex items-center mt-1">
                     • Los porcentajes en <span className="text-green-600 font-semibold mx-1">verde</span>
-                    con <ArrowUpIcon className="h-4 w-4 mx-1 text-green-600" /> representan el % del total de ingresos
+                    con <ArrowUpIcon className="h-4 w-4 mx-1 text-green-600" /> representan el % del total de entradas
                   </p>
                 </div>
               </div>
@@ -1407,7 +1404,7 @@ const Reportes = () => {
                         Cantidad
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        {getFilteredTransactionType() === 'entrada' ? "% de Ingresos" : "% de Gastos"}
+                        {getFilteredTransactionType() === 'entrada' ? "% de Entradas" : "% de Salidas"}
                       </th>
                     </tr>
                   </thead>
@@ -1502,7 +1499,7 @@ const Reportes = () => {
                         Cantidad
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        {getFilteredTransactionType() === 'entrada' ? "% de Ingresos" : "% de Gastos"}
+                        {getFilteredTransactionType() === 'entrada' ? "% de Entradas" : "% de Salidas"}
                       </th>
                     </tr>
                   </thead>
@@ -1598,7 +1595,7 @@ const Reportes = () => {
                         Cantidad
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        {getFilteredTransactionType() === 'entrada' ? "% de Ingresos" : "% de Gastos"}
+                        {getFilteredTransactionType() === 'entrada' ? "% de Entradas" : "% de Salidas"}
                       </th>
                     </tr>
                   </thead>
@@ -1686,7 +1683,7 @@ const Reportes = () => {
                       Transacciones
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      % de Gastos
+                      % de Salidas
                     </th>
                   </tr>
                 </thead>
@@ -1750,7 +1747,7 @@ const Reportes = () => {
                       Transacciones
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      % de Gastos
+                      % de Salidas
                     </th>
                   </tr>
                 </thead>

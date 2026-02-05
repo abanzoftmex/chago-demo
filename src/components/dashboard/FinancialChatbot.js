@@ -920,7 +920,7 @@ const FinancialChatbot = () => {
               {
                 key: "type",
                 title: "Tipo",
-                format: (value) => (value === "entrada" ? "Ingreso" : "Gasto"),
+                format: (value) => (value === "entrada" ? "Entrada" : "Salida"),
               },
               { key: "concept", title: "Concepto" },
               { key: "description", title: "Descripción" },
