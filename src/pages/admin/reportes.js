@@ -1033,17 +1033,17 @@ const Reportes = () => {
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
 
 
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                      <h4 className="font-medium text-green-800">
+                    <div className="bg-lime-50 border border-lime-200 rounded-lg p-4">
+                      <h4 className="font-medium text-lime-900">
                         Arrastre de Entradas
                       </h4>
-                      <p className="text-2xl font-bold text-green-600">
+                      <p className="text-2xl font-bold text-lime-600">
                         {(() => {
                           console.log(`🔍 Renderizando arrastre: stats.carryoverIncome=`, stats.carryoverIncome);
                           return formatCurrency(stats.carryoverIncome || 0);
                         })()}
                       </p>
-                      <p className="text-sm text-green-600">
+                      <p className="text-sm text-lime-600">
                         Del mes anterior
                       </p>
                     </div>
