@@ -459,6 +459,19 @@ const Reportes = () => {
     }).format(amount);
   };
 
+  // Formatea moneda con badge amarillo para números negativos (práctica contable)
+  const formatCurrencyWithBadge = (amount) => {
+    const formatted = formatCurrency(amount);
+    if (amount < 0) {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded bg-yellow-100 text-yellow-900 font-semibold">
+          {formatted}
+        </span>
+      );
+    }
+    return formatted;
+  };
+
   const formatPercentage = (amount, total) => {
     if (total === 0) return "0%";
     const percentage = (amount / total) * 100;
@@ -957,8 +970,8 @@ const Reportes = () => {
                         <tr key={index} className="hover:bg-muted/50 transition-colors">
                           <td className="px-6 py-4 text-sm text-foreground">
                             <div className="space-y-1">
-                              <span className="font-medium text-base">{tree.generalName} / {tree.conceptName} </span>
-                              <span className="font-semibold text-base"> / {tree.subconceptName}</span>
+                              <div className="font-semibold">{tree.subconceptName}</div>
+                              <div className="font-medium text-xs">{tree.generalName} / {tree.conceptName} </div>
                             </div>
                           </td>
                           <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-medium ${
@@ -976,7 +989,7 @@ const Reportes = () => {
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                                     </svg>
                                   )}
-                                  {formatCurrency(tree.carryover)}
+                                  {formatCurrencyWithBadge(tree.carryover)}
                                 </>
                               ) : (
                                 <span className="text-muted-foreground">-</span>
@@ -1010,7 +1023,7 @@ const Reportes = () => {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                                 </svg>
                               )}
-                              {formatCurrency(tree.balance)}
+                              {formatCurrencyWithBadge(tree.balance)}
                             </div>
                           </td>
                           <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${
@@ -1026,7 +1039,7 @@ const Reportes = () => {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                                 </svg>
                               )}
-                              {formatCurrency(tree.todayBalance)}
+                              {formatCurrencyWithBadge(tree.todayBalance)}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
@@ -1395,7 +1408,7 @@ const Reportes = () => {
                       <p className="text-2xl font-bold text-lime-600">
                         {(() => {
                           console.log(`🔍 Renderizando arrastre: stats.carryoverIncome=`, stats.carryoverIncome);
-                          return formatCurrency(stats.carryoverIncome || 0);
+                          return formatCurrencyWithBadge(stats.carryoverIncome || 0);
                         })()}
                       </p>
                       <p className="text-sm text-lime-600">
@@ -1409,7 +1422,7 @@ const Reportes = () => {
                       <p
                         className={`text-2xl font-bold ${stats.currentPeriodBalance >= 0 ? "text-green-600" : "text-red-600"}`}
                       >
-                        {formatCurrency(stats.currentPeriodBalance)}
+                        {formatCurrencyWithBadge(stats.currentPeriodBalance)}
                       </p>
                       <p className="text-sm text-blue-600">
                         Solo transacciones actuales
@@ -1440,12 +1453,12 @@ const Reportes = () => {
                           // Arrastre + Ingresos del período - Solo gastos PAGADOS del período
                           const gastosPagados = (stats.paymentStatusSalidas?.pagado?.amount || 0) + (stats.paymentStatusSalidas?.liquidado?.amount || 0);
                           const balanceSinPendientes = stats.carryoverIncome + stats.totalEntradas - gastosPagados;
-                          return formatCurrency(balanceSinPendientes);
+                          return formatCurrencyWithBadge(balanceSinPendientes);
                         })()}
                       </p>
                       <p className="text-sm text-gray-600">Sin gastos pendientes</p>
                       <p className="text-xs text-gray-500 mt-1">
-                        Considerando pendientes: {formatCurrency(stats.totalBalance)}
+                        Considerando pendientes: {formatCurrencyWithBadge(stats.totalBalance)}
                       </p>
                     </div>
                     <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
@@ -1466,7 +1479,7 @@ const Reportes = () => {
                             totalPendientes,
                             carryoverBalance: stats.carryoverBalance
                           });
-                          return formatCurrency(-Math.abs(totalPendientes));
+                          return formatCurrencyWithBadge(-Math.abs(totalPendientes));
                         })()}
                       </p>
                       <p className="text-sm text-orange-600">
