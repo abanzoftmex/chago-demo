@@ -83,17 +83,17 @@ export const reportService = {
           return true;
         });
 
-        console.log('🔍 Filtrado de gastos pendientes por mes:', {
-          reportMonth: `${reportYear}-${String(reportMonth + 1).padStart(2, '0')}`,
-          totalPendingInSystem: allTransactions.filter(t => t.type === 'salida' && t.status === 'pendiente').length,
-          pendingUntilReportMonth: allPendingTransactions.length,
-          pendingByMonth: allPendingTransactions.reduce((acc, t) => {
-            const tDate = t.date?.toDate ? t.date.toDate() : new Date(t.date);
-            const monthKey = `${tDate.getFullYear()}-${String(tDate.getMonth() + 1).padStart(2, '0')}`;
-            acc[monthKey] = (acc[monthKey] || 0) + 1;
-            return acc;
-          }, {})
-        });
+        // console.log('🔍 Filtrado de gastos pendientes por mes:', {
+        //   reportMonth: `${reportYear}-${String(reportMonth + 1).padStart(2, '0')}`,
+        //   totalPendingInSystem: allTransactions.filter(t => t.type === 'salida' && t.status === 'pendiente').length,
+        //   pendingUntilReportMonth: allPendingTransactions.length,
+        //   pendingByMonth: allPendingTransactions.reduce((acc, t) => {
+        //     const tDate = t.date?.toDate ? t.date.toDate() : new Date(t.date);
+        //     const monthKey = `${tDate.getFullYear()}-${String(tDate.getMonth() + 1).padStart(2, '0')}`;
+        //     acc[monthKey] = (acc[monthKey] || 0) + 1;
+        //     return acc;
+        //   }, {})
+        // });
 
         // Debug específico: buscar transacciones de agosto 2025
         const augustTransactions = allTransactions.filter(transaction => {
@@ -159,7 +159,7 @@ export const reportService = {
   // Generar estadísticas del reporte con balance de arrastre mejorado
   async generateReportStats(transactions, filters = {}) {
     try {
-      console.log(`🔍 generateReportStats: filters recibidos:`, filters);
+      // console.log(`🔍 generateReportStats: filters recibidos:`, filters);
 
       const stats = {
         totalTransactions: 0, // Se calculará después como entradasCount + salidasCount
@@ -211,26 +211,26 @@ export const reportService = {
         const year = parseInt(startDateParts[0]);
         const month = parseInt(startDateParts[1]);
 
-        console.log(`🔍 generateReportStats: Extrayendo fechas - startDate=${startDateStr}, year=${year}, month=${month}`);
-        console.log(`🔍 Buscando arrastre para mostrar en ${month}/${year}`);
+        // console.log(`🔍 generateReportStats: Extrayendo fechas - startDate=${startDateStr}, year=${year}, month=${month}`);
+        // console.log(`🔍 Buscando arrastre para mostrar en ${month}/${year}`);
 
         try {
           // Buscar el arrastre que viene HACIA este mes
           // Si estamos viendo septiembre, buscamos el arrastre calculado PARA septiembre (desde agosto)
           // Si estamos viendo octubre, buscamos el arrastre calculado PARA octubre (desde septiembre)
 
-          console.log(`🔍 Buscando arrastre calculado PARA ${month}/${year}`);
+          // console.log(`🔍 Buscando arrastre calculado PARA ${month}/${year}`);
           monthlyCarryover = await carryoverService.getCarryoverForMonth(year, month);
-          console.log('📊 Resultado de carryover desde registro:', monthlyCarryover);
+          // console.log('📊 Resultado de carryover desde registro:', monthlyCarryover);
 
           if (monthlyCarryover && monthlyCarryover.saldoArrastre > 0) {
             stats.carryoverIncome = monthlyCarryover.saldoArrastre;
-            console.log(`✅ Arrastre aplicado: ${monthlyCarryover.saldoArrastre} del ${monthlyCarryover.previousMonth}/${monthlyCarryover.previousYear}`);
+            // console.log(`✅ Arrastre aplicado: ${monthlyCarryover.saldoArrastre} del ${monthlyCarryover.previousMonth}/${monthlyCarryover.previousYear}`);
           } else {
-            console.log(`❌ No hay arrastre para ${month}/${year} o es 0`, {
-              hasCarryover: !!monthlyCarryover,
-              saldoArrastre: monthlyCarryover?.saldoArrastre
-            });
+            // console.log(`❌ No hay arrastre para ${month}/${year} o es 0`, {
+            //   hasCarryover: !!monthlyCarryover,
+            //   saldoArrastre: monthlyCarryover?.saldoArrastre
+            // });
           }
         } catch (error) {
           console.warn('⚠️ Error obteniendo arrastre:', error.message);
@@ -330,18 +330,18 @@ export const reportService = {
           (transactionDate >= startDate && transactionDate <= endDate);
 
         // Log para debugging de clasificación de transacciones
-        if (isInPeriod && transaction.type === 'salida') {
-          console.log(`🔍 Clasificando transacción:`, {
-            id: transaction.id.substring(0, 8),
-            date: transactionDate.toISOString().split('T')[0],
-            amount,
-            status: transaction.status,
-            isRecurring: transaction.isRecurring,
-            isCarryover,
-            isInPeriod,
-            description: transaction.description?.substring(0, 30)
-          });
-        }
+        // if (isInPeriod && transaction.type === 'salida') {
+        //   console.log(`🔍 Clasificando transacción:`, {
+        //     id: transaction.id.substring(0, 8),
+        //     date: transactionDate.toISOString().split('T')[0],
+        //     amount,
+        //     status: transaction.status,
+        //     isRecurring: transaction.isRecurring,
+        //     isCarryover,
+        //     isInPeriod,
+        //     description: transaction.description?.substring(0, 30)
+        //   });
+        // }
 
 
 
@@ -398,13 +398,13 @@ export const reportService = {
             stats.salidasCount++;
             stats.currentPeriodBalance -= amount;
 
-            console.log(`✅ Contabilizando gasto del período:`, {
-              id: transaction.id.substring(0, 8),
-              amount,
-              status: transaction.status,
-              totalSalidas: stats.totalSalidas,
-              salidasCount: stats.salidasCount
-            });
+            // console.log(`✅ Contabilizando gasto del período:`, {
+            //   id: transaction.id.substring(0, 8),
+            //   amount,
+            //   status: transaction.status,
+            //   totalSalidas: stats.totalSalidas,
+            //   salidasCount: stats.salidasCount
+            // });
           }
 
           if (isCarryover) {
@@ -417,7 +417,7 @@ export const reportService = {
           const totalPaid = transaction.totalPaid || 0;
           stats.totalPaid += totalPaid;
 
-          console.log(`💰 Procesando gasto - totalPaid: ${totalPaid}, stats.totalPaid acumulado: ${stats.totalPaid}`);
+          // console.log(`💰 Procesando gasto - totalPaid: ${totalPaid}, stats.totalPaid acumulado: ${stats.totalPaid}`);
 
           // Payment status para GASTOS (salidas)
           // Calcular el status REAL basado en pagos, no en el campo status
@@ -430,14 +430,14 @@ export const reportService = {
             status = 'pagado';  // Completamente pagado
           }
           
-          console.log(`🔍 DEBUG Transaction:`, {
-            id: transaction.id.substring(0, 8),
-            statusOriginal: transaction.status,
-            statusCalculado: status,
-            totalPaid: transaction.totalPaid,
-            amount: transaction.amount,
-            balance: transaction.balance
-          });
+          // console.log(`🔍 DEBUG Transaction:`, {
+          //   id: transaction.id.substring(0, 8),
+          //   statusOriginal: transaction.status,
+          //   statusCalculado: status,
+          //   totalPaid: transaction.totalPaid,
+          //   amount: transaction.amount,
+          //   balance: transaction.balance
+          // });
 
           if (isCarryover && status === 'pendiente') {
             // Gastos pendientes de meses anteriores van a categoría especial
@@ -474,8 +474,10 @@ export const reportService = {
               salidas: 0,
               total: 0,
               count: 0,
-              paid: 0,
-              pending: 0
+              paidEntradas: 0,
+              pendingEntradas: 0,
+              paidSalidas: 0,
+              pendingSalidas: 0
             };
           }
 
@@ -484,13 +486,15 @@ export const reportService = {
 
           if (transaction.type === 'entrada') {
             stats.conceptBreakdown[conceptName].entradas += amount;
+            stats.conceptBreakdown[conceptName].paidEntradas += totalPaid;
+            stats.conceptBreakdown[conceptName].pendingEntradas += balance;
           } else {
             stats.conceptBreakdown[conceptName].salidas += amount;
+            stats.conceptBreakdown[conceptName].paidSalidas += totalPaid;
+            stats.conceptBreakdown[conceptName].pendingSalidas += balance;
           }
           stats.conceptBreakdown[conceptName].total += amount;
           stats.conceptBreakdown[conceptName].count++;
-          stats.conceptBreakdown[conceptName].paid += totalPaid;
-          stats.conceptBreakdown[conceptName].pending += balance;
         }
 
         // General breakdown - solo para transacciones del período actual
@@ -501,8 +505,10 @@ export const reportService = {
               salidas: 0,
               total: 0,
               count: 0,
-              paid: 0,
-              pending: 0
+              paidEntradas: 0,
+              pendingEntradas: 0,
+              paidSalidas: 0,
+              pendingSalidas: 0
             };
           }
 
@@ -511,13 +517,15 @@ export const reportService = {
 
           if (transaction.type === 'entrada') {
             stats.generalBreakdown[generalName].entradas += amount;
+            stats.generalBreakdown[generalName].paidEntradas += totalPaid;
+            stats.generalBreakdown[generalName].pendingEntradas += balance;
           } else {
             stats.generalBreakdown[generalName].salidas += amount;
+            stats.generalBreakdown[generalName].paidSalidas += totalPaid;
+            stats.generalBreakdown[generalName].pendingSalidas += balance;
           }
           stats.generalBreakdown[generalName].total += amount;
           stats.generalBreakdown[generalName].count++;
-          stats.generalBreakdown[generalName].paid += totalPaid;
-          stats.generalBreakdown[generalName].pending += balance;
         }
 
         // Subconcept breakdown - solo para transacciones del período actual
@@ -528,8 +536,10 @@ export const reportService = {
               salidas: 0,
               total: 0,
               count: 0,
-              paid: 0,
-              pending: 0
+              paidEntradas: 0,
+              pendingEntradas: 0,
+              paidSalidas: 0,
+              pendingSalidas: 0
             };
           }
 
@@ -538,13 +548,15 @@ export const reportService = {
 
           if (transaction.type === 'entrada') {
             stats.subconceptBreakdown[subconceptName].entradas += amount;
+            stats.subconceptBreakdown[subconceptName].paidEntradas += totalPaid;
+            stats.subconceptBreakdown[subconceptName].pendingEntradas += balance;
           } else {
             stats.subconceptBreakdown[subconceptName].salidas += amount;
+            stats.subconceptBreakdown[subconceptName].paidSalidas += totalPaid;
+            stats.subconceptBreakdown[subconceptName].pendingSalidas += balance;
           }
           stats.subconceptBreakdown[subconceptName].total += amount;
           stats.subconceptBreakdown[subconceptName].count++;
-          stats.subconceptBreakdown[subconceptName].paid += totalPaid;
-          stats.subconceptBreakdown[subconceptName].pending += balance;
         }
 
         // Division breakdown (solo para salidas) - solo para transacciones del período actual

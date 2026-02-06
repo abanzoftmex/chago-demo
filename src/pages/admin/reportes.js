@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { useToast } from "../../components/ui/Toast";
 import { Button } from "../../components/ui/Button";
@@ -71,7 +71,7 @@ const Reportes = () => {
   useEffect(() => {
     const initializePage = async () => {
       await loadReferenceData();
-      // Load initial report with current month after reference data is loaded
+      // Set initial date range (report will generate only when user selects a type)
       handleDateChange(currentDate);
     };
     initializePage();
@@ -114,13 +114,6 @@ const Reportes = () => {
   };
 
   useEffect(() => {
-    if (filters.startDate && filters.endDate) {
-      generateReport();
-      loadCarryoverInfo();
-    }
-  }, [filters]);
-
-  useEffect(() => {
     updateMonthName(currentDate);
   }, [currentDate]);
 
@@ -158,7 +151,7 @@ const Reportes = () => {
       const year = parseInt(startDateParts[0]);
       const month = parseInt(startDateParts[1]);
 
-      console.log(`Calculando arrastre manualmente para ${month}/${year}`);
+      // console.log(`Calculando arrastre manualmente para ${month}/${year}`);
       
       // Calcular y guardar el arrastre
       const carryoverData = await carryoverService.calculateAndSaveCarryover(year, month);
@@ -185,7 +178,7 @@ const Reportes = () => {
     }
   };
 
-  const generateReport = async () => {
+  const generateReport = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -224,11 +217,11 @@ const Reportes = () => {
 
         // Si estamos viendo el mes actual, verificar arrastre automáticamente
         if (filterYear === currentYear && filterMonth === currentMonth) {
-          console.log('Verificando cálculo de arrastre automático para el mes actual...');
+          // console.log('Verificando cálculo de arrastre automático para el mes actual...');
           try {
             const carryoverResult = await reportService.checkAndCalculateCarryoverIfNeeded();
             if (carryoverResult.calculated) {
-              console.log('✅ Arrastre calculado automáticamente:', carryoverResult.message);
+              // console.log('✅ Arrastre calculado automáticamente:', carryoverResult.message);
             } else if (carryoverResult.error) {
               console.warn('Error en verificación de arrastre:', carryoverResult.message);
             }
@@ -273,7 +266,8 @@ const Reportes = () => {
     } finally {
       setLoading(false);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.startDate, filters.endDate, filters.type, filters.generalId, filters.conceptId, filters.subconceptId, filters.division, providers]);
 
   const loadCarryoverTransactions = async () => {
     try {
@@ -300,12 +294,12 @@ const Reportes = () => {
           (transactionYear === reportYear && transactionMonth <= reportMonth);
       });
 
-      console.log('Frontend - Filtrado de gastos pendientes:', {
-        reportMonth: `${reportYear}-${String(reportMonth + 1).padStart(2, '0')}`,
-        totalPendingInSystem: allTransactions.length,
-        pendingUntilReportMonth: pendingFromPrevious.length,
-        filteredOut: allTransactions.length - pendingFromPrevious.length
-      });
+      // console.log('Frontend - Filtrado de gastos pendientes:', {
+      //   reportMonth: `${reportYear}-${String(reportMonth + 1).padStart(2, '0')}`,
+      //   totalPendingInSystem: allTransactions.length,
+      //   pendingUntilReportMonth: pendingFromPrevious.length,
+      //   filteredOut: allTransactions.length - pendingFromPrevious.length
+      // });
 
       // Get reference data for display
       const [conceptsData, providersData, generalsData] = await Promise.all([
@@ -330,7 +324,7 @@ const Reportes = () => {
     }
   };
 
-  const loadCarryoverInfo = async () => {
+  const loadCarryoverInfo = useCallback(async () => {
     try {
       if (filters.startDate) {
         // Parsear la fecha correctamente evitando problemas de zona horaria
@@ -343,10 +337,10 @@ const Reportes = () => {
         const year = parseInt(startDateParts[0]);
         const month = parseInt(startDateParts[1]);
 
-        console.log(`checkCarryoverStatus: startDate=${startDateStr}, year=${year}, month=${month}`);
+        // console.log(`checkCarryoverStatus: startDate=${startDateStr}, year=${year}, month=${month}`);
 
         const status = await reportService.getCarryoverStatus(year, month);
-        console.log(`checkCarryoverStatus: status recibido:`, status);
+        // console.log(`checkCarryoverStatus: status recibido:`, status);
 
         setCarryoverStatus(status);
         setCarryoverInfo(status.data);
@@ -360,7 +354,19 @@ const Reportes = () => {
         data: null
       });
     }
-  };
+  }, [filters.startDate]);
+
+  // useEffect para generar reporte cuando cambian los filtros
+  // Debe estar después de las definiciones de generateReport y loadCarryoverInfo
+  // Genera el reporte siempre que haya fechas (para mostrar estadísticas generales)
+  // Las secciones de desglose solo se mostrarán si hay tipo seleccionado (validación en el render)
+  useEffect(() => {
+    if (filters.startDate && filters.endDate) {
+      generateReport();
+      loadCarryoverInfo();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.startDate, filters.endDate, filters.type, filters.generalId, filters.conceptId, filters.subconceptId, filters.division]);
 
   const handleFilterChange = (field, value) => {
     setFilters((prev) => {
@@ -1800,10 +1806,16 @@ const Reportes = () => {
                             }
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
-                            {formatCurrency(data.paid || 0)}
+                            {getFilteredTransactionType() === 'entrada'
+                              ? formatCurrency(data.paidEntradas || 0)
+                              : formatCurrency(data.paidSalidas || 0)
+                            }
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">
-                            {formatCurrency(data.pending || 0)}
+                            {getFilteredTransactionType() === 'entrada'
+                              ? formatCurrency(data.pendingEntradas || 0)
+                              : formatCurrency(data.pendingSalidas || 0)
+                            }
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                             {data.count}
@@ -1896,10 +1908,16 @@ const Reportes = () => {
                             }
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
-                            {formatCurrency(data.paid || 0)}
+                            {getFilteredTransactionType() === 'entrada'
+                              ? formatCurrency(data.paidEntradas || 0)
+                              : formatCurrency(data.paidSalidas || 0)
+                            }
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">
-                            {formatCurrency(data.pending || 0)}
+                            {getFilteredTransactionType() === 'entrada'
+                              ? formatCurrency(data.pendingEntradas || 0)
+                              : formatCurrency(data.pendingSalidas || 0)
+                            }
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                             {data.count}
@@ -1992,10 +2010,16 @@ const Reportes = () => {
                             }
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
-                            {formatCurrency(data.paid || 0)}
+                            {getFilteredTransactionType() === 'entrada'
+                              ? formatCurrency(data.paidEntradas || 0)
+                              : formatCurrency(data.paidSalidas || 0)
+                            }
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">
-                            {formatCurrency(data.pending || 0)}
+                            {getFilteredTransactionType() === 'entrada'
+                              ? formatCurrency(data.pendingEntradas || 0)
+                              : formatCurrency(data.pendingSalidas || 0)
+                            }
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                             {data.count}
