@@ -970,7 +970,7 @@ const Reportes = () => {
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                                     </svg>
                                   )}
-                                  {formatCurrency(Math.abs(tree.carryover))}
+                                  {formatCurrency(tree.carryover)}
                                 </>
                               ) : (
                                 <span className="text-muted-foreground">-</span>
@@ -1004,7 +1004,7 @@ const Reportes = () => {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                                 </svg>
                               )}
-                              {formatCurrency(Math.abs(tree.balance))}
+                              {formatCurrency(tree.balance)}
                             </div>
                           </td>
                           <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${
@@ -1020,7 +1020,7 @@ const Reportes = () => {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                                 </svg>
                               )}
-                              {formatCurrency(Math.abs(tree.todayBalance))}
+                              {formatCurrency(tree.todayBalance)}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
@@ -2529,10 +2529,7 @@ const Reportes = () => {
                         <div className={`text-xl font-bold ${
                           selectedTreeBalance.carryover >= 0 ? 'text-purple-600' : 'text-purple-700'
                         }`}>
-                          {selectedTreeBalance.carryover >= 0 
-                            ? formatCurrency(selectedTreeBalance.carryover || 0)
-                            : `-${formatCurrency(Math.abs(selectedTreeBalance.carryover || 0))}`
-                          }
+                          {formatCurrency(selectedTreeBalance.carryover || 0)}
                         </div>
                       </div>
                       <div className="flex items-center">
@@ -2558,10 +2555,7 @@ const Reportes = () => {
                         <div className={`text-xl font-bold ${
                           selectedTreeBalance.todayBalance >= 0 ? 'text-orange-600' : 'text-orange-700'
                         }`}>
-                          {selectedTreeBalance.todayBalance >= 0 
-                            ? formatCurrency(selectedTreeBalance.todayBalance || 0)
-                            : `-${formatCurrency(Math.abs(selectedTreeBalance.todayBalance || 0))}`
-                          }
+                          {formatCurrency(selectedTreeBalance.todayBalance || 0)}
                         </div>
                       </div>
                       <div className="flex items-center">
@@ -2630,10 +2624,7 @@ const Reportes = () => {
                         <div className={`text-lg font-bold ${
                           selectedTreeBalance.balance >= 0 ? 'text-blue-600' : 'text-red-600'
                         }`}>
-                          {selectedTreeBalance.balance >= 0 
-                            ? formatCurrency(selectedTreeBalance.balance)
-                            : `-${formatCurrency(Math.abs(selectedTreeBalance.balance))}`
-                          }
+                          {formatCurrency(selectedTreeBalance.balance)}
                         </div>
                       </div>
                       <div className="flex items-center flex-shrink-0 ml-2">
