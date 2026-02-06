@@ -69,9 +69,12 @@ const Reportes = () => {
   const [providers, setProviders] = useState([]);
 
   useEffect(() => {
-    loadReferenceData();
-    // Load initial report with current month
-    handleDateChange(currentDate);
+    const initializePage = async () => {
+      await loadReferenceData();
+      // Load initial report with current month after reference data is loaded
+      handleDateChange(currentDate);
+    };
+    initializePage();
   }, []);
 
   const handleDateChange = (newDate) => {
