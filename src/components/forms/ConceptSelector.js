@@ -30,7 +30,7 @@ const ConceptSelector = forwardRef(({
       // Fetch all concepts and filter by general and type
       const allConcepts = await conceptService.getAll();
       const filteredConcepts = allConcepts.filter(concept => 
-        concept.generalId === generalId && concept.type === type
+        concept.generalId === generalId && (concept.type === type || concept.type === 'ambos')
       );
       setConcepts(filteredConcepts);
     } catch (err) {

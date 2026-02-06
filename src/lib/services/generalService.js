@@ -19,6 +19,11 @@ export const generalService = {
   // Create a new general category
   async create(generalData) {
     try {
+      // Validar que type sea 'entrada', 'salida' o 'ambos'
+      if (!['entrada', 'salida', 'ambos'].includes(generalData.type)) {
+        throw new Error('Tipo inválido. Debe ser: entrada, salida o ambos');
+      }
+      
       const docRef = await addDoc(collection(db, COLLECTION_NAME), {
         ...generalData,
         createdAt: serverTimestamp(),
@@ -28,7 +33,7 @@ export const generalService = {
       return { id: docRef.id, ...generalData };
     } catch (error) {
       console.error('Error creating general:', error);
-      throw new Error('Error al crear la categoría general');
+      throw new Error(error.message || 'Error al crear la categoría general');
     }
   },
 
@@ -49,12 +54,12 @@ export const generalService = {
     }
   },
 
-  // Get generals by type (entrada/salida)
+  // Get generals by type (entrada/salida/ambos)
+  // Incluye generales del tipo específico Y los de tipo 'ambos'
   async getByType(type) {
     try {
       const q = query(
         collection(db, COLLECTION_NAME),
-        where('type', '==', type),
         where('isActive', '==', true),
         orderBy('name', 'asc')
       );
@@ -63,7 +68,11 @@ export const generalService = {
       const generals = [];
       
       querySnapshot.forEach((doc) => {
-        generals.push({ id: doc.id, ...doc.data() });
+        const data = doc.data();
+        // Incluir generales que coincidan con el tipo O sean 'ambos'
+        if (data.type === type || data.type === 'ambos') {
+          generals.push({ id: doc.id, ...data });
+        }
       });
       
       return generals;
@@ -100,13 +109,18 @@ export const generalService = {
   // Update general
   async update(id, updateData) {
     try {
+      // Validar tipo si se está actualizando
+      if (updateData.type && !['entrada', 'salida', 'ambos'].includes(updateData.type)) {
+        throw new Error('Tipo inválido. Debe ser: entrada, salida o ambos');
+      }
+      
       const docRef = doc(db, COLLECTION_NAME, id);
       await updateDoc(docRef, updateData);
       
       return { id, ...updateData };
     } catch (error) {
       console.error('Error updating general:', error);
-      throw new Error('Error al actualizar la categoría general');
+      throw new Error(error.message || 'Error al actualizar la categoría general');
     }
   },
 
@@ -188,8 +202,8 @@ export const generalService = {
       errors.name = 'El nombre de la categoría general es requerido';
     }
     
-    if (!generalData.type || !['entrada', 'salida'].includes(generalData.type)) {
-      errors.type = 'El tipo debe ser "entrada" o "salida"';
+    if (!generalData.type || !['entrada', 'salida', 'ambos'].includes(generalData.type)) {
+      errors.type = 'El tipo debe ser "entrada", "salida" o "ambos"';
     }
     
     return {

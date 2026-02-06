@@ -194,6 +194,7 @@ export default function ConceptosPage() {
                   <option value="all">Todos los tipos</option>
                   <option value="entrada">Entradas</option>
                   <option value="salida">Salidas</option>
+                  <option value="ambos">Ambos</option>
                 </select>
               </div>
             </div>
@@ -326,10 +327,12 @@ export default function ConceptosPage() {
                               className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                                 concept.type === "entrada"
                                   ? "bg-green-100 text-green-800"
-                                  : "bg-red-100 text-red-800"
+                                  : concept.type === "salida"
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-purple-100 text-purple-800"
                               }`}
                             >
-                              {concept.type === "entrada" ? "Entrada" : "Salida"}
+                              {concept.type === "entrada" ? "Entrada" : concept.type === "salida" ? "Salida" : "Ambos"}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

@@ -279,7 +279,7 @@ const Sidebar = ({
                             : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                             }`}
                         >
-                          <ChatBubbleLeftRightIcon className="h-5 w-5 flex-shrink-0" />
+                          <TagIcon className="h-5 w-5 flex-shrink-0" />
                           <span className="ml-3">Subconceptos</span>
                         </button>
                       )}

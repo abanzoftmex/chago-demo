@@ -59,8 +59,8 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
         setLoadingGenerals(true);
         setGeneralsError(null);
         const allGenerals = await generalService.getAll();
-        // Filter only salidas (expenses) for recurring expenses
-        const filtered = allGenerals.filter(g => g.type === "salida");
+        // Filter salidas and ambos for recurring expenses
+        const filtered = allGenerals.filter(g => g.type === "salida" || g.type === "ambos");
         setGenerals(filtered);
       } catch (err) {
         setGeneralsError(err.message);
@@ -76,7 +76,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
     const loadConcepts = async () => {
       try {
         const allConcepts = await conceptService.getAll();
-        setConcepts(allConcepts.filter(c => c.type === "salida"));
+        setConcepts(allConcepts.filter(c => c.type === "salida" || c.type === "ambos"));
       } catch (err) {
         console.error('Error loading concepts:', err);
       }
@@ -265,7 +265,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
         setLoadingGenerals(true);
         setGeneralsError(null);
         const allGenerals = await generalService.getAll();
-        const filtered = allGenerals.filter(g => g.type === "salida");
+        const filtered = allGenerals.filter(g => g.type === "salida" || g.type === "ambos");
         setGenerals(filtered);
       } catch (err) {
         setGeneralsError(err.message);
@@ -366,7 +366,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
                 <option value="">Selecciona una categoría general</option>
                 {generals.map(g => (
                   <option key={g.id} value={g.id}>
-                    {g.name}
+                    {g.name} ({g.type === 'salida' ? 'Salida' : 'Ambos'})
                   </option>
                 ))}
                 <option value="CREATE_NEW" className="font-semibold text-rose-600">

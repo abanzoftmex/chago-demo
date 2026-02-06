@@ -7,6 +7,7 @@ import { conceptService } from "../../../lib/services/conceptService";
 import { descriptionService } from "../../../lib/services/descriptionService";
 import { providerService } from "../../../lib/services/providerService";
 import { generalService } from "../../../lib/services/generalService";
+import { subconceptService } from "../../../lib/services/subconceptService";
 import { DIVISIONS, formatDivision } from "../../../lib/constants/divisions";
 import { 
   Search, 
@@ -32,6 +33,7 @@ const Historial = () => {
   const [transactions, setTransactions] = useState([]);
   const [transactionStats, setTransactionStats] = useState({ pendiente: 0, parcial: 0, pagado: 0, total: 0 });
   const [concepts, setConcepts] = useState([]);
+  const [subconcepts, setSubconcepts] = useState([]);
   const [descriptions, setDescriptions] = useState([]);
   const [providers, setProviders] = useState([]);
   const [generals, setGenerals] = useState([]);
@@ -89,7 +91,8 @@ const Historial = () => {
   const typeOptions = [
     { value: "", label: "Todos los tipos" },
     { value: "entrada", label: "Entradas" },
-    { value: "salida", label: "Salidas" }
+    { value: "salida", label: "Salidas" },
+    { value: "ambos", label: "Ambos" }
   ];
 
   const statusOptions = [
@@ -157,13 +160,15 @@ const Historial = () => {
 
   const loadInitialData = async () => {
     try {
-      const [conceptsData, providersData, generalsData] = await Promise.all([
+      const [conceptsData, subconceptsData, providersData, generalsData] = await Promise.all([
         conceptService.getAll(),
+        subconceptService.getAll(),
         providerService.getAll(),
         generalService.getAll(),
       ]);
 
       setConcepts(conceptsData);
+      setSubconcepts(subconceptsData);
       setProviders(providersData);
       setGenerals(generalsData);
       setInitialDataLoaded(true);
@@ -456,6 +461,41 @@ const Historial = () => {
     return general ? general.name : "N/A";
   };
 
+  const getSubconceptName = (subconceptId, transaction = null) => {
+    // Si es un gasto inicial con subconceptName, usar ese nombre
+    if (transaction?.isInitialExpense && transaction?.subconceptName) {
+      return transaction.subconceptName;
+    }
+    
+    if (!subconceptId) return "N/A";
+    const subconcept = subconcepts.find((s) => s.id === subconceptId);
+    return subconcept ? subconcept.name : "N/A";
+  };
+
+  // Función para mostrar el árbol completo: General / Concepto / Subconcepto (subconcepto en negritas)
+  const getTreeDisplay = (transaction) => {
+    const generalName = getGeneralName(transaction.generalId, transaction);
+    const conceptName = getConceptName(transaction.conceptId, transaction);
+    const subconceptName = getSubconceptName(transaction.subconceptId, transaction);
+    
+    // Verificar si el general es de tipo "ambos"
+    const general = generals.find((g) => g.id === transaction.generalId);
+    const isAmboTree = general?.type === "ambos";
+    
+    return (
+      <div>
+        <div className="text-sm text-foreground">
+          {generalName} / {conceptName} / <strong>{subconceptName}</strong>
+        </div>
+        {isAmboTree && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 mt-1">
+            Árbol Mixto
+          </span>
+        )}
+      </div>
+    );
+  };
+
   // Function to get active filters display
   const getActiveFilters = () => {
     const activeFilters = [];
@@ -463,8 +503,8 @@ const Historial = () => {
     if (filters.type) {
       activeFilters.push({
         label: 'Tipo',
-        value: filters.type === 'entrada' ? 'Entradas' : 'Salidas',
-        icon: filters.type === 'entrada' ? TrendingUp : TrendingDown
+        value: filters.type === 'entrada' ? 'Entradas' : filters.type === 'salida' ? 'Salidas' : 'Ambos',
+        icon: filters.type === 'entrada' ? TrendingUp : filters.type === 'salida' ? TrendingDown : Layers
       });
     }
     
@@ -812,9 +852,6 @@ const Historial = () => {
                         Tipo
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        General
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Concepto
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -845,19 +882,20 @@ const Historial = () => {
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                               transaction.type === "entrada"
                                 ? "bg-green-100 text-green-800"
-                                : "bg-red-100 text-red-800"
+                                : transaction.type === "salida"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-purple-100 text-purple-800"
                             }`}
                           >
                             {transaction.type === "entrada"
                               ? "Entrada"
-                              : "Salida"}
+                              : transaction.type === "salida"
+                              ? "Salida"
+                              : "Ambos"}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
-                          {getGeneralName(transaction.generalId, transaction)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
-                          {getConceptName(transaction.conceptId, transaction)}
+                        <td className="px-6 py-4 text-sm text-foreground">
+                          {getTreeDisplay(transaction)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                           {getProviderName(transaction.providerId, transaction)}
@@ -898,21 +936,22 @@ const Historial = () => {
                             className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                               transaction.type === "entrada"
                                 ? "bg-green-100 text-green-800"
-                                : "bg-red-100 text-red-800"
+                                : transaction.type === "salida"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-purple-100 text-purple-800"
                             }`}
                           >
                             {transaction.type === "entrada"
                               ? "Entrada"
-                              : "Salida"}
+                              : transaction.type === "salida"
+                              ? "Salida"
+                              : "Ambos"}
                           </span>
                           {getStatusBadge(transaction.status)}
                         </div>
-                        <p className="text-sm font-medium text-foreground">
-                          {getGeneralName(transaction.generalId, transaction)}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {getConceptName(transaction.conceptId, transaction)}
-                        </p>
+                        <div className="mb-2">
+                          {getTreeDisplay(transaction)}
+                        </div>
                         <p className="text-sm text-muted-foreground">
                           {getProviderName(transaction.providerId, transaction)}
                         </p>

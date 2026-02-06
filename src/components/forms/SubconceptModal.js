@@ -24,6 +24,9 @@ const SubconceptModal = ({
     }
   }, [isOpen, initialData]);
 
+  // Obtener el concepto seleccionado para mostrar información
+  const selectedConcept = concepts.find(c => c.id === formData.conceptId);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -56,12 +59,16 @@ const SubconceptModal = ({
     try {
       setLoading(true);
       
+      console.log('📝 Guardando subconcepto con datos:', formData);
+      
       if (initialData?.id) {
         // Update existing subconcept
         await subconceptService.update(initialData.id, formData);
+        console.log('✅ Subconcepto actualizado exitosamente');
       } else {
         // Create new subconcept
-        await subconceptService.create(formData);
+        const result = await subconceptService.create(formData);
+        console.log('✅ Subconcepto creado exitosamente:', result);
       }
       
       onSuccess?.(formData);
@@ -74,7 +81,7 @@ const SubconceptModal = ({
       });
       setErrors({});
     } catch (error) {
-      console.error('Error saving subconcept:', error);
+      console.error('❌ Error saving subconcept:', error);
       setErrors({ 
         general: error.message || 'Error al guardar el subconcepto' 
       });
@@ -120,6 +127,7 @@ const SubconceptModal = ({
             </div>
           )}
 
+          {/* Concepto Field - PRIMERO */}
           <div className="mb-4">
             <label
               htmlFor="conceptId"
@@ -147,9 +155,35 @@ const SubconceptModal = ({
             {errors.conceptId && (
               <p className="mt-1 text-sm text-red-600">{errors.conceptId}</p>
             )}
+            
+            {/* Mostrar información del concepto y tipo heredado */}
+            {selectedConcept && (
+              <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-blue-900">
+                      Tipo heredado del Concepto:
+                    </p>
+                    <div className="mt-1">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        selectedConcept.type === 'entrada' ? 'bg-green-100 text-green-800' :
+                        selectedConcept.type === 'salida' ? 'bg-red-100 text-red-800' :
+                        'bg-purple-100 text-purple-800'
+                      }`}>
+                        {selectedConcept.type === 'entrada' ? 'Entrada' : 
+                         selectedConcept.type === 'salida' ? 'Salida' : 'Ambos'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Name Field */}
+          {/* Name Field - SEGUNDO */}
           <div className="mb-6">
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
               Nombre del Subconcepto <span className="text-red-500">*</span>

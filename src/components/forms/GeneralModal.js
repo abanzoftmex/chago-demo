@@ -154,9 +154,13 @@ export default function GeneralModal({ isOpen, onClose, onSuccess, type = 'entra
               }`}
               disabled={isSubmitting}
             >
-              <option value="entrada">Ingreso</option>
-              <option value="salida">Gasto</option>
+              <option value="entrada">Entrada</option>
+              <option value="salida">Salida</option>
+              <option value="ambos">Ambos (Entrada y Salida)</option>
             </select>
+            <p className="mt-1 text-xs text-gray-500">
+              Selecciona "Ambos" si esta categoría puede tener tanto entradas como salidas
+            </p>
             {errors.type && (
               <p className="mt-1 text-sm text-red-600">{errors.type}</p>
             )}

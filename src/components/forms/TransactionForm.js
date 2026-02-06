@@ -242,8 +242,8 @@ const TransactionForm = ({
         setLoadingGenerals(true);
         setGeneralsError(null);
         const allGenerals = await generalService.getAll();
-        // Filter by transaction type if provided
-        const filtered = allGenerals.filter(g => !formData.type || g.type === formData.type);
+        // Filter by transaction type if provided, incluir 'ambos'
+        const filtered = allGenerals.filter(g => !formData.type || g.type === formData.type || g.type === 'ambos');
         setGenerals(filtered);
       } catch (err) {
         setGeneralsError(err.message);
@@ -612,7 +612,7 @@ const TransactionForm = ({
                 <option value="">Selecciona una categoría general</option>
                 {generals.map(g => (
                   <option key={g.id} value={g.id}>
-                    {g.name} ({g.type === 'entrada' ? 'Ingreso' : 'Gasto'})
+                    {g.name} ({g.type === 'entrada' ? 'Entrada' : g.type === 'salida' ? 'Salida' : 'Ambos'})
                   </option>
                 ))}
                 <option value="CREATE_NEW" className="font-semibold text-primary">
@@ -891,7 +891,7 @@ const TransactionForm = ({
               </svg>
             )}
             {initialData ? "Actualizar" : "Guardar"}{" "}
-            {formData.type === "entrada" ? "Ingreso" : "Gasto"}
+            {formData.type === "entrada" ? "Entrada" : "Salida"}
           </button>
         </div>
       </form>

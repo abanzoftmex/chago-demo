@@ -217,9 +217,11 @@ export default function ConceptCsvImportModal({ isOpen, onClose, onSuccess }) {
                       <span className={`px-2 py-0.5 rounded text-xs ${
                         general.type === 'entrada' 
                           ? 'bg-green-100 text-green-700' 
-                          : 'bg-red-100 text-red-700'
+                          : general.type === 'salida'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-purple-100 text-purple-700'
                       }`}>
-                        {general.type === 'entrada' ? 'Ingreso' : 'Gasto'}
+                        {general.type === 'entrada' ? 'Entrada' : general.type === 'salida' ? 'Salida' : 'Ambos'}
                       </span>
                     </li>
                   ))}

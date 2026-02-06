@@ -51,6 +51,21 @@ export default function SubconceptosPage() {
         generalService.getAll()
       ]);
 
+      console.log('📊 Datos cargados en subconceptos:', {
+        subconcepts: subconceptsData.length,
+        concepts: conceptsData.length,
+        generals: generalsData.length
+      });
+      
+      // Debug: mostrar los primeros 3 subconceptos
+      if (subconceptsData.length > 0) {
+        console.log('🔍 Primeros subconceptos:', subconceptsData.slice(0, 3).map(s => ({
+          id: s.id,
+          name: s.name,
+          conceptId: s.conceptId
+        })));
+      }
+
       setSubconcepts(subconceptsData);
       setConcepts(conceptsData);
       setGenerals(generalsData);
@@ -281,6 +296,16 @@ export default function SubconceptosPage() {
                     filteredSubconcepts.map((subconcept) => {
                       const concept = concepts.find(c => c.id === subconcept.conceptId);
                       const general = concept ? generals.find(g => g.id === concept.generalId) : null;
+                      
+                      // Debug: mostrar información de relaciones
+                      if (!concept) {
+                        console.warn('⚠️ Subconcepto sin concepto encontrado:', {
+                          subconceptId: subconcept.id,
+                          subconceptName: subconcept.name,
+                          conceptId: subconcept.conceptId
+                        });
+                      }
+                      
                       return (
                         <tr key={subconcept.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -304,10 +329,16 @@ export default function SubconceptosPage() {
                                 className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                                   concept.type === "entrada"
                                     ? "bg-green-100 text-green-800"
-                                    : "bg-red-100 text-red-800"
+                                    : concept.type === "salida"
+                                    ? "bg-red-100 text-red-800"
+                                    : "bg-purple-100 text-purple-800"
                                 }`}
                               >
-                                {concept.type === "entrada" ? "Entrada" : "Salida"}
+                                {concept.type === "entrada" 
+                                  ? "Entrada" 
+                                  : concept.type === "salida" 
+                                  ? "Salida" 
+                                  : "Ambos"}
                               </span>
                             ) : (
                               <span className="text-sm text-gray-400">N/A</span>

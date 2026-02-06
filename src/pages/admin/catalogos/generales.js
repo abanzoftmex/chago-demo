@@ -171,6 +171,7 @@ export default function GeneralesPage() {
                   <option value="all">Todos</option>
                   <option value="entrada">Entrada</option>
                   <option value="salida">Salida</option>
+                  <option value="ambos">Ambos</option>
                 </select>
               </div>
             </div>
@@ -293,10 +294,12 @@ export default function GeneralesPage() {
                             className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                               general.type === "entrada"
                                 ? "bg-green-100 text-green-800"
-                                : "bg-red-100 text-red-800"
+                                : general.type === "salida"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-purple-100 text-purple-800"
                             }`}
                           >
-                            {general.type === "entrada" ? "Entrada" : "Salida"}
+                            {general.type === "entrada" ? "Entrada" : general.type === "salida" ? "Salida" : "Ambos"}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

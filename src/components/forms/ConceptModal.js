@@ -19,21 +19,45 @@ const ConceptModal = ({
 
   // Load data when modal opens
   useEffect(() => {
-    if (isOpen && initialData) {
-      setFormData({
-        name: initialData.name || "",
-        type: initialData.type || "entrada",
-        generalId: initialData.generalId || "",
-      });
+    if (isOpen) {
+      if (initialData) {
+        // Modo edición: cargar datos existentes
+        const general = generals.find(g => g.id === initialData.generalId);
+        setFormData({
+          name: initialData.name || "",
+          type: general?.type || initialData.type || "entrada",
+          generalId: initialData.generalId || "",
+        });
+      } else {
+        // Modo creación: valores por defecto
+        setFormData({
+          name: "",
+          type: type || "entrada",
+          generalId: "",
+        });
+      }
     }
-  }, [isOpen, initialData]);
+  }, [isOpen, initialData, type, generals]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    
+    // Si cambia el general, heredar su tipo automáticamente
+    if (name === 'generalId' && value) {
+      const selectedGeneral = generals.find(g => g.id === value);
+      if (selectedGeneral) {
+        setFormData((prev) => ({
+          ...prev,
+          generalId: value,
+          type: selectedGeneral.type // Heredar tipo del general
+        }));
+      }
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
 
     if (errors[name]) {
       setErrors((prev) => ({
@@ -42,6 +66,10 @@ const ConceptModal = ({
       }));
     }
   };
+
+  // Obtener el general seleccionado para mostrar su tipo
+  const selectedGeneral = generals.find(g => g.id === formData.generalId);
+  const inheritedType = selectedGeneral?.type;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -157,31 +185,6 @@ const ConceptModal = ({
 
           <div className="mb-4">
             <label
-              htmlFor="type"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              Tipo *
-            </label>
-            <select
-              id="type"
-              name="type"
-              value={formData.type}
-              onChange={handleInputChange}
-              disabled={loading}
-              className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500 ${
-                errors.type ? "border-red-300" : "border-gray-300"
-              }`}
-            >
-              <option value="entrada">Ingreso</option>
-              <option value="salida">Gasto</option>
-            </select>
-            {errors.type && (
-              <p className="mt-1 text-sm text-red-600">{errors.type}</p>
-            )}
-          </div>
-
-          <div className="mb-4">
-            <label
               htmlFor="generalId"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
@@ -198,16 +201,40 @@ const ConceptModal = ({
               }`}
             >
               <option value="">Selecciona una categoría general</option>
-              {generals
-                .filter(general => general.type === formData.type)
-                .map((general) => (
-                  <option key={general.id} value={general.id}>
-                    {general.name}
-                  </option>
-                ))}
+              {generals.map((general) => (
+                <option key={general.id} value={general.id}>
+                  {general.name}
+                </option>
+              ))}
             </select>
             {errors.generalId && (
               <p className="mt-1 text-sm text-red-600">{errors.generalId}</p>
+            )}
+            
+            {/* Mostrar tipo heredado */}
+            {inheritedType && (
+              <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-blue-900">
+                      Tipo heredado del General:
+                    </p>
+                    <div className="mt-1">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        inheritedType === 'entrada' ? 'bg-green-100 text-green-800' :
+                        inheritedType === 'salida' ? 'bg-red-100 text-red-800' :
+                        'bg-purple-100 text-purple-800'
+                      }`}>
+                        {inheritedType === 'entrada' ? 'Entrada' : 
+                         inheritedType === 'salida' ? 'Salida' : 'Ambos'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 

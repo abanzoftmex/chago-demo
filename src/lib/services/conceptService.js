@@ -19,6 +19,11 @@ export const conceptService = {
   // Create a new concept
   async create(conceptData) {
     try {
+      // Validar que type sea 'entrada', 'salida' o 'ambos'
+      if (!['entrada', 'salida', 'ambos'].includes(conceptData.type)) {
+        throw new Error('Tipo inválido. Debe ser: entrada, salida o ambos');
+      }
+      
       const docRef = await addDoc(collection(db, COLLECTION_NAME), {
         ...conceptData,
         createdAt: serverTimestamp(),
@@ -28,7 +33,7 @@ export const conceptService = {
       return { id: docRef.id, ...conceptData };
     } catch (error) {
       console.error('Error creating concept:', error);
-      throw new Error('Error al crear el concepto');
+      throw new Error(error.message || 'Error al crear el concepto');
     }
   },
 
@@ -73,12 +78,12 @@ export const conceptService = {
     }
   },
 
-  // Get concepts by type (entrada/salida)
+  // Get concepts by type (entrada/salida/ambos)
+  // Incluye conceptos del tipo específico Y los de tipo 'ambos'
   async getByType(type) {
     try {
       const q = query(
         collection(db, COLLECTION_NAME),
-        where('type', '==', type),
         where('isActive', '==', true),
         orderBy('name', 'asc')
       );
@@ -87,7 +92,11 @@ export const conceptService = {
       const concepts = [];
 
       querySnapshot.forEach((doc) => {
-        concepts.push({ id: doc.id, ...doc.data() });
+        const data = doc.data();
+        // Incluir conceptos que coincidan con el tipo O sean 'ambos'
+        if (data.type === type || data.type === 'ambos') {
+          concepts.push({ id: doc.id, ...data });
+        }
       });
 
       return concepts;
@@ -125,13 +134,18 @@ export const conceptService = {
   // Update concept
   async update(id, updateData) {
     try {
+      // Validar tipo si se está actualizando
+      if (updateData.type && !['entrada', 'salida', 'ambos'].includes(updateData.type)) {
+        throw new Error('Tipo inválido. Debe ser: entrada, salida o ambos');
+      }
+      
       const docRef = doc(db, COLLECTION_NAME, id);
       await updateDoc(docRef, updateData);
 
       return { id, ...updateData };
     } catch (error) {
       console.error('Error updating concept:', error);
-      throw new Error('Error al actualizar el concepto');
+      throw new Error(error.message || 'Error al actualizar el concepto');
     }
   },
 
@@ -208,8 +222,8 @@ export const conceptService = {
       errors.name = 'El nombre del concepto es requerido';
     }
 
-    if (!conceptData.type || !['entrada', 'salida'].includes(conceptData.type)) {
-      errors.type = 'El tipo debe ser "entrada" o "salida"';
+    if (!conceptData.type || !['entrada', 'salida', 'ambos'].includes(conceptData.type)) {
+      errors.type = 'El tipo debe ser "entrada", "salida" o "ambos"';
     }
 
     if (!conceptData.generalId || conceptData.generalId.trim() === '') {
