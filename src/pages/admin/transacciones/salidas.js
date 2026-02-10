@@ -20,6 +20,7 @@ import {
   ClipboardIcon,
   EyeIcon,
   ArrowPathIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
 
 const SolicitudesPago = () => {
@@ -144,6 +145,26 @@ const SolicitudesPago = () => {
 
   const handleEditTransaction = (transaction) => {
     router.push(`/admin/transacciones/editar/${transaction.id}`);
+  };
+
+  const handleDeleteTransaction = async (transaction) => {
+    if (!canDeleteTransactions) {
+      toast.error("No tienes permisos para eliminar transacciones");
+      return;
+    }
+
+    const confirmMessage = `¿Estás seguro de eliminar esta transacción?\n\nProveedor: ${getProviderName(transaction.providerId, transaction)}\nMonto: ${formatCurrency(transaction.amount)}\nFecha: ${formatDate(transaction.date)}\n\nEsta acción no se puede deshacer.`;
+    
+    if (window.confirm(confirmMessage)) {
+      try {
+        await transactionService.delete(transaction.id, { uid: 'admin' }, 'Eliminación manual desde interfaz');
+        setTransactions((prev) => prev.filter((t) => t.id !== transaction.id));
+        toast.success("Transacción eliminada exitosamente");
+      } catch (error) {
+        console.error("Error deleting transaction:", error);
+        toast.error("Error al eliminar la transacción: " + error.message);
+      }
+    }
   };
 
   const getGeneralName = (generalId, transaction = null) => {
@@ -743,6 +764,16 @@ const SolicitudesPago = () => {
                                   >
                                     <EyeIcon className="h-4 w-4" />
                                   </button>
+                                  {canDeleteTransactions && (
+                                    <button
+                                      onClick={() => handleDeleteTransaction(transaction)}
+                                      className="bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center"
+                                      title="Eliminar gasto"
+                                      cursor="pointer"
+                                    >
+                                      <TrashIcon className="h-4 w-4" />
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -821,6 +852,16 @@ const SolicitudesPago = () => {
                             >
                               Ver Detalles
                             </button>
+                            {canDeleteTransactions && (
+                              <button
+                                onClick={() => handleDeleteTransaction(transaction)}
+                                className="text-sm text-red-600 hover:text-red-800 transition-colors flex items-center"
+                                title="Eliminar gasto"
+                              >
+                                <TrashIcon className="w-4 h-4 mr-1" />
+                                Eliminar
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
