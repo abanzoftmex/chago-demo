@@ -3,13 +3,19 @@ import AdminLayout from "../../components/layout/AdminLayout";
 import { useToast } from "../../components/ui/Toast";
 import SummaryCards from "../../components/dashboard/SummaryCards";
 import MonthlyTrendsChart from "../../components/charts/MonthlyTrendsChart";
-import BarConceptChart from "../../components/charts/BarConceptChart";
+import DailyTransactionsChart from "../../components/charts/DailyTransactionsChart";
 import AdvancedDateSelector from "../../components/dashboard/AdvancedDateSelector";
 import { dashboardService } from "../../lib/services/dashboardService";
 import { generalService } from "../../lib/services/generalService";
 import { transactionService } from "../../lib/services/transactionService";
 import { conceptService } from "../../lib/services/conceptService";
+import { subconceptService } from "../../lib/services/subconceptService";
 import { recurringExpenseService } from "../../lib/services/recurringExpenseService";
+import { reportService } from "../../lib/services/reportService";
+import TreeComparisonSection from "../../components/reports/TreeComparisonSection";
+import WeeklyBreakdownEntradas from "../../components/reports/WeeklyBreakdownEntradas";
+import WeeklyBreakdownSalidas from "../../components/reports/WeeklyBreakdownSalidas";
+import { formatCurrency, formatCurrencyWithBadge, calculateTreeComparison, getTreeBalanceByName, isAmboTree } from "../../lib/utils/reportUtils";
 
 const Dashboard = () => {
   const { error, success } = useToast();
@@ -22,12 +28,23 @@ const Dashboard = () => {
     entradasCount: 0,
     salidasCount: 0,
   });
-  const [conceptData, setConceptData] = useState({});
-  const [generalData, setGeneralData] = useState({});
+  const [dailyData, setDailyData] = useState({});
 
   const [monthlyTrends, setMonthlyTrends] = useState([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentMonthName, setCurrentMonthName] = useState("");
+
+  // States for report sections
+  const [stats, setStats] = useState(null);
+  const [allTransactionsReport, setAllTransactionsReport] = useState([]);
+  const [transactionsReport, setTransactionsReport] = useState([]);
+  const [generals, setGenerals] = useState([]);
+  const [concepts, setConcepts] = useState([]);
+  const [subconcepts, setSubconcepts] = useState([]);
+  const [filters, setFilters] = useState({
+    startDate: "",
+    endDate: "",
+  });
 
   useEffect(() => {
     loadDashboardData();
@@ -64,6 +81,43 @@ const Dashboard = () => {
       console.error("Error auto-generating recurring transactions:", error);
       // Keep it silent for users - no error toast
     }
+  };
+
+  // Función para agrupar transacciones por día del mes
+  const groupTransactionsByDay = (transactions, currentDate) => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    // Inicializar todos los días del mes con valores en 0
+    const dailyData = {};
+    for (let day = 1; day <= daysInMonth; day++) {
+      dailyData[`Día ${day}`] = {
+        entradas: 0,
+        salidas: 0,
+        entradasCount: 0,
+        salidasCount: 0,
+      };
+    }
+    
+    // Agrupar transacciones por día
+    transactions.forEach(transaction => {
+      const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
+      const day = transactionDate.getDate();
+      const dayKey = `Día ${day}`;
+      
+      if (dailyData[dayKey]) {
+        if (transaction.type === 'entrada') {
+          dailyData[dayKey].entradas += transaction.amount || 0;
+          dailyData[dayKey].entradasCount++;
+        } else if (transaction.type === 'salida') {
+          dailyData[dayKey].salidas += transaction.amount || 0;
+          dailyData[dayKey].salidasCount++;
+        }
+      }
+    });
+    
+    return dailyData;
   };
 
   // Función para agrupar transacciones por categoría general
@@ -138,42 +192,70 @@ const Dashboard = () => {
       const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
       const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
 
+      // Format dates for filters
+      const formatDateLocal = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
+      const startDateStr = formatDateLocal(startOfMonth);
+      const endDateStr = formatDateLocal(endOfMonth);
+
+      // Update filters for report components
+      setFilters({
+        startDate: startDateStr,
+        endDate: endDateStr
+      });
+
       // Load all dashboard data in parallel for the selected month
-      const [summaryData, conceptsData, trendsData, allTransactions, allConcepts] = await Promise.all([
+      const [
+        summaryData,
+        trendsData, 
+        allTransactions, 
+        allConcepts,
+        generalsData,
+        subconceptsData
+      ] = await Promise.all([
         dashboardService.getMonthSummary(startOfMonth, endOfMonth),
-        dashboardService.getTransactionsByConceptForDateRange(startOfMonth, endOfMonth),
         dashboardService.getMonthlyTrends(),
         transactionService.getByDateRange(startOfMonth, endOfMonth),
         conceptService.getAll(),
+        generalService.getAll(),
+        subconceptService.getAll()
       ]);
 
-      // Agrupar transacciones por General (misma estructura que otros charts)
-      const allGenerals = await generalService.getAll();
-      const generalMap = {};
-      allGenerals
-        .filter(g => g.type === 'salida')
-        .forEach(g => { generalMap[g.id] = g.name; });
-      const conceptToGeneralMap = {};
-      allConcepts.forEach(c => { conceptToGeneralMap[c.id] = c.generalId; });
-      const genData = {};
-      allTransactions.forEach(tx => {
-        if (tx.type === 'salida') {
-          const genId = tx.generalId || conceptToGeneralMap[tx.conceptId] || 'sin';
-          const name = generalMap[genId] || 'Sin Categoría';
-          if (!genData[name]) {
-            genData[name] = { entradas: 0, salidas: 0, total: 0, count: 0 };
-          }
-          genData[name].salidas += tx.amount;
-          genData[name].total += tx.amount;
-          genData[name].count += 1;
-        }
-      });
+      // Generate report stats for report components
+      const filterData = {
+        startDate: startOfMonth,
+        endDate: endOfMonth,
+        type: null,
+        generalId: null,
+        conceptId: null,
+        subconceptId: null,
+        division: null
+      };
 
+      const transactionsForReport = await reportService.getFilteredTransactions(filterData);
+      const statsData = await reportService.generateReportStats(transactionsForReport, filterData);
 
+      // Store data for report components
+      setGenerals(generalsData);
+      setConcepts(allConcepts);
+      setSubconcepts(subconceptsData);
+      setStats(statsData);
+      setTransactionsReport(transactionsForReport);
+      
+      // Get all transactions without date filter for tree comparison
+      const allTransactionsComplete = await transactionService.getAll({});
+      setAllTransactionsReport(allTransactionsComplete);
+
+      // Agrupar transacciones por día
+      const dailyTransactions = groupTransactionsByDay(allTransactions, currentDate);
 
       setSummary(summaryData);
-      setConceptData(conceptsData);
-      setGeneralData(genData);
+      setDailyData(dailyTransactions);
       setMonthlyTrends(trendsData);
     } catch (err) {
       console.error("Error loading dashboard data:", err);
@@ -255,43 +337,70 @@ const Dashboard = () => {
       
 
         {/* Summary Cards */}
-        <SummaryCards summary={summary} />
+        <SummaryCards summary={summary} currentMonthName={currentMonthName} />
+
+        {/* Report Sections */}
+        {stats && (
+          <div className="space-y-6">
+            {/* Tree Comparison Section */}
+            <TreeComparisonSection
+              stats={stats}
+              currentMonthName={currentMonthName}
+              calculateTreeComparison={() => calculateTreeComparison(allTransactionsReport, stats, filters, generals, concepts)}
+              formatCurrency={formatCurrency}
+              formatCurrencyWithBadge={formatCurrencyWithBadge}
+              subconcepts={subconcepts}
+            />
+
+            {/* Weekly Breakdown for Entradas */}
+            <WeeklyBreakdownEntradas
+              stats={stats}
+              currentMonthName={currentMonthName}
+              transactions={transactionsReport}
+              generals={generals}
+              concepts={concepts}
+              subconcepts={subconcepts}
+              filters={filters}
+              currentDate={currentDate}
+              formatCurrency={formatCurrency}
+              getTreeBalanceByName={(treeString) => getTreeBalanceByName(treeString, () => calculateTreeComparison(allTransactionsReport, stats, filters, generals, concepts))}
+              isAmboTree={(treeString) => isAmboTree(treeString, generals)}
+            />
+
+            {/* Weekly Breakdown for Salidas */}
+            <WeeklyBreakdownSalidas
+              stats={stats}
+              currentMonthName={currentMonthName}
+              transactions={transactionsReport}
+              generals={generals}
+              concepts={concepts}
+              subconcepts={subconcepts}
+              filters={filters}
+              currentDate={currentDate}
+              formatCurrency={formatCurrency}
+              getTreeBalanceByName={(treeString) => getTreeBalanceByName(treeString, () => calculateTreeComparison(allTransactionsReport, stats, filters, generals, concepts))}
+              isAmboTree={(treeString) => isAmboTree(treeString, generals)}
+            />
+          </div>
+        )}
 
         {/* Charts Section */}
         <div className="space-y-6">
-          {/* Gastos por General */}
-          <div className="w-full">
-            <h2 className="text-xl font-bold text-foreground mb-4">Gastos por Generales</h2>
-            {Object.keys(generalData).length > 0 ? (
-              <BarConceptChart data={generalData} type="salidas" chartType="general" />
-            ) : (
-              <div className="bg-background rounded-lg border border-border p-6">
-                <div className="border-2 border-dashed border-border rounded-lg h-64 flex items-center justify-center">
-                  <div className="text-center">
-                    <p className="text-muted-foreground">No hay gastos registrados este mes</p>
-                  </div>
+          {/* Movimientos Diarios - Entradas y Salidas */}
+          {Object.keys(dailyData).length > 0 ? (
+            <DailyTransactionsChart data={dailyData} monthName={currentMonthName} />
+          ) : (
+            <div className="bg-background rounded-lg border border-border p-6">
+              <div className="border-2 border-dashed border-border rounded-lg h-64 flex items-center justify-center">
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    Movimientos Diarios
+                  </h3>
+                  <p className="text-muted-foreground">No hay transacciones registradas este mes</p>
                 </div>
               </div>
-            )}
-          </div>
-
-          {/* Gastos por Concepto */}
-          <div className="w-full">
-            <h2 className="text-xl font-bold text-foreground mb-4">Gastos por Concepto</h2>
-            {Object.keys(conceptData).length > 0 ? (
-              <BarConceptChart data={conceptData}  />
-            ) : (
-              <div className="bg-background rounded-lg border border-border p-6">
-                <div className="border-2 border-dashed border-border rounded-lg h-64 flex items-center justify-center">
-                  <div className="text-center">
-                    <p className="text-muted-foreground">No hay gastos registrados este mes</p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-
+            </div>
+          )}
         </div>
 
         {/* Monthly Trends Chart */}

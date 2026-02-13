@@ -76,16 +76,26 @@ const AdvancedDateSelector = ({ currentDate, onDateChange, onSuccess, onError })
       newYear++;
     }
     
-    // Check if the new month has data
+    // Verificar si el nuevo mes tiene datos
     const hasData = availableData.months.some(m => m.year === newYear && m.month === newMonth);
     
-    if (hasData) {
-      const newDate = new Date(newYear, newMonth, 1);
+    // Verificar si el nuevo mes es actual o pasado (no futuro)
+    const now = new Date();
+    const newDate = new Date(newYear, newMonth, 1);
+    const actualCurrentDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    const isNotFuture = newDate <= actualCurrentDate;
+    
+    // Permitir navegación si tiene datos O si no es futuro
+    if (hasData || isNotFuture) {
       onDateChange(newDate);
       setSelectedYear(newYear);
-      onSuccess && onSuccess(`Mostrando datos de ${newDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}`);
+      if (hasData) {
+        onSuccess && onSuccess(`Mostrando datos de ${newDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}`);
+      } else {
+        onSuccess && onSuccess(`Sin datos para ${newDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}`);
+      }
     } else {
-      onError && onError('No hay datos disponibles para ese mes');
+      onError && onError('No se puede navegar a meses futuros');
     }
   };
 
@@ -102,16 +112,18 @@ const AdvancedDateSelector = ({ currentDate, onDateChange, onSuccess, onError })
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
     
-    // Check if current month has data
+    // Siempre permitir ir al mes actual, tenga o no datos
+    onDateChange(now);
+    setSelectedYear(currentYear);
+    setShowDropdown(false);
+    
+    // Verificar si el mes actual tiene datos para personalizar el mensaje
     const hasData = availableData.months.some(m => m.year === currentYear && m.month === currentMonth);
     
     if (hasData) {
-      onDateChange(now);
-      setSelectedYear(currentYear);
-      setShowDropdown(false);
       onSuccess && onSuccess("Mostrando datos del mes actual");
     } else {
-      onError && onError('No hay datos disponibles para el mes actual');
+      onSuccess && onSuccess("Mes actual (sin transacciones aún)");
     }
   };
 
@@ -166,7 +178,22 @@ const AdvancedDateSelector = ({ currentDate, onDateChange, onSuccess, onError })
       nextYear++;
     }
     
-    return availableData.months.some(m => m.year === nextYear && m.month === nextMonth);
+    // Obtener el mes actual del sistema
+    const now = new Date();
+    const actualCurrentMonth = now.getMonth();
+    const actualCurrentYear = now.getFullYear();
+    
+    // Crear fechas para comparación
+    const nextDate = new Date(nextYear, nextMonth, 1);
+    const actualCurrentDate = new Date(actualCurrentYear, actualCurrentMonth, 1);
+    
+    // Permitir navegación si:
+    // 1. El mes siguiente tiene datos, O
+    // 2. El mes siguiente es el mes actual o anterior (no permitir meses futuros)
+    const hasData = availableData.months.some(m => m.year === nextYear && m.month === nextMonth);
+    const isNotFuture = nextDate <= actualCurrentDate;
+    
+    return hasData || isNotFuture;
   };
 
   if (loading) {
@@ -220,7 +247,7 @@ const AdvancedDateSelector = ({ currentDate, onDateChange, onSuccess, onError })
               {/* Current Month Option */}
               <button
                 onClick={selectCurrentMonth}
-                className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center justify-between"
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center justify-between"
               >
                 <span>Mes Actual</span>
                 {availableData.months.some(m => {

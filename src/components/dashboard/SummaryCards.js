@@ -5,22 +5,13 @@ import {
   DocumentTextIcon 
 } from '@heroicons/react/24/outline';
 
-const SummaryCards = ({ summary }) => {
-  // Obtener el nombre del mes actual
-  const getCurrentMonthName = () => {
-    const months = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-    ];
-    const currentMonth = new Date().getMonth();
-    return months[currentMonth];
-  };
-
-  const currentMonthName = getCurrentMonthName();
+const SummaryCards = ({ summary, currentMonthName }) => {
+  // Extraer solo el nombre del mes (sin el año) si viene en formato "Mes Año"
+  const monthOnly = currentMonthName ? currentMonthName.split(' ')[0] : '';
 
   const cards = [
     {
-      title: `Entradas del Mes (${currentMonthName})`,
+      title: `Entradas del Mes (${monthOnly})`,
       bgcolorcard: 'bg-green-50',
       value: summary.entradas,
       icon: ArrowTrendingUpIcon,
@@ -29,7 +20,7 @@ const SummaryCards = ({ summary }) => {
       count: summary.entradasCount
     },
     {
-      title: `Salidas del Mes (${currentMonthName})`,
+      title: `Salidas del Mes (${monthOnly})`,
       bgcolorcard: 'bg-red-50',
       value: summary.salidas,
       icon: ArrowTrendingDownIcon,

@@ -14,6 +14,16 @@ import { carryoverService } from "../../lib/services/carryoverService";
 import { DIVISIONS, formatDivision } from "../../lib/constants/divisions";
 import { useAuth } from "../../context/AuthContext";
 import useReportStore from "../../lib/stores/reportStore";
+import TreeComparisonSection from "../../components/reports/TreeComparisonSection";
+import WeeklyBreakdownEntradas from "../../components/reports/WeeklyBreakdownEntradas";
+import WeeklyBreakdownSalidas from "../../components/reports/WeeklyBreakdownSalidas";
+import { 
+  formatCurrency as formatCurrencyUtil, 
+  formatCurrencyWithBadge as formatCurrencyWithBadgeUtil, 
+  calculateTreeComparison as calculateTreeComparisonUtil, 
+  getTreeBalanceByName as getTreeBalanceByNameUtil, 
+  isAmboTree as isAmboTreeUtil 
+} from "../../lib/utils/reportUtils";
 import {
   CalendarIcon,
   DocumentArrowDownIcon,
@@ -53,6 +63,8 @@ const Reportes = () => {
   const [selectedTreeBalance, setSelectedTreeBalance] = useState(null);
   const [selectedTreeTransactions, setSelectedTreeTransactions] = useState(null);
   const [selectedWeekDetail, setSelectedWeekDetail] = useState(null);
+  const [showPendingSalidasModal, setShowPendingSalidasModal] = useState(false);
+  const [pendingSalidasTransactions, setPendingSalidasTransactions] = useState([]);
 
   const [filters, setFilters] = useState({
     startDate: "",
@@ -325,6 +337,49 @@ const Reportes = () => {
     }
   };
 
+  const loadPendingSalidasTransactions = async () => {
+    try {
+      // Get all transactions from the current period
+      const allTransactions = await transactionService.getAll({
+        type: 'salida'
+      });
+
+      // Filter by date range and status (pendiente or parcial)
+      const startDate = new Date(filters.startDate);
+      const endDate = new Date(filters.endDate);
+
+      const pendingTransactions = allTransactions.filter(transaction => {
+        const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
+        const isInRange = transactionDate >= startDate && transactionDate <= endDate;
+        const isPendingOrPartial = transaction.status === 'pendiente' || transaction.status === 'parcial';
+        return isInRange && isPendingOrPartial;
+      });
+
+      // Get reference data for display
+      const [conceptsData, subconceptsData, providersData, generalsData] = await Promise.all([
+        conceptService.getAll(),
+        subconceptService.getAll(),
+        providerService.getAll(),
+        generalService.getAll()
+      ]);
+
+      // Enrich transactions with reference data
+      const enrichedTransactions = pendingTransactions.map(transaction => ({
+        ...transaction,
+        conceptName: conceptsData.find(c => c.id === transaction.conceptId)?.name || 'Sin concepto',
+        subconceptName: subconceptsData.find(s => s.id === transaction.subconceptId)?.name || 'Sin subconcepto',
+        providerName: providersData.find(p => p.id === transaction.providerId)?.name || 'Sin proveedor',
+        generalName: generalsData.find(g => g.id === transaction.generalId)?.name || 'Sin categoría'
+      }));
+
+      setPendingSalidasTransactions(enrichedTransactions);
+      setShowPendingSalidasModal(true);
+    } catch (err) {
+      console.error("Error loading pending salidas:", err);
+      error("Error al cargar salidas pendientes");
+    }
+  };
+
   const loadCarryoverInfo = useCallback(async () => {
     try {
       if (filters.startDate) {
@@ -454,23 +509,12 @@ const Reportes = () => {
   };
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("es-MX", {
-      style: "currency",
-      currency: "MXN",
-    }).format(amount);
+    return formatCurrencyUtil(amount);
   };
 
   // Formatea moneda con badge amarillo para números negativos (práctica contable)
   const formatCurrencyWithBadge = (amount) => {
-    const formatted = formatCurrency(amount);
-    if (amount < 0) {
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded bg-yellow-100 text-yellow-900 font-semibold">
-          {formatted}
-        </span>
-      );
-    }
-    return formatted;
+    return formatCurrencyWithBadgeUtil(amount);
   };
 
   const formatPercentage = (amount, total) => {
@@ -508,206 +552,17 @@ const Reportes = () => {
   // Función para calcular comparativos por árbol (General → Concepto → Subconcepto)
   // Solo para árboles de tipo 'ambos' que tienen transacciones de entrada y salida
   const calculateTreeComparison = () => {
-    if (!allTransactions || allTransactions.length === 0 || !stats || !stats.weeklyBreakdown) {
-      return [];
-    }
-
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
-
-    const startDate = filters.startDate ? new Date(filters.startDate) : null;
-    const endDate = filters.endDate ? new Date(filters.endDate) : null;
-
-    // Usar las mismas semanas que ya están calculadas en stats.weeklyBreakdown
-    const weeks = stats.weeklyBreakdown.weeks || [];
-    
-    // Función para obtener en qué semana cae una fecha
-    const getWeekInfo = (transactionDate) => {
-      const transactionTime = transactionDate.getTime();
-      
-      // Buscar la semana correspondiente
-      for (let i = 0; i < weeks.length; i++) {
-        const week = weeks[i];
-        if (transactionTime >= week.startTimestamp && transactionTime <= week.endTimestamp) {
-          return {
-            weekNumber: i + 1, // Número secuencial de semana en el mes
-            weekIndex: i,
-            startDate: week.startDate,
-            endDate: week.endDate
-          };
-        }
-      }
-      return null;
-    };
-
-    // PASO 1: Calcular arrastre inicial (antes del mes) por concepto
-    const initialCarryoverByTree = {};
-    allTransactions.forEach(transaction => {
-      const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
-      const isBeforeStart = startDate && transactionDate < startDate;
-      
-      if (isBeforeStart) {
-        const treeKey = `${transaction.generalId}|${transaction.conceptId}`;
-        if (!initialCarryoverByTree[treeKey]) {
-          initialCarryoverByTree[treeKey] = { entradas: 0, salidas: 0 };
-        }
-        
-        const amount = transaction.amount || 0;
-        if (transaction.type === 'entrada') {
-          initialCarryoverByTree[treeKey].entradas += amount;
-        } else if (transaction.type === 'salida') {
-          initialCarryoverByTree[treeKey].salidas += amount;
-        }
-      }
-    });
-
-    // PASO 2: Agrupar transacciones por semana + concepto y calcular balance de cada semana
-    const treeMap = {};
-    const weeklyBalances = {}; // Para acumular balances por concepto y semana
-    
-    allTransactions.forEach(transaction => {
-      const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
-      const amount = transaction.amount || 0;
-      
-      const isInPeriod = (!startDate || transactionDate >= startDate) && (!endDate || transactionDate <= endDate);
-      const isUntilToday = transactionDate <= today;
-
-      // Solo procesar transacciones del período consultado
-      if (!isInPeriod) return;
-
-      const weekInfo = getWeekInfo(transactionDate);
-      if (!weekInfo) return;
-      
-      // Agrupar por Semana + General + Concepto
-      const weekKey = weekInfo.weekNumber;
-      const treeKey = `${transaction.generalId}|${transaction.conceptId}`;
-      const key = `${weekKey}|${treeKey}`;
-      
-      if (!treeMap[key]) {
-        const general = generals.find(g => g.id === transaction.generalId);
-        const concept = concepts.find(c => c.id === transaction.conceptId);
-        
-        treeMap[key] = {
-          weekNumber: weekKey,
-          weekInfo: weekInfo,
-          generalId: transaction.generalId,
-          generalName: general?.name || 'Sin categoría',
-          generalType: general?.type || 'N/A',
-          conceptId: transaction.conceptId,
-          conceptName: concept?.name || 'Sin concepto',
-          conceptType: concept?.type || 'N/A',
-          // Período consultado (específico de esta semana)
-          entradas: 0,
-          salidas: 0,
-          balance: 0,
-          transactionCount: 0,
-          transactions: [],
-          // Saldo al día (hasta hoy, específico de esta semana)
-          todayEntradas: 0,
-          todaySalidas: 0,
-          todayBalance: 0,
-          hasEntradas: false,
-          hasSalidas: false
-        };
-      }
-      
-      // Acumular transacciones de la semana
-      if (transaction.type === 'entrada') {
-        treeMap[key].entradas += amount;
-        treeMap[key].hasEntradas = true;
-      } else if (transaction.type === 'salida') {
-        treeMap[key].salidas += amount;
-        treeMap[key].hasSalidas = true;
-      }
-      treeMap[key].transactionCount++;
-      treeMap[key].transactions.push(transaction);
-      
-      // Saldo al día (acumulado hasta hoy dentro de esta semana)
-      if (isUntilToday) {
-        if (transaction.type === 'entrada') {
-          treeMap[key].todayEntradas += amount;
-        } else if (transaction.type === 'salida') {
-          treeMap[key].todaySalidas += amount;
-        }
-      }
-    });
-
-    // PASO 3: Calcular balances y arrastres acumulados
-    Object.values(treeMap).forEach(tree => {
-      tree.balance = tree.entradas - tree.salidas;
-    });
-
-    // PASO 4: Calcular arrastre para cada semana (acumulado de semanas anteriores)
-    const treeArray = Object.values(treeMap);
-    treeArray.forEach(tree => {
-      const treeKey = `${tree.generalId}|${tree.conceptId}`;
-      const initialCarryover = initialCarryoverByTree[treeKey] || { entradas: 0, salidas: 0 };
-      
-      if (tree.weekNumber === 1) {
-        // Primera semana: arrastre es del mes anterior
-        tree.carryover = initialCarryover.entradas - initialCarryover.salidas;
-      } else {
-        // Semanas posteriores: arrastre inicial + suma de balances de semanas anteriores
-        let accumulatedBalance = initialCarryover.entradas - initialCarryover.salidas;
-        
-        // Sumar balances de semanas anteriores del mismo concepto
-        treeArray.forEach(otherTree => {
-          if (otherTree.generalId === tree.generalId &&
-              otherTree.conceptId === tree.conceptId &&
-              otherTree.weekNumber < tree.weekNumber) {
-            accumulatedBalance += otherTree.balance;
-          }
-        });
-        
-        tree.carryover = accumulatedBalance;
-      }
-      
-      // Saldo al día = arrastre + entradas hasta hoy - salidas hasta hoy
-      tree.todayBalance = tree.carryover + tree.todayEntradas - tree.todaySalidas;
-    });
-
-    // PASO 5: Filtrar solo árboles mixtos
-    const mixedTrees = treeArray.filter(tree => {
-      const hasBothTypes = tree.hasEntradas && tree.hasSalidas;
-      const isAmbosType = tree.generalType === 'ambos' || tree.conceptType === 'ambos';
-      return (hasBothTypes || isAmbosType) && tree.weekNumber > 0;
-    });
-
-    // Ordenar primero por semana, luego por balance
-    return mixedTrees.sort((a, b) => {
-      if (a.weekNumber !== b.weekNumber) {
-        return a.weekNumber - b.weekNumber;
-      }
-      return Math.abs(b.balance) - Math.abs(a.balance);
-    });
+    return calculateTreeComparisonUtil(allTransactions, stats, filters, generals, concepts);
   };
 
   // Función para obtener el balance de un árbol específico por su nombre completo
   const getTreeBalanceByName = (treeString) => {
-    const parts = treeString.split(' > ');
-    if (parts.length !== 2) return null;
-
-    const [generalName, conceptName] = parts;
-
-    // Buscar el árbol en calculateTreeComparison
-    const trees = calculateTreeComparison();
-    const matchingTree = trees.find(tree => 
-      tree.generalName === generalName && 
-      tree.conceptName === conceptName
-    );
-
-    return matchingTree || null;
+    return getTreeBalanceByNameUtil(treeString, calculateTreeComparison);
   };
 
   // Función para verificar si un árbol es de tipo "ambos"
   const isAmboTree = (treeString) => {
-    const parts = treeString.split(' > ');
-    if (parts.length !== 2) return false;
-
-    const [generalName] = parts;
-    const general = generals.find(g => g.name === generalName);
-    
-    return general?.type === 'ambos';
+    return isAmboTreeUtil(treeString, generals);
   };
 
   return (
@@ -988,530 +843,47 @@ const Reportes = () => {
             </div>
 
             {/* Tree Comparison Section - Comparativo por Árbol (Entrada vs Salida) */}
-            {stats && calculateTreeComparison().length > 0 && (
-              <div className="bg-purple-100 rounded-lg border border-border p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-foreground">
-                      Balance de cuentas mixtas (Entrada vs Salida)
-                    </h3>
-                    <p className="text-xs text-foreground mt-1">
-                      Transacciones mixtas por semana - Período: {currentMonthName}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-border">
-                    <thead className="bg-muted">
-                      <tr>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                          Semana
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                          Árbol (General / Concepto)
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-purple-600 uppercase tracking-wider">
-                          Arrastre<br/><span className="text-[10px] font-normal normal-case">(Semana anterior)</span>
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-green-600 uppercase tracking-wider">
-                          Entradas<br/><span className="text-[10px] font-normal normal-case">(Semana)</span>
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-red-600 uppercase tracking-wider">
-                          Salidas<br/><span className="text-[10px] font-normal normal-case">(Semana)</span>
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-blue-600 uppercase tracking-wider">
-                          Saldo<br/><span className="text-[10px] font-normal normal-case">(Semana)</span>
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-orange-600 uppercase tracking-wider">
-                          Saldo al día<br/><span className="text-[10px] font-normal normal-case">(Hasta hoy)</span>
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                          Transacciones
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-background divide-y divide-border">
-                      {calculateTreeComparison().map((tree, index) => (
-                        <tr key={index} className="hover:bg-muted/50 transition-colors">
-                          <td className="px-4 py-4 whitespace-nowrap text-center">
-                            <div className="inline-flex flex-col items-center">
-                              <span className="text-lg font-bold text-foreground">
-                                {tree.weekNumber}
-                              </span>
-                              {tree.weekInfo && (
-                                <span className="text-[10px] text-muted-foreground mt-0.5">
-                                  {tree.weekInfo.startDate} - {tree.weekInfo.endDate}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-foreground">
-                            <div className="space-y-1">
-                              <div className="font-semibold">{tree.conceptName}</div>
-                              <div className="font-medium text-xs">{tree.generalName}</div>
-                            </div>
-                          </td>
-                          <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-medium ${
-                            tree.carryover >= 0 ? 'text-purple-600' : 'text-purple-700'
-                          }`}>
-                            <div className="flex items-center justify-end">
-                              {tree.carryover !== 0 ? (
-                                <>
-                                  {tree.carryover >= 0 ? (
-                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                                    </svg>
-                                  ) : (
-                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                                    </svg>
-                                  )}
-                                  {formatCurrencyWithBadge(tree.carryover)}
-                                </>
-                              ) : (
-                                <span className="text-muted-foreground">-</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
-                            {tree.entradas > 0 ? (
-                              <span className="text-green-600">{formatCurrency(tree.entradas)}</span>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
-                            {tree.salidas > 0 ? (
-                              <span className="text-red-600">{formatCurrency(tree.salidas)}</span>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </td>
-                          <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${
-                            tree.balance >= 0 ? 'text-blue-600' : 'text-blue-700'
-                          }`}>
-                            <div className="flex items-center justify-end">
-                              {tree.balance >= 0 ? (
-                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                                </svg>
-                              ) : (
-                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                                </svg>
-                              )}
-                              {formatCurrencyWithBadge(tree.balance)}
-                            </div>
-                          </td>
-                          <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${
-                            tree.todayBalance >= 0 ? 'text-orange-600' : 'text-orange-700'
-                          }`}>
-                            <div className="flex items-center justify-end">
-                              {tree.todayBalance >= 0 ? (
-                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                                </svg>
-                              ) : (
-                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                                </svg>
-                              )}
-                              {formatCurrencyWithBadge(tree.todayBalance)}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                            <button
-                              onClick={() => setSelectedTreeTransactions(tree)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700 hover:text-blue-800 font-medium transition-colors cursor-pointer border border-blue-300"
-                            >
-                              <EyeIcon className="h-4 w-4" />
-                              <span>{tree.transactionCount}</span>
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {calculateTreeComparison().length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p className="text-sm">No hay árboles con transacciones mixtas en el período seleccionado</p>
-                    <p className="text-xs mt-2">Los árboles tipo 'ambos' aparecerán aquí agrupados por semana cuando tengan transacciones</p>
-                  </div>
-                )}
-              </div>
-            )}
+            <TreeComparisonSection
+              stats={stats}
+              currentMonthName={currentMonthName}
+              calculateTreeComparison={calculateTreeComparison}
+              formatCurrency={formatCurrency}
+              formatCurrencyWithBadge={formatCurrencyWithBadge}
+              subconcepts={subconcepts}
+            />
 
             {/* Weekly Breakdown for Entradas - PRIMERO */}
-            {stats && (!getFilteredTransactionType() || getFilteredTransactionType() === 'entrada') && (
-              <div className="bg-background rounded-lg border border-border p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold text-lime-700">
-                    Resumen Mes {currentMonthName} - Entradas
-                  </h3>
-                </div>
-
-                {stats.weeklyBreakdown && stats.weeklyBreakdown.weeks ? (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-border">
-                      <thead className="bg-lime-100">
-                        <tr>
-                          <th rowSpan={2} className="px-6 py-3 text-center text-sm font-bold text-lime-800 bg-lime-200 tracking-wider border-r-2 border-lime-200">
-                            Concepto
-                          </th>
-                          <th colSpan={stats.weeklyBreakdown.weeks.length} className="px-6 py-3 text-center text-sm font-bold bg-lime-200 text-lime-800 tracking-wider border-r-2 border-lime-200">
-                            Semanas
-                          </th>
-                          <th rowSpan={2} className="px-6 py-3 text-center text-sm font-bold tracking-wider text-lime-800 bg-lime-200">
-                            Totales
-                          </th>
-                        </tr>
-                        <tr>
-                          {stats.weeklyBreakdown.weeks.map((week, index) => {
-                            return (
-                            <th key={index} className="px-6 py-3 text-center text-xs font-medium text-lime-800 tracking-wider bg-lime-50">
-                              <div>{week.weekNumber || (index + 1)}</div>
-                              {(() => {
-                                try {
-                                  if (!week.startDate || !week.endDate) {
-                                    return null;
-                                  }
-                                  
-                                  // Parse dates - handle both Firestore Timestamp and "dd/MM" string format
-                                  let startDate, endDate;
-                                  
-                                  if (typeof week.startDate === 'string' && week.startDate.includes('/')) {
-                                    // Format "dd/MM" - need to add year
-                                    const currentYear = new Date(filters.startDate || currentDate).getFullYear();
-                                    const [dayStart, monthStart] = week.startDate.split('/');
-                                    startDate = new Date(currentYear, parseInt(monthStart) - 1, parseInt(dayStart));
-                                  } else {
-                                    startDate = week.startDate?.toDate ? week.startDate.toDate() : new Date(week.startDate);
-                                  }
-                                  
-                                  if (typeof week.endDate === 'string' && week.endDate.includes('/')) {
-                                    // Format "dd/MM" - need to add year
-                                    const currentYear = new Date(filters.startDate || currentDate).getFullYear();
-                                    const [dayEnd, monthEnd] = week.endDate.split('/');
-                                    endDate = new Date(currentYear, parseInt(monthEnd) - 1, parseInt(dayEnd));
-                                  } else {
-                                    endDate = week.endDate?.toDate ? week.endDate.toDate() : new Date(week.endDate);
-                                  }
-                                  
-                                  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-                                    return null;
-                                  }
-                                  
-                                  return (
-                                    <div className="text-xs font-normal text-lime-700 mt-1">
-                                      {startDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })} - {endDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}
-                                    </div>
-                                  );
-                                } catch (error) {
-                                  return null;
-                                }
-                              })()}
-                            </th>
-                            );
-                          })}
-                        </tr>
-                      </thead>
-                      <tbody className="bg-background divide-y divide-border">
-                        {Object.entries(stats.weeklyBreakdown.entradas || {}).map(([subconcept, weekData]) => {
-                          const parts = subconcept.split(' > ');
-                          const isAmbo = isAmboTree(subconcept);
-                          return (
-                          <tr key={subconcept} className="hover:bg-muted/50">
-                            <td className="px-6 py-4 text-sm text-foreground min-w-[200px] max-w-[230px]">
-                              <div className="break-words">
-                                {parts.length === 3 ? (
-                                  <>
-                                    <div className="flex items-center justify-between gap-2">
-                                      <div className="flex-1">
-                                        <div className="font-bold text-foreground">{parts[2]}</div>
-                                        <div className="font-normal text-xs text-muted-foreground mt-0.5">{parts[0]} / {parts[1]}</div>
-                                      </div>
-                                      {isAmbo && (
-                                        <button
-                                          onClick={() => setSelectedTreeBalance(getTreeBalanceByName(subconcept))}
-                                          className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded hover:bg-purple-200 transition-colors whitespace-nowrap"
-                                          title="Ver balance de este árbol mixto"
-                                        >
-                                          Ver saldo
-                                        </button>
-                                      )}
-                                    </div>
-                                  </>
-                                ) : (
-                                  <span className="font-semibold">{subconcept}</span>
-                                )}
-                              </div>
-                            </td>
-                            {stats.weeklyBreakdown.weeks.map((week, index) => {
-                              const amount = weekData[`week${index + 1}`];
-                              return (
-                              <td key={index} className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                                {amount ? (
-                                  <button
-                                    onClick={() => {
-                                      // Filtrar transacciones de esta semana y subconcepto
-                                      const weekTransactions = transactions.filter(t => {
-                                        const tDate = t.date?.toDate ? t.date.toDate() : new Date(t.date);
-                                        const tTime = tDate.getTime();
-                                        
-                                        // Construir el nombre completo del árbol desde los IDs
-                                        const general = generals.find(g => g.id === t.generalId);
-                                        const concept = concepts.find(c => c.id === t.conceptId);
-                                        const subconceptItem = subconcepts.find(s => s.id === t.subconceptId);
-                                        const fullName = `${general?.name || 'N/A'} > ${concept?.name || 'N/A'} > ${subconceptItem?.name || 'N/A'}`;
-                                        
-                                        return t.type === 'entrada' &&
-                                               tTime >= week.startTimestamp &&
-                                               tTime <= week.endTimestamp &&
-                                               fullName === subconcept;
-                                      });
-                                      setSelectedWeekDetail({
-                                        weekNumber: week.weekNumber || (index + 1),
-                                        weekRange: `${week.startDate} - ${week.endDate}`,
-                                        subconcept,
-                                        type: 'entrada',
-                                        amount,
-                                        transactions: weekTransactions
-                                      });
-                                    }}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-lime-100 hover:bg-lime-200 text-lime-700 hover:text-lime-800 font-medium transition-colors cursor-pointer border border-lime-300"
-                                  >
-                                    <EyeIcon className="h-4 w-4" />
-                                    {formatCurrency(amount)}
-                                  </button>
-                                ) : (
-                                  <span className="text-gray-400">-</span>
-                                )}
-                              </td>
-                              );
-                            })}
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-lime-800 bg-lime-100">
-                              {formatCurrency(weekData.total || 0)}
-                            </td>
-                          </tr>
-                          );
-                        })}
-                        <tr className="bg-gray-200 font-bold border-t-2 border-gray-400">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
-                            {/* Vacío para totales */}
-                          </td>
-                          {stats.weeklyBreakdown.weeks.map((week, index) => {
-                            const weekTotal = Object.values(stats.weeklyBreakdown.entradas || {}).reduce(
-                              (sum, data) => sum + (data[`week${index + 1}`] || 0),
-                              0
-                            );
-                            return (
-                              <td key={index} className="px-6 py-4 whitespace-nowrap text-sm text-right text-lime-700">
-                                {formatCurrency(weekTotal)}
-                              </td>
-                            );
-                          })}
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-lime-800 bg-lime-200">
-                            {formatCurrency(stats.totalEntradas || 0)}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p>No hay datos de desglose semanal disponibles.</p>
-                    <p className="text-sm mt-2">El backend necesita proporcionar la estructura <code>weeklyBreakdown</code> con semanas y subconceptos.</p>
-                  </div>
-                )}
-              </div>
+            {(!getFilteredTransactionType() || getFilteredTransactionType() === 'entrada') && (
+              <WeeklyBreakdownEntradas
+                stats={stats}
+                currentMonthName={currentMonthName}
+                transactions={transactions}
+                generals={generals}
+                concepts={concepts}
+                subconcepts={subconcepts}
+                filters={filters}
+                currentDate={currentDate}
+                formatCurrency={formatCurrency}
+                getTreeBalanceByName={getTreeBalanceByName}
+                isAmboTree={isAmboTree}
+              />
             )}
 
             {/* Weekly Breakdown for Salidas - SEGUNDO */}
-            {stats && (!getFilteredTransactionType() || getFilteredTransactionType() === 'salida') && (
-              <div className="bg-background rounded-lg border border-border p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold text-red-700">
-                    Resumen Mes {currentMonthName} - Salidas
-                  </h3>
-                </div>
-
-                {stats.weeklyBreakdown && stats.weeklyBreakdown.weeks ? (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-border">
-                      <thead className="bg-red-100">
-                        <tr>
-                          <th rowSpan={2} className="px-6 py-3 text-center text-sm font-bold text-red-800 tracking-wider border-r-2 border-red-200">
-                            Concepto
-                          </th>
-                          <th colSpan={stats.weeklyBreakdown.weeks.length} className="px-6 py-3 text-center text-sm font-bold text-red-800 tracking-wider border-r-2 border-red-200">
-                            Semanas
-                          </th>
-                          <th rowSpan={2} className="px-6 py-3 text-center text-sm font-bold tracking-wider bg-red-200 text-red-800">
-                            Totales
-                          </th>
-                        </tr>
-                        <tr>
-                          {stats.weeklyBreakdown.weeks.map((week, index) => {
-                            return (
-                            <th key={index} className="px-6 py-3 text-center text-xs font-medium text-red-800 uppercase tracking-wider bg-red-50">
-                              <div>{week.weekNumber || (index + 1)}</div>
-                              {(() => {
-                                try {
-                                  if (!week.startDate || !week.endDate) {
-                                    return null;
-                                  }
-                                  
-                                  // Parse dates - handle both Firestore Timestamp and "dd/MM" string format
-                                  let startDate, endDate;
-                                  
-                                  if (typeof week.startDate === 'string' && week.startDate.includes('/')) {
-                                    // Format "dd/MM" - need to add year
-                                    const currentYear = new Date(filters.startDate || currentDate).getFullYear();
-                                    const [dayStart, monthStart] = week.startDate.split('/');
-                                    startDate = new Date(currentYear, parseInt(monthStart) - 1, parseInt(dayStart));
-                                  } else {
-                                    startDate = week.startDate?.toDate ? week.startDate.toDate() : new Date(week.startDate);
-                                  }
-                                  
-                                  if (typeof week.endDate === 'string' && week.endDate.includes('/')) {
-                                    // Format "dd/MM" - need to add year
-                                    const currentYear = new Date(filters.startDate || currentDate).getFullYear();
-                                    const [dayEnd, monthEnd] = week.endDate.split('/');
-                                    endDate = new Date(currentYear, parseInt(monthEnd) - 1, parseInt(dayEnd));
-                                  } else {
-                                    endDate = week.endDate?.toDate ? week.endDate.toDate() : new Date(week.endDate);
-                                  }
-                                  
-                                  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-                                    return null;
-                                  }
-                                  
-                                  return (
-                                    <div className="text-xs font-normal text-red-700 mt-1">
-                                      {startDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })} - {endDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}
-                                    </div>
-                                  );
-                                } catch (error) {
-                                  return null;
-                                }
-                              })()}
-                            </th>
-                            );
-                          })}
-                        </tr>
-                      </thead>
-                      <tbody className="bg-background divide-y divide-border">
-                        {Object.entries(stats.weeklyBreakdown.salidas || {}).map(([subconcept, weekData]) => {
-                          const parts = subconcept.split(' > ');
-                          const isAmbo = isAmboTree(subconcept);
-                          return (
-                          <tr key={subconcept} className="hover:bg-muted/50">
-                            <td className="px-6 py-4 text-sm text-foreground min-w-[200px] max-w-[230px]">
-                              <div className="break-words">
-                                {parts.length === 3 ? (
-                                  <>
-                                    <div className="flex items-center justify-between gap-2">
-                                      <div className="flex-1">
-                                        <div className="font-bold text-foreground">{parts[2]}</div>
-                                        <div className="font-normal text-xs text-muted-foreground mt-0.5">{parts[0]} / {parts[1]}</div>
-                                      </div>
-                                      {isAmbo && (
-                                        <button
-                                          onClick={() => setSelectedTreeBalance(getTreeBalanceByName(subconcept))}
-                                          className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded hover:bg-purple-200 transition-colors whitespace-nowrap"
-                                          title="Ver balance de este árbol mixto"
-                                        >
-                                          Ver saldo
-                                        </button>
-                                      )}
-                                    </div>
-                                  </>
-                                ) : (
-                                  <span className="font-semibold">{subconcept}</span>
-                                )}
-                              </div>
-                            </td>
-                            {stats.weeklyBreakdown.weeks.map((week, index) => {
-                              const amount = weekData[`week${index + 1}`];
-                              return (
-                              <td key={index} className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                                {amount ? (
-                                  <button
-                                    onClick={() => {
-                                      // Filtrar transacciones de esta semana y subconcepto
-                                      const weekTransactions = transactions.filter(t => {
-                                        const tDate = t.date?.toDate ? t.date.toDate() : new Date(t.date);
-                                        const tTime = tDate.getTime();
-                                        
-                                        // Construir el nombre completo del árbol desde los IDs
-                                        const general = generals.find(g => g.id === t.generalId);
-                                        const concept = concepts.find(c => c.id === t.conceptId);
-                                        const subconceptItem = subconcepts.find(s => s.id === t.subconceptId);
-                                        const fullName = `${general?.name || 'N/A'} > ${concept?.name || 'N/A'} > ${subconceptItem?.name || 'N/A'}`;
-                                        
-                                        return t.type === 'salida' &&
-                                               tTime >= week.startTimestamp &&
-                                               tTime <= week.endTimestamp &&
-                                               fullName === subconcept;
-                                      });
-                                      setSelectedWeekDetail({
-                                        weekNumber: week.weekNumber || (index + 1),
-                                        weekRange: `${week.startDate} - ${week.endDate}`,
-                                        subconcept,
-                                        type: 'salida',
-                                        amount,
-                                        transactions: weekTransactions
-                                      });
-                                    }}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-100 hover:bg-red-200 text-red-700 hover:text-red-800 font-medium transition-colors cursor-pointer border border-red-300"
-                                  >
-                                    <EyeIcon className="h-4 w-4" />
-                                    {formatCurrency(amount)}
-                                  </button>
-                                ) : (
-                                  <span className="text-gray-400">-</span>
-                                )}
-                              </td>
-                              );
-                            })}
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-red-700 bg-red-100">
-                              {formatCurrency(weekData.total || 0)}
-                            </td>
-                          </tr>
-                          );
-                        })}
-                        <tr className="bg-gray-200 font-bold border-t-2 border-gray-400">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
-                            {/* Vacío para totales */}
-                          </td>
-                          {stats.weeklyBreakdown.weeks.map((week, index) => {
-                            const weekTotal = Object.values(stats.weeklyBreakdown.salidas || {}).reduce(
-                              (sum, data) => sum + (data[`week${index + 1}`] || 0),
-                              0
-                            );
-                            return (
-                              <td key={index} className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-700">
-                                {formatCurrency(weekTotal)}
-                              </td>
-                            );
-                          })}
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-red-800 bg-red-200">
-                            {formatCurrency(stats.totalSalidas || 0)}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p>No hay datos de desglose semanal disponibles.</p>
-                    <p className="text-sm mt-2">El backend necesita proporcionar la estructura <code>weeklyBreakdown</code> con semanas y subconceptos.</p>
-                  </div>
-                )}
-              </div>
+            {(!getFilteredTransactionType() || getFilteredTransactionType() === 'salida') && (
+              <WeeklyBreakdownSalidas
+                stats={stats}
+                currentMonthName={currentMonthName}
+                transactions={transactions}
+                generals={generals}
+                concepts={concepts}
+                subconcepts={subconcepts}
+                filters={filters}
+                currentDate={currentDate}
+                formatCurrency={formatCurrency}
+                getTreeBalanceByName={getTreeBalanceByName}
+                isAmboTree={isAmboTree}
+              />
             )}
 
             {/* Balance Breakdown */}
@@ -1610,14 +982,18 @@ const Reportes = () => {
                           return formatCurrencyWithBadge(balanceSinPendientes);
                         })()}
                       </p>
-                      <p className="text-sm text-gray-600">Sin gastos pendientes</p>
+                      <p className="text-sm text-gray-600">Sin salidas pendientes</p>
                       <p className="text-xs text-gray-500 mt-1">
                         Considerando pendientes: {formatCurrencyWithBadge(stats.totalBalance)}
                       </p>
                     </div>
-                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                      <h4 className="font-medium text-orange-800">
-                        Gastos Pendientes
+                    <button 
+                      onClick={loadPendingSalidasTransactions}
+                      className="bg-orange-50 border border-orange-200 rounded-lg p-4 hover:bg-orange-100 transition-colors cursor-pointer text-left w-full"
+                    >
+                      <h4 className="font-medium text-orange-800 flex items-center gap-2">
+                        Salidas pendientes por cubrirse
+                        <EyeIcon className="h-4 w-4" />
                       </h4>
                       <p
                         className={`text-2xl font-bold text-red-600`}
@@ -1627,7 +1003,7 @@ const Reportes = () => {
                           const pendientesActuales = stats.paymentStatusSalidas?.pendiente?.amount || 0;
                           const pendientesAnteriores = stats.paymentStatusSalidas?.pendienteAnterior?.carryover || 0;
                           const totalPendientes = pendientesActuales + pendientesAnteriores;
-                          console.log('💰 Calculando gastos pendientes totales:', {
+                          console.log('💰 Calculando salidas pendientes totales:', {
                             pendientesActuales,
                             pendientesAnteriores,
                             totalPendientes,
@@ -1639,7 +1015,7 @@ const Reportes = () => {
                       <p className="text-sm text-orange-600">
                         Todos los pendientes
                       </p>
-                    </div>
+                    </button>
                   </div>
 
 
@@ -2280,7 +1656,7 @@ const Reportes = () => {
           <div className="bg-background rounded-lg border border-border p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-foreground">
-                Desglose por División (Gastos)
+                Desglose por División (Salidas)
               </h3>
               <p className="text-sm text-muted-foreground italic">
                 Solo período: {currentMonthName}
@@ -2959,9 +2335,9 @@ const Reportes = () => {
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                             Proveedor
                           </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                          {/* <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                             División
-                          </th>
+                          </th> */}
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                             Estado
                           </th>
@@ -3020,9 +2396,9 @@ const Reportes = () => {
                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                                   {transaction.providerName || 'Sin proveedor'}
                                 </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                {/* <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                                   {transaction.division ? formatDivision(transaction.division) : '-'}
-                                </td>
+                                </td> */}
                                 <td className="px-4 py-3 whitespace-nowrap text-sm">
                                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${paymentBadge.color}`}>
                                     {paymentBadge.icon}
@@ -3061,7 +2437,7 @@ const Reportes = () => {
               <div className="px-6 py-4 border-b border-border">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-foreground">
-                    Gastos Pendientes
+                    Salidas pendientes por cubrirse
                   </h3>
                   <Button
                     variant="ghost"
@@ -3072,7 +2448,7 @@ const Reportes = () => {
                   </Button>
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Todos los gastos con estado pendiente
+                  Todas las salidas con estado pendiente
                 </p>
               </div>
 
@@ -3080,7 +2456,7 @@ const Reportes = () => {
               <div className="flex-1 overflow-y-auto px-6 py-4">
                 {carryoverTransactions.length === 0 ? (
                   <p className="text-muted-foreground text-center py-8">
-                    No hay gastos pendientes en el sistema
+                    No hay salidas pendientes en el sistema
                   </p>
                 ) : (
                   <div className="space-y-4">
@@ -3132,6 +2508,176 @@ const Reportes = () => {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Salidas Pendientes por Cubrirse */}
+      {showPendingSalidasModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowPendingSalidasModal(false)} />
+          <div className="relative bg-white rounded-xl shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden">
+            <div className="px-6 py-4 rounded-t-xl bg-gradient-to-r from-orange-500 to-red-600">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-white">
+                    Salidas Pendientes por Cubrirse
+                  </h3>
+                  <p className="text-white/90 text-sm mt-0.5">
+                    Transacciones pendientes o parcialmente cubiertas en el período: {currentMonthName}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowPendingSalidasModal(false)}
+                  className="p-1 rounded-lg hover:bg-white/20 transition-colors"
+                >
+                  <XMarkIcon className="h-6 w-6 text-white" />
+                </button>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-50 border border-red-200">
+                    <span className="text-xs font-medium text-red-700">
+                      Total por cubrir:
+                    </span>
+                    <span className="text-lg font-bold text-red-600">
+                      {formatCurrency(pendingSalidasTransactions.reduce((sum, t) => sum + (t.balance || t.amount), 0))}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    <span className="font-medium">{pendingSalidasTransactions.length}</span> transacciones
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto" style={{ maxHeight: 'calc(90vh - 280px)' }}>
+              <div className="px-6 py-4">
+                {pendingSalidasTransactions.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-100 sticky top-0">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                            Fecha
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                            Categoría
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                            Concepto
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                            Subconcepto
+                          </th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                            Monto Total
+                          </th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                            Por Cubrir
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                            Proveedor
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                            Descripción
+                          </th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">
+                            Estado
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {pendingSalidasTransactions
+                          .sort((a, b) => {
+                            const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
+                            const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+                            return dateB - dateA;
+                          })
+                          .map((transaction, index) => {
+                            const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
+                            
+                            const getPaymentStatusBadge = (status) => {
+                              const statusConfig = {
+                                pendiente: { 
+                                  color: "bg-red-100 text-red-800", 
+                                  text: "Pendiente",
+                                  icon: <ClockIcon className="h-3 w-3 mr-1" />
+                                },
+                                parcial: { 
+                                  color: "bg-yellow-100 text-yellow-800", 
+                                  text: "Parcial",
+                                  icon: <ClockIcon className="h-3 w-3 mr-1" />
+                                },
+                              };
+                              return statusConfig[status] || statusConfig.pendiente;
+                            };
+
+                            const paymentBadge = getPaymentStatusBadge(transaction.status);
+                            
+                            return (
+                              <tr key={transaction.id || index} className="hover:bg-gray-50">
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                  {transactionDate.toLocaleDateString('es-MX', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    year: 'numeric'
+                                  })}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                  {transaction.generalName}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                  {transaction.conceptName}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                  {transaction.subconceptName}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-semibold text-gray-900">
+                                  {formatCurrency(transaction.amount || 0)}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-bold text-red-600">
+                                  {formatCurrency(transaction.balance || transaction.amount || 0)}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                  {transaction.providerName}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-900 max-w-xs truncate" title={transaction.description || 'Sin descripción'}>
+                                  {transaction.description || 'Sin descripción'}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-center">
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${paymentBadge.color}`}>
+                                    {paymentBadge.icon}
+                                    {paymentBadge.text}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <p className="text-sm">No hay salidas pendientes por cubrirse en este período</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="px-6 py-3 bg-gray-50 border-t border-gray-200 rounded-b-xl">
+              <div className="flex justify-between items-center">
+                <div className="text-xs text-gray-600">
+                  Mostrando <strong>{pendingSalidasTransactions.length}</strong> transacciones • Período: {currentMonthName}
+                </div>
+                <div className="text-sm font-bold text-red-600">
+                  Total: {formatCurrency(pendingSalidasTransactions.reduce((sum, t) => sum + (t.balance || t.amount), 0))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
