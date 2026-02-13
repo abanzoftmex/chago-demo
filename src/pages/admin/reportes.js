@@ -3,6 +3,7 @@ import AdminLayout from "../../components/layout/AdminLayout";
 import { useToast } from "../../components/ui/Toast";
 import { Button } from "../../components/ui/Button";
 import AdvancedDateSelector from "../../components/dashboard/AdvancedDateSelector";
+import SummaryCards from "../../components/dashboard/SummaryCards";
 import { reportService } from "../../lib/services/reportService";
 import { dashboardService } from "../../lib/services/dashboardService";
 import { generalService } from "../../lib/services/generalService";
@@ -28,7 +29,6 @@ import {
   CalendarIcon,
   DocumentArrowDownIcon,
   ChartBarIcon,
-  CurrencyDollarIcon,
   DocumentTextIcon,
   ClockIcon,
   XMarkIcon,
@@ -758,89 +758,27 @@ const Reportes = () => {
         </div>
 
         {/* Statistics Summary */}
+        {stats && (() => {
+          // Preparar los datos para SummaryCards
+          const filteredType = getFilteredTransactionType();
+          const summary = {
+            entradas: filteredType === 'salida' ? 0 : stats.totalEntradas,
+            salidas: filteredType === 'entrada' ? 0 : stats.totalSalidas,
+            balance: (filteredType === 'salida' ? 0 : stats.totalEntradas) - (filteredType === 'entrada' ? 0 : stats.totalSalidas),
+            totalTransactions: filteredType === 'entrada' 
+              ? stats.entradasCount 
+              : filteredType === 'salida' 
+                ? stats.salidasCount 
+                : stats.entradasCount + stats.salidasCount,
+            entradasCount: filteredType === 'salida' ? 0 : stats.entradasCount,
+            salidasCount: filteredType === 'entrada' ? 0 : stats.salidasCount
+          };
+          
+          return <SummaryCards summary={summary} currentMonthName={currentMonthName} />;
+        })()}
+
         {stats && (
           <div className="space-y-6">
-            {/* Current Period Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="bg-lime-50 rounded-lg border border-border p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">
-                      Total de Entradas
-                    </h3>
-                    <p className="text-2xl font-bold text-green-600">
-                      {formatCurrency(getFilteredTransactionType() === 'salida' ? 0 : stats.totalEntradas)}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {getFilteredTransactionType() === 'salida' ? 0 : stats.entradasCount} transacciones
-                    </p>
-                  </div>
-                  <CurrencyDollarIcon className="h-8 w-8 text-green-600" />
-                </div>
-              </div>
-
-
-              <div className="bg-red-50 rounded-lg border border-border p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">
-                      Total de Salidas
-                    </h3>
-                    <p className="text-2xl font-bold text-red-600">
-                      {formatCurrency(getFilteredTransactionType() === 'entrada' ? 0 : stats.totalSalidas)}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {getFilteredTransactionType() === 'entrada' ? 0 : stats.salidasCount} transacciones
-                    </p>
-                  </div>
-                  <CurrencyDollarIcon className="h-8 w-8 text-red-600" />
-                </div>
-              </div>
-
-              {/* Balance Total
-              <div className="bg-background rounded-lg border border-border p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">
-                      Balance Total
-                    </h3>
-                    <p
-                      className={`text-2xl font-bold ${stats.totalBalance >= 0 ? "text-green-600" : "text-red-600"}`}
-                    >
-                      {formatCurrency(stats.totalBalance)}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Incluye arrastre
-                    </p>
-                  </div>
-                  <ChartBarIcon
-                    className={`h-8 w-8 ${stats.totalBalance >= 0 ? "text-green-600" : "text-red-600"}`}
-                  />
-                </div>
-              </div> */}
-
-              <div className="bg-purple-50 rounded-lg border border-border p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">
-                      Total de Transacciones
-                    </h3>
-                    <p className="text-2xl font-bold text-purple-600">
-                      {getFilteredTransactionType() === 'entrada' 
-                        ? stats.entradasCount 
-                        : getFilteredTransactionType() === 'salida' 
-                          ? stats.salidasCount 
-                          : stats.entradasCount + stats.salidasCount
-                      }
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      En el período
-                    </p>
-                  </div>
-                  <DocumentTextIcon className="h-8 w-8 text-purple-600" />
-                </div>
-              </div>
-            </div>
 
             {/* Tree Comparison Section - Comparativo por Árbol (Entrada vs Salida) */}
             <TreeComparisonSection
