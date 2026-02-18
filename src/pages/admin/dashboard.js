@@ -363,8 +363,6 @@ const Dashboard = () => {
               filters={filters}
               currentDate={currentDate}
               formatCurrency={formatCurrency}
-              getTreeBalanceByName={(treeString) => getTreeBalanceByName(treeString, () => calculateTreeComparison(allTransactionsReport, stats, filters, generals, concepts))}
-              isAmboTree={(treeString) => isAmboTree(treeString, generals)}
             />
 
             {/* Weekly Breakdown for Salidas */}
@@ -378,8 +376,6 @@ const Dashboard = () => {
               filters={filters}
               currentDate={currentDate}
               formatCurrency={formatCurrency}
-              getTreeBalanceByName={(treeString) => getTreeBalanceByName(treeString, () => calculateTreeComparison(allTransactionsReport, stats, filters, generals, concepts))}
-              isAmboTree={(treeString) => isAmboTree(treeString, generals)}
             />
           </div>
         )}
@@ -388,7 +384,7 @@ const Dashboard = () => {
         <div className="space-y-6">
           {/* Movimientos Diarios - Entradas y Salidas */}
           {Object.keys(dailyData).length > 0 ? (
-            <DailyTransactionsChart data={dailyData} monthName={currentMonthName} />
+            <DailyTransactionsChart data={dailyData} monthName={currentMonthName} currentDate={currentDate} />
           ) : (
             <div className="bg-background rounded-lg border border-border p-6">
               <div className="border-2 border-dashed border-border rounded-lg h-64 flex items-center justify-center">

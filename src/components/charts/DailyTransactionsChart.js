@@ -18,7 +18,13 @@ Chart.register(
   Legend
 );
 
-const DailyTransactionsChart = ({ data, monthName }) => {
+const DailyTransactionsChart = ({ data, monthName, currentDate }) => {
+  // Función para obtener la abreviatura del día de la semana
+  const getDayAbbreviation = (date) => {
+    const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    return days[date.getDay()];
+  };
+
   // Ordenar los días numéricamente
   const sortedDays = Object.keys(data).sort((a, b) => {
     const dayA = parseInt(a.replace('Día ', ''));
@@ -29,8 +35,13 @@ const DailyTransactionsChart = ({ data, monthName }) => {
   const entradasData = sortedDays.map(day => data[day].entradas || 0);
   const salidasData = sortedDays.map(day => data[day].salidas || 0);
   
-  // Extraer solo el número del día para las etiquetas del eje X
-  const dayLabels = sortedDays.map(day => day.replace('Día ', ''));
+  // Crear etiquetas con el número del día y la abreviatura del día de la semana
+  const dayLabels = sortedDays.map(day => {
+    const dayNumber = parseInt(day.replace('Día ', ''));
+    const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), dayNumber);
+    const dayAbbr = getDayAbbreviation(date);
+    return [`${dayNumber}`, dayAbbr];
+  });
 
   const chartData = {
     labels: dayLabels,
@@ -86,7 +97,10 @@ const DailyTransactionsChart = ({ data, monthName }) => {
       tooltip: {
         callbacks: {
           title: function(context) {
-            return `Día ${context[0].label}`;
+            const label = context[0].label;
+            // Si label es un array, tomamos el primer elemento
+            const dayNumber = Array.isArray(label) ? label[0] : label;
+            return `Día ${dayNumber}`;
           },
           label: function(context) {
             const label = context.dataset.label || '';
@@ -115,6 +129,9 @@ const DailyTransactionsChart = ({ data, monthName }) => {
           font: {
             size: 10,
           },
+          autoSkip: false,
+          maxRotation: 0,
+          minRotation: 0,
         },
       },
       y: {
