@@ -20,10 +20,10 @@ const TreeComparisonSection = ({
       <div className="flex justify-between items-center mb-4">
         <div>
           <h3 className="text-lg font-semibold text-foreground">
-            Balance de cuentas mixtas (Entrada vs Salida)
+            Saldo de cuentas (Entrada vs Salida)
           </h3>
           <p className="text-xs text-foreground mt-1">
-            Transacciones mixtas por semana - Período: {currentMonthName}
+            Saldo por semana - Período: {currentMonthName}
           </p>
         </div>
       </div>
@@ -39,7 +39,7 @@ const TreeComparisonSection = ({
                 Árbol (General / Concepto)
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-purple-600 uppercase tracking-wider">
-                Arrastre<br/><span className="text-[10px] font-normal normal-case">(Semana anterior)</span>
+                Saldo<br/><span className="text-[10px] font-normal normal-case">(Semana anterior)</span>
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-green-600 uppercase tracking-wider">
                 Entradas<br/><span className="text-[10px] font-normal normal-case">(Semana)</span>
@@ -51,7 +51,7 @@ const TreeComparisonSection = ({
                 Saldo<br/><span className="text-[10px] font-normal normal-case">(Semana)</span>
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-orange-600 uppercase tracking-wider">
-                Saldo al día<br/><span className="text-[10px] font-normal normal-case">(Hasta hoy)</span>
+                Saldo total
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Transacciones
@@ -289,9 +289,6 @@ const TreeComparisonSection = ({
                           <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
                             Monto
                           </th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-blue-600 uppercase tracking-wider">
-                            Saldo Acumulado
-                          </th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                             Descripción
                           </th>
@@ -351,18 +348,6 @@ const TreeComparisonSection = ({
                                 transaction.type === 'entrada' ? 'text-green-600' : 'text-red-600'
                               }`}>
                                 {transaction.type === 'entrada' ? '+' : '-'}{formatCurrency(transaction.amount || 0)}
-                              </td>
-                              <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-bold ${
-                                transaction.runningBalance >= 0 ? 'text-blue-600' : 'text-orange-600'
-                              }`}>
-                                <div className="flex items-center justify-end">
-                                  {transaction.runningBalance >= 0 ? (
-                                    <ArrowUpIcon className="h-4 w-4 mr-1" />
-                                  ) : (
-                                    <ArrowDownIcon className="h-4 w-4 mr-1" />
-                                  )}
-                                  {formatCurrency(Math.abs(transaction.runningBalance))}
-                                </div>
                               </td>
                               <td className="px-4 py-3 text-sm text-gray-900 max-w-xs truncate" title={transaction.description || 'Sin descripción'}>
                                 {transaction.description || 'Sin descripción'}
