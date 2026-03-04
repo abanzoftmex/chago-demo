@@ -1,7 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { generalService } from '../../lib/services/generalService';
+import { useAuth } from '../../context/AuthContextMultiTenant';
 
 export default function GeneralModal({ isOpen, onClose, onSuccess, type = 'entrada', initialData = null }) {
+  const { tenantInfo } = useAuth();
+  
+  // Memoize tenantId to prevent unnecessary re-renders
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
+  
   const [formData, setFormData] = useState({
     name: '',
     type: 'entrada',
@@ -63,13 +69,17 @@ export default function GeneralModal({ isOpen, onClose, onSuccess, type = 'entra
     setErrors({});
 
     try {
+      if (!tenantId) {
+        throw new Error('No tenant ID available');
+      }
+      
       let result;
       if (initialData && initialData.id) {
         // Update existing general
-        result = await generalService.update(initialData.id, formData);
+        result = await generalService.update(initialData.id, formData, tenantId);
       } else {
         // Create new general
-        result = await generalService.create(formData);
+        result = await generalService.create(formData, tenantId);
       }
       
       onSuccess(result);

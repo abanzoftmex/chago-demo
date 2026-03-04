@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { subconceptService } from '../../lib/services/subconceptService';
 import { conceptService } from '../../lib/services/conceptService';
 import { generalService } from '../../lib/services/generalService';
+import { useAuth } from '../../context/AuthContextMultiTenant';
 
 export default function SubconceptCsvImportModal({ isOpen, onClose, onSuccess }) {
+  const { tenantInfo } = useAuth();
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
   const [uploadSuccess, setUploadSuccess] = useState(null);
@@ -20,8 +23,8 @@ export default function SubconceptCsvImportModal({ isOpen, onClose, onSuccess })
   const loadData = async () => {
     try {
       const [conceptsData, generalsData] = await Promise.all([
-        conceptService.getAll(),
-        generalService.getAll()
+        conceptService.getAll(tenantId),
+        generalService.getAll(tenantId)
       ]);
       setConcepts(conceptsData);
       setGenerals(generalsData);
@@ -132,7 +135,7 @@ export default function SubconceptCsvImportModal({ isOpen, onClose, onSuccess })
             name: name,
             conceptId: concept.id,
             description: description
-          });
+          }, tenantId);
           successCount++;
         } catch (error) {
           const name = row.name || row.nombre;

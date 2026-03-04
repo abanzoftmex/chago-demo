@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "../../../../context/AuthContext";
+import { useAuth } from "../../../../context/AuthContextMultiTenant";
 import { useRouter } from "next/router";
 import AdminLayout from "../../../../components/layout/AdminLayout";
 import PaymentManager from "../../../../components/forms/PaymentManager";

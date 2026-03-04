@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { conceptService } from "../../lib/services/conceptService";
+import { useAuth } from "../../context/AuthContextMultiTenant";
 
 const ConceptModal = ({
   isOpen,
@@ -9,6 +10,11 @@ const ConceptModal = ({
   initialData = null,
   generals = [],
 }) => {
+  const { tenantInfo } = useAuth();
+  
+  // Memoize tenantId to prevent unnecessary re-renders
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
+  
   const [formData, setFormData] = useState({
     name: initialData?.name || "",
     type: type || initialData?.type || "entrada",
@@ -85,13 +91,17 @@ const ConceptModal = ({
       setLoading(true);
       setErrors({});
 
+      if (!tenantId) {
+        throw new Error('No tenant ID available');
+      }
+
       let result;
       if (initialData) {
         // Update existing concept
-        result = await conceptService.update(initialData.id, formData);
+        result = await conceptService.update(initialData.id, formData, tenantId);
       } else {
         // Create new concept
-        result = await conceptService.create(formData);
+        result = await conceptService.create(formData, tenantId);
       }
 
       onSuccess && onSuccess(result);

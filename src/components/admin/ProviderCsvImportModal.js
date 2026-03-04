@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { providerService } from '../../lib/services/providerService';
 import { useToast } from '../ui/Toast';
+import { useAuth } from '../../context/AuthContextMultiTenant';
 
 const ProviderCsvImportModal = ({ isOpen, onClose, onSuccess }) => {
+  const { tenantInfo } = useAuth();
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
   const [file, setFile] = useState(null);
   const [importing, setImporting] = useState(false);
   const [errors, setErrors] = useState([]);
@@ -161,7 +164,7 @@ const ProviderCsvImportModal = ({ isOpen, onClose, onSuccess }) => {
 
       for (const provider of providers) {
         try {
-          await providerService.create(provider);
+          await providerService.create(provider, tenantId);
           successCount++;
         } catch (err) {
           errorCount++;

@@ -16,6 +16,20 @@ import { transactionService } from "./transactionService";
 
 const COLLECTION_NAME = "recurringExpenses";
 
+// Helper to get tenant-scoped collection reference
+const getCollection = (tenantId) => {
+  if (!tenantId) throw new Error('Tenant ID es requerido');
+  const id = typeof tenantId === 'string' ? tenantId : String(tenantId);
+  if (id === '[object Object]') throw new Error('Tenant ID inválido: se recibió un objeto en lugar de string');
+  return collection(db, `tenants/${id}/${COLLECTION_NAME}`);
+};
+
+const getDocRef = (tenantId, id) => {
+  if (!tenantId) throw new Error('Tenant ID es requerido');
+  const tid = typeof tenantId === 'string' ? tenantId : String(tenantId);
+  return doc(db, `tenants/${tid}/${COLLECTION_NAME}/${id}`);
+};
+
 // Helper para obtener la fecha actual en zona horaria de México
 const getMexicoDate = () => {
   const now = new Date();
@@ -26,9 +40,10 @@ const getMexicoDate = () => {
 
 export const recurringExpenseService = {
   // Create a new recurring expense
-  async create(expenseData, user) {
+  async create(expenseData, tenantId) {
     try {
-      const docRef = await addDoc(collection(db, COLLECTION_NAME), {
+      if (!tenantId) throw new Error('Tenant ID es requerido');
+      const docRef = await addDoc(getCollection(tenantId), {
         ...expenseData,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -48,9 +63,10 @@ export const recurringExpenseService = {
   },
 
   // Get all recurring expenses
-  async getAll(filters = {}) {
+  async getAll(tenantId, filters = {}) {
     try {
-      let q = collection(db, COLLECTION_NAME);
+      if (!tenantId) throw new Error('Tenant ID es requerido');
+      let q = getCollection(tenantId);
 
       if (filters.isActive !== undefined) {
         q = query(q, where("isActive", "==", filters.isActive));
@@ -74,9 +90,9 @@ export const recurringExpenseService = {
   },
 
   // Update recurring expense
-  async update(id, updateData, user) {
+  async update(id, updateData, tenantId) {
     try {
-      const docRef = doc(db, COLLECTION_NAME, id);
+      const docRef = getDocRef(tenantId, id);
       await updateDoc(docRef, {
         ...updateData,
         updatedAt: serverTimestamp(),
@@ -90,9 +106,9 @@ export const recurringExpenseService = {
   },
 
   // Delete recurring expense
-  async delete(id, user) {
+  async delete(id, tenantId) {
     try {
-      const docRef = doc(db, COLLECTION_NAME, id);
+      const docRef = getDocRef(tenantId, id);
       await deleteDoc(docRef);
       return true;
     } catch (error) {
@@ -102,9 +118,9 @@ export const recurringExpenseService = {
   },
 
   // Generate pending transactions based on frequency (daily check)
-  async generatePendingTransactions(user) {
+  async generatePendingTransactions(tenantId, user) {
     try {
-      const activeExpenses = await this.getAll({ isActive: true });
+      const activeExpenses = await this.getAll(tenantId, { isActive: true });
       // ✅ Usar zona horaria de México para evaluar correctamente el día
       const today = getMexicoDate();
       console.log(`[TIMEZONE] Server UTC: ${new Date().toISOString()}, Mexico: ${today.toISOString()}, Day: ${today.getDate()}`);
@@ -145,7 +161,7 @@ export const recurringExpenseService = {
             recurringExpenseId: expense.id,
           };
 
-          const newTransaction = await transactionService.create(transactionData, user);
+          const newTransaction = await transactionService.create(transactionData, user, tenantId);
           generatedTransactions.push(newTransaction);
 
           // Update the lastGenerated date and add the date to generatedDates array
@@ -157,7 +173,7 @@ export const recurringExpenseService = {
             ...(frequency === 'monthly' && {
               generatedMonths: updatedGeneratedDates
             })
-          }, user);
+          }, tenantId);
 
           console.log(`Generated recurring transaction for expense ${expense.id} (${frequency}) for date ${todayKey}`);
         } else {
@@ -223,9 +239,9 @@ export const recurringExpenseService = {
   },
 
   // Get recurring expense by ID
-  async getById(id) {
+  async getById(id, tenantId) {
     try {
-      const docRef = doc(db, COLLECTION_NAME, id);
+      const docRef = getDocRef(tenantId, id);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
@@ -240,14 +256,14 @@ export const recurringExpenseService = {
   },
 
   // Clean future transactions for a recurring expense
-  async cleanFutureTransactions(recurringExpenseId, user) {
+  async cleanFutureTransactions(recurringExpenseId, tenantId, user) {
     try {
       const now = new Date();
       const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
       // Get all transactions from this recurring expense
       const transactionsQuery = query(
-        collection(db, "transactions"),
+        collection(db, `tenants/${tenantId}/transacciones`),
         where("recurringExpenseId", "==", recurringExpenseId),
         where("isRecurring", "==", true)
       );
@@ -275,13 +291,13 @@ export const recurringExpenseService = {
 
       // Update the recurring expense to remove the deleted months from generatedMonths
       if (deletedMonthKeys.size > 0) {
-        const expense = await this.getById(recurringExpenseId);
+        const expense = await this.getById(recurringExpenseId, tenantId);
         const currentGeneratedMonths = expense.generatedMonths || [];
         const updatedGeneratedMonths = currentGeneratedMonths.filter(monthKey => !deletedMonthKeys.has(monthKey));
 
         await this.update(recurringExpenseId, {
           generatedMonths: updatedGeneratedMonths
-        }, user);
+        }, tenantId);
 
         console.log(`Updated generatedMonths for expense ${recurringExpenseId}. Removed future months: ${Array.from(deletedMonthKeys).join(', ')}`);
       }
@@ -295,17 +311,17 @@ export const recurringExpenseService = {
   },
 
   // Toggle active status
-  async toggleActive(id, user) {
+  async toggleActive(id, tenantId, user) {
     try {
-      const expense = await this.getById(id);
+      const expense = await this.getById(id, tenantId);
       const newActiveStatus = !expense.isActive;
 
       // If deactivating, clean future transactions
       if (!newActiveStatus) {
-        await this.cleanFutureTransactions(id, user);
+        await this.cleanFutureTransactions(id, tenantId, user);
       }
 
-      await this.update(id, { isActive: newActiveStatus }, user);
+      await this.update(id, { isActive: newActiveStatus }, tenantId);
       return newActiveStatus;
     } catch (error) {
       console.error("Error toggling recurring expense:", error);
@@ -314,10 +330,10 @@ export const recurringExpenseService = {
   },
 
   // Get transactions generated by a recurring expense
-  async getGeneratedTransactions(recurringExpenseId) {
+  async getGeneratedTransactions(recurringExpenseId, tenantId) {
     try {
       const transactionsQuery = query(
-        collection(db, "transactions"),
+        collection(db, `tenants/${tenantId}/transacciones`),
         where("recurringExpenseId", "==", recurringExpenseId),
         where("isRecurring", "==", true),
         orderBy("date", "desc")
@@ -339,9 +355,9 @@ export const recurringExpenseService = {
   },
 
   // Get generated months history for a recurring expense
-  async getGeneratedMonthsHistory(recurringExpenseId) {
+  async getGeneratedMonthsHistory(recurringExpenseId, tenantId) {
     try {
-      const expense = await this.getById(recurringExpenseId);
+      const expense = await this.getById(recurringExpenseId, tenantId);
       const generatedMonths = expense.generatedMonths || [];
 
       // Convert month keys to readable format and add additional info
@@ -370,9 +386,9 @@ export const recurringExpenseService = {
   },
 
   // Migration method to add generatedMonths field to existing recurring expenses
-  async migrateExistingExpenses() {
+  async migrateExistingExpenses(tenantId) {
     try {
-      const allExpenses = await this.getAll();
+      const allExpenses = await this.getAll(tenantId);
       const expensesToMigrate = allExpenses.filter(expense =>
         !expense.generatedMonths && !expense.generatedDates && !expense.frequency
       );
@@ -396,7 +412,7 @@ export const recurringExpenseService = {
         }
 
         // Update the expense with the new fields
-        await this.update(expense.id, updateData, { uid: 'system-migration' });
+        await this.update(expense.id, updateData, tenantId);
         console.log(`Migrated recurring expense ${expense.id} with frequency: ${updateData.frequency}, dates: ${updateData.generatedDates.join(', ')}`);
       }
 

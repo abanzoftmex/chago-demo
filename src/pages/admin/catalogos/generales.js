@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/router";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import GeneralModal from "../../../components/forms/GeneralModal";
 import MassiveCsvImportModal from "../../../components/forms/MassiveCsvImportModal";
 import { generalService } from "../../../lib/services/generalService";
-import { useAuth } from "../../../context/AuthContext";
+import { useAuth } from '../../../context/AuthContextMultiTenant';
 import { 
   PencilIcon,
   TrashIcon,
@@ -13,8 +13,11 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function GeneralesPage() {
-  const { user, userRole, loading: authLoading } = useAuth();
+  const { user, userRole, loading: authLoading, tenantInfo } = useAuth();
   const router = useRouter();
+  
+  // Memoize tenantId to prevent unnecessary re-renders
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
   
   // Debug: Log user object to check role
   useEffect(() => {
@@ -44,13 +47,20 @@ export default function GeneralesPage() {
     if (user) {
       loadGenerals();
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, tenantId]);
 
   const loadGenerals = async () => {
     try {
       setLoading(true);
       setError(null);
-      const generalsData = await generalService.getAll();
+
+      if (!tenantId) {
+        console.error("No tenant ID available");
+        setLoading(false);
+        return;
+      }
+
+      const generalsData = await generalService.getAll(tenantId);
       setGenerals(generalsData);
     } catch (err) {
       setError(err.message);
@@ -80,7 +90,11 @@ export default function GeneralesPage() {
     }
 
     try {
-      await generalService.delete(general.id, { role: user.userRole });
+      if (!tenantId) {
+        throw new Error('No tenant ID available');
+      }
+      
+      await generalService.delete(general.id, tenantId, { role: user.userRole });
       await loadGenerals(); // Reload the list
     } catch (error) {
       alert(`Error al eliminar el general: ${error.message}`);

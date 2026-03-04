@@ -15,11 +15,20 @@ import { db } from '../firebase/firebaseConfig';
 
 const COLLECTION_NAME = 'descriptions';
 
+// Helper function to get the correct collection path
+const getDescriptionsCollection = (tenantId) => {
+  return tenantId ? `tenants/${tenantId}/descriptions` : COLLECTION_NAME;
+};
+
 export const descriptionService = {
   // Create a new description
-  async create(descriptionData) {
+  async create(descriptionData, tenantId) {
     try {
-      const docRef = await addDoc(collection(db, COLLECTION_NAME), {
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
+      const docRef = await addDoc(collection(db, getDescriptionsCollection(tenantId)), {
         ...descriptionData,
         createdAt: serverTimestamp(),
         isActive: true
@@ -33,9 +42,13 @@ export const descriptionService = {
   },
 
   // Get description by ID
-  async getById(id) {
+  async getById(id, tenantId) {
     try {
-      const docRef = doc(db, COLLECTION_NAME, id);
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
+      const docRef = doc(db, getDescriptionsCollection(tenantId), id);
       const docSnap = await getDoc(docRef);
       
       if (docSnap.exists()) {
@@ -50,10 +63,14 @@ export const descriptionService = {
   },
 
   // Get descriptions by concept ID
-  async getByConcept(conceptId) {
+  async getByConcept(conceptId, tenantId) {
     try {
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
       const q = query(
-        collection(db, COLLECTION_NAME),
+        collection(db, getDescriptionsCollection(tenantId)),
         where('conceptId', '==', conceptId),
         where('isActive', '==', true),
         orderBy('name', 'asc')
@@ -74,10 +91,14 @@ export const descriptionService = {
   },
 
   // Get all descriptions
-  async getAll() {
+  async getAll(tenantId) {
     try {
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
       const q = query(
-        collection(db, COLLECTION_NAME),
+        collection(db, getDescriptionsCollection(tenantId)),
         where('isActive', '==', true),
         orderBy('conceptId', 'asc'),
         orderBy('name', 'asc')
@@ -98,9 +119,13 @@ export const descriptionService = {
   },
 
   // Update description
-  async update(id, updateData) {
+  async update(id, updateData, tenantId) {
     try {
-      const docRef = doc(db, COLLECTION_NAME, id);
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
+      const docRef = doc(db, getDescriptionsCollection(tenantId), id);
       await updateDoc(docRef, updateData);
       
       return { id, ...updateData };
@@ -111,17 +136,21 @@ export const descriptionService = {
   },
 
   // Soft delete description (set isActive to false)
-  async delete(id) {
+  async delete(id, tenantId) {
     try {
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
       // Check if description has associated transactions
-      const hasTransactions = await this.hasAssociatedTransactions(id);
+      const hasTransactions = await this.hasAssociatedTransactions(id, tenantId);
       
       if (hasTransactions) {
         // Soft delete - just deactivate
-        await this.update(id, { isActive: false });
+        await this.update(id, { isActive: false }, tenantId);
       } else {
         // Hard delete if no transactions
-        const docRef = doc(db, COLLECTION_NAME, id);
+        const docRef = doc(db, getDescriptionsCollection(tenantId), id);
         await deleteDoc(docRef);
       }
       
@@ -133,9 +162,13 @@ export const descriptionService = {
   },
 
   // Check if description has associated transactions
-  async hasAssociatedTransactions(descriptionId) {
+  async hasAssociatedTransactions(descriptionId, tenantId) {
     try {
-      const transactionsRef = collection(db, 'transactions');
+      if (!tenantId) {
+        return false;
+      }
+      
+      const transactionsRef = collection(db, `tenants/${tenantId}/transacciones`);
       const q = query(transactionsRef, where('descriptionId', '==', descriptionId));
       const querySnapshot = await getDocs(q);
       
@@ -147,9 +180,13 @@ export const descriptionService = {
   },
 
   // Get descriptions for dropdown/select by concept
-  async getForSelect(conceptId) {
+  async getForSelect(conceptId, tenantId) {
     try {
-      const descriptions = await this.getByConcept(conceptId);
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
+      const descriptions = await this.getByConcept(conceptId, tenantId);
       return descriptions.map(description => ({
         value: description.id,
         label: description.name,

@@ -1,23 +1,23 @@
 import { useState } from "react";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/AuthContextMultiTenant";
 import { XMarkIcon, EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 
 const CreateUserModal = ({ onClose, onUserCreated, editingUser = null }) => {
-  const { user, ROLES } = useAuth();
+  const { user, tenantInfo, TENANT_ROLES } = useAuth();
   const [formData, setFormData] = useState(() => {
     if (editingUser) {
       return {
         email: editingUser.email || "",
         password: "", // No mostrar la contraseña existente
         displayName: editingUser.displayName || "",
-        role: editingUser.role || ROLES.ADMINISTRATIVO,
+        role: editingUser.tenantRole || (TENANT_ROLES?.ADMIN || "admin"),
       };
     }
     return {
       email: "",
       password: "",
       displayName: "",
-      role: ROLES.ADMINISTRATIVO,
+      role: TENANT_ROLES?.ADMIN || "admin",
     };
   });
   const [loading, setLoading] = useState(false);
@@ -33,7 +33,7 @@ const CreateUserModal = ({ onClose, onUserCreated, editingUser = null }) => {
       // Get current user token
       const token = await user.getIdToken();
 
-      const endpoint = editingUser ? "/api/admin/update-user" : "/api/admin/create-user";
+      const endpoint = editingUser ? "/api/admin/update-user-tenant" : "/api/admin/create-user-tenant";
       const method = editingUser ? "PUT" : "POST";
 
       const response = await fetch(endpoint, {
@@ -45,6 +45,7 @@ const CreateUserModal = ({ onClose, onUserCreated, editingUser = null }) => {
           ...formData,
           userId: editingUser?.id,
           currentUserToken: token,
+          tenantId: tenantInfo?.id,
         }),
       });
 
@@ -183,9 +184,9 @@ const CreateUserModal = ({ onClose, onUserCreated, editingUser = null }) => {
               onChange={handleChange}
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
             >
-              <option value={ROLES.ADMINISTRATIVO}>Administrador</option>
-              <option value={ROLES.CONTADOR}>Contador</option>
-              <option value={ROLES.DIRECTOR_GENERAL}>Director General</option>
+              <option value={TENANT_ROLES?.ADMIN || "admin"}>Administrador</option>
+              <option value={TENANT_ROLES?.CONTADOR || "contador"}>Contador</option>
+              <option value={TENANT_ROLES?.VIEWER || "viewer"}>Viewer</option>
             </select>
           </div>
 

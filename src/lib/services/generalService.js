@@ -15,16 +15,25 @@ import { db } from '../firebase/firebaseConfig';
 
 const COLLECTION_NAME = 'generals';
 
+// Helper function to get the correct collection path
+const getGeneralsCollection = (tenantId) => {
+  return tenantId ? `tenants/${tenantId}/generals` : COLLECTION_NAME;
+};
+
 export const generalService = {
   // Create a new general category
-  async create(generalData) {
-    try {
+  async create(generalData, tenantId) {
+    try{
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
       // Validar que type sea 'entrada', 'salida' o 'ambos'
       if (!['entrada', 'salida', 'ambos'].includes(generalData.type)) {
         throw new Error('Tipo inválido. Debe ser: entrada, salida o ambos');
       }
       
-      const docRef = await addDoc(collection(db, COLLECTION_NAME), {
+      const docRef = await addDoc(collection(db, getGeneralsCollection(tenantId)), {
         ...generalData,
         createdAt: serverTimestamp(),
         isActive: true
@@ -38,9 +47,13 @@ export const generalService = {
   },
 
   // Get general by ID
-  async getById(id) {
+  async getById(id, tenantId) {
     try {
-      const docRef = doc(db, COLLECTION_NAME, id);
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
+      const docRef = doc(db, getGeneralsCollection(tenantId), id);
       const docSnap = await getDoc(docRef);
       
       if (docSnap.exists()) {
@@ -56,10 +69,14 @@ export const generalService = {
 
   // Get generals by type (entrada/salida/ambos)
   // Incluye generales del tipo específico Y los de tipo 'ambos'
-  async getByType(type) {
+  async getByType(type, tenantId) {
     try {
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
       const q = query(
-        collection(db, COLLECTION_NAME),
+        collection(db, getGeneralsCollection(tenantId)),
         where('isActive', '==', true),
         orderBy('name', 'asc')
       );
@@ -83,10 +100,14 @@ export const generalService = {
   },
 
   // Get all generals
-  async getAll() {
+  async getAll(tenantId) {
     try {
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
       const q = query(
-        collection(db, COLLECTION_NAME),
+        collection(db, getGeneralsCollection(tenantId)),
         where('isActive', '==', true),
         orderBy('type', 'asc'),
         orderBy('name', 'asc')
@@ -107,14 +128,18 @@ export const generalService = {
   },
 
   // Update general
-  async update(id, updateData) {
+  async update(id, updateData, tenantId) {
     try {
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
       // Validar tipo si se está actualizando
       if (updateData.type && !['entrada', 'salida', 'ambos'].includes(updateData.type)) {
         throw new Error('Tipo inválido. Debe ser: entrada, salida o ambos');
       }
       
-      const docRef = doc(db, COLLECTION_NAME, id);
+      const docRef = doc(db, getGeneralsCollection(tenantId), id);
       await updateDoc(docRef, updateData);
       
       return { id, ...updateData };
@@ -125,22 +150,26 @@ export const generalService = {
   },
 
   // Soft delete general (set isActive to false)
-  async delete(id, user = null) {
+  async delete(id, tenantId, user = null) {
     try {
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
       // Check if user has permission to delete (contador and director_general roles cannot delete)
       const userRole = user?.role || user?.userRole;
       if (user && ['contador', 'director_general'].includes(userRole)) {
         throw new Error("No tienes permisos para eliminar categorías generales");
       }
       // Check if general has associated concepts
-      const hasConcepts = await this.hasAssociatedConcepts(id);
+      const hasConcepts = await this.hasAssociatedConcepts(id, tenantId);
       
       if (hasConcepts) {
         // Soft delete - just deactivate
-        await this.update(id, { isActive: false });
+        await this.update(id, { isActive: false }, tenantId);
       } else {
         // Hard delete if no concepts
-        const docRef = doc(db, COLLECTION_NAME, id);
+        const docRef = doc(db, getGeneralsCollection(tenantId), id);
         await deleteDoc(docRef);
       }
       
@@ -152,9 +181,13 @@ export const generalService = {
   },
 
   // Check if general has associated concepts
-  async hasAssociatedConcepts(generalId) {
+  async hasAssociatedConcepts(generalId, tenantId) {
     try {
-      const conceptsRef = collection(db, 'concepts');
+      if (!tenantId) {
+        return false;
+      }
+      
+      const conceptsRef = collection(db, `tenants/${tenantId}/concepts`);
       const q = query(conceptsRef, where('generalId', '==', generalId), where('isActive', '==', true));
       const querySnapshot = await getDocs(q);
       
@@ -166,9 +199,13 @@ export const generalService = {
   },
 
   // Check if general has associated transactions
-  async hasAssociatedTransactions(generalId) {
+  async hasAssociatedTransactions(generalId, tenantId) {
     try {
-      const transactionsRef = collection(db, 'transactions');
+      if (!tenantId) {
+        return false;
+      }
+      
+      const transactionsRef = collection(db, `tenants/${tenantId}/transacciones`);
       const q = query(transactionsRef, where('generalId', '==', generalId));
       const querySnapshot = await getDocs(q);
       
@@ -180,9 +217,13 @@ export const generalService = {
   },
 
   // Get generals for dropdown/select by type
-  async getForSelect(type) {
+  async getForSelect(type, tenantId) {
     try {
-      const generals = await this.getByType(type);
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
+      const generals = await this.getByType(type, tenantId);
       return generals.map(general => ({
         value: general.id,
         label: general.name,

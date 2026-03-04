@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/router";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import TransactionForm from "../../../components/forms/TransactionForm";
 import ProtectedRoute from "../../../components/auth/ProtectedRoute";
 import AdvancedDateSelector from "../../../components/dashboard/AdvancedDateSelector";
-import { useAuth } from "../../../context/AuthContext";
+import { useAuth } from "../../../context/AuthContextMultiTenant";
 import { useToast } from "../../../components/ui/Toast";
 import { transactionService } from "../../../lib/services/transactionService";
 import { conceptService } from "../../../lib/services/conceptService";
@@ -25,7 +25,7 @@ import {
 
 const SolicitudesPago = () => {
   const router = useRouter();
-  const { checkPermission } = useAuth();
+  const { tenantInfo, TENANT_ROLES } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [transactions, setTransactions] = useState([]);
@@ -42,13 +42,23 @@ const SolicitudesPago = () => {
   const [itemsPerPage] = useState(20);
   const toast = useToast();
 
-  // Check permissions based on user role
-  const canManageTransactions = checkPermission("canManageTransactions");
-  const canDeleteTransactions = checkPermission("canDeleteTransactions");
+  // Check permissions based on user role in tenant
+  const canManageTransactions = TENANT_ROLES && (tenantInfo?.role === TENANT_ROLES.ADMIN || tenantInfo?.role === TENANT_ROLES.CONTADOR);
+  const canDeleteTransactions = TENANT_ROLES && tenantInfo?.role === TENANT_ROLES.ADMIN;
+
+  // Memoize tenantId to prevent unnecessary re-renders
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
 
   const loadTransactions = useCallback(async () => {
     try {
       setLoading(true);
+
+      // Check if we have tenant ID
+      if (!tenantId) {
+        console.error("No tenant ID available");
+        setLoading(false);
+        return;
+      }
 
       // Get first and last day of the selected month
       const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -63,11 +73,11 @@ const SolicitudesPago = () => {
 
       const [transactionsData, conceptsData, providersData, generalsData, subconceptsData] = await Promise.all(
         [
-          transactionService.getAll(transactionQuery),
-          conceptService.getAll(),
-          providerService.getAll(),
-          generalService.getAll(),
-          subconceptService.getAll(),
+          transactionService.getAll(transactionQuery, tenantId),
+          conceptService.getAll(tenantId),
+          providerService.getAll(tenantId),
+          generalService.getAll(tenantId),
+          subconceptService.getAll(tenantId),
         ]
       );
       
@@ -101,7 +111,7 @@ const SolicitudesPago = () => {
     } finally {
       setLoading(false);
     }
-  }, [toast, currentDate]);
+  }, [toast, currentDate, tenantId]);
 
   const updateMonthName = useCallback(() => {
     const monthName = currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
@@ -109,9 +119,12 @@ const SolicitudesPago = () => {
   }, [currentDate]);
 
   useEffect(() => {
-    loadTransactions();
-    updateMonthName();
-  }, [loadTransactions, currentDate, updateMonthName]);
+    // Only load transactions if we have tenant info
+    if (tenantId) {
+      loadTransactions();
+      updateMonthName();
+    }
+  }, [loadTransactions, updateMonthName, tenantId]);
 
   const handleDateChange = (newDate) => {
     setCurrentDate(newDate);

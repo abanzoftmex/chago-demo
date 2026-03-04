@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import AdminLayout from "../../components/layout/AdminLayout";
 import ProtectedRoute from "../../components/auth/ProtectedRoute";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/AuthContextMultiTenant";
 import { useToast } from "../../components/ui/Toast";
 import {
   UserCircleIcon,

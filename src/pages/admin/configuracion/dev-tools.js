@@ -4,7 +4,7 @@ import DeleteTransactionsModal from "../../../components/admin/DeleteTransaction
 import InitialExpenseModal from "../../../components/admin/InitialExpenseModal";
 import { transactionService } from "../../../lib/services/transactionService";
 import { reportService } from "../../../lib/services/reportService";
-import { useAuth } from "../../../context/AuthContext";
+import { useAuth } from "../../../context/AuthContextMultiTenant";
 import { useToast } from "../../../components/ui/Toast";
 
 const DevTools = () => {

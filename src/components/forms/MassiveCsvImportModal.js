@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { generalService } from "../../lib/services/generalService";
 import { conceptService } from "../../lib/services/conceptService";
+import { useAuth } from "../../context/AuthContextMultiTenant";
 
 export default function MassiveCsvImportModal({ isOpen, onClose, onSuccess }) {
+  const { tenantInfo } = useAuth();
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
   const [file, setFile] = useState(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importResults, setImportResults] = useState(null);
@@ -133,7 +136,7 @@ concepto,Torneos,Organización de torneos,ingreso,Ingresos por Eventos`;
               type: row.tipo_movimiento.toLowerCase() === 'ingreso' ? 'entrada' : 'salida' // Convertir a formato backend
             };
 
-            const createdGeneral = await generalService.create(generalData);
+            const createdGeneral = await generalService.create(generalData, tenantId);
             results.generales.created.push(createdGeneral);
             generalesMap.set(row.nombre.toLowerCase(), createdGeneral);
           }
@@ -157,7 +160,7 @@ concepto,Torneos,Organización de torneos,ingreso,Ingresos por Eventos`;
 
             let general = generalesMap.get(row.general_nombre.toLowerCase());
             if (!general) {
-              const existingGenerals = await generalService.getAll();
+              const existingGenerals = await generalService.getAll(tenantId);
               general = existingGenerals.find(g => g.name.toLowerCase() === row.general_nombre.toLowerCase());
               if (!general) {
                 results.conceptos.errors.push(`Línea ${row.lineNumber}: General '${row.general_nombre}' no encontrado`);
@@ -178,7 +181,7 @@ concepto,Torneos,Organización de torneos,ingreso,Ingresos por Eventos`;
               type: row.tipo_movimiento.toLowerCase() === 'ingreso' ? 'entrada' : 'salida' // Convertir a formato backend
             };
 
-            const createdConcept = await conceptService.create(conceptData);
+            const createdConcept = await conceptService.create(conceptData, tenantId);
             results.conceptos.created.push(createdConcept);
             conceptosMap.set(conceptKey, createdConcept);
           }

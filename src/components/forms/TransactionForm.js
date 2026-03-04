@@ -8,7 +8,7 @@ import SubconceptModal from "./SubconceptModal";
 import GeneralModal from "./GeneralModal";
 import { useToast } from "../ui/Toast";
 import { settingsService } from "../../lib/services/settingsService";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/AuthContextMultiTenant";
 import { generalService } from "../../lib/services/generalService";
 import FileUpload from "../ui/FileUpload";
 import { conceptService } from "../../lib/services/conceptService";
@@ -81,7 +81,7 @@ const TransactionForm = ({
   const subconceptSelectorRef = useRef();
   const providerSelectorRef = useRef();
   const toast = useToast();
-  const { user } = useAuth();
+  const { user, tenantInfo } = useAuth();
 
   const formatNumberWithCommas = (value) => {
     // Ensure value is a string and handle null/undefined
@@ -241,7 +241,14 @@ const TransactionForm = ({
       try {
         setLoadingGenerals(true);
         setGeneralsError(null);
-        const allGenerals = await generalService.getAll();
+        
+        const tenantId = tenantInfo?.id;
+        if (!tenantId) {
+          setGeneralsError('No tenant ID available');
+          return;
+        }
+        
+        const allGenerals = await generalService.getAll(tenantId);
         // Filter by transaction type if provided, incluir 'ambos'
         const filtered = allGenerals.filter(g => !formData.type || g.type === formData.type || g.type === 'ambos');
         setGenerals(filtered);
@@ -252,20 +259,26 @@ const TransactionForm = ({
       }
     };
     loadGenerals();
-  }, [formData.type]);
+  }, [formData.type, tenantInfo]);
 
   // Load concepts when needed for SubconceptModal
   React.useEffect(() => {
     const loadConcepts = async () => {
       try {
-        const allConcepts = await conceptService.getAll();
+        const tenantId = tenantInfo?.id;
+        if (!tenantId) {
+          console.error('No tenant ID available for loading concepts');
+          return;
+        }
+        
+        const allConcepts = await conceptService.getAll(tenantId);
         setConcepts(allConcepts);
       } catch (err) {
         console.error('Error loading concepts:', err);
       }
     };
     loadConcepts();
-  }, []);
+  }, [tenantInfo]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -304,18 +317,24 @@ const TransactionForm = ({
         transactionData.division = formData.division;
       }
 
+      const tenantId = tenantInfo?.id;
+      if (!tenantId) {
+        throw new Error("No se pudo obtener el tenant ID");
+      }
+
       let result;
       if (initialData) {
         // Update existing transaction
         result = await transactionService.update(
           initialData.id,
           transactionData,
-          user
+          user,
+          tenantId
         );
         toast.success("Transacción actualizada exitosamente");
       } else {
         // Create new transaction
-        result = await transactionService.create(transactionData, user);
+        result = await transactionService.create(transactionData, user, tenantId);
         
         // Upload optional attachments and save on transaction
         if (files.length > 0) {
@@ -341,7 +360,7 @@ const TransactionForm = ({
             }
             
             if (attachments.length > 0) {
-              await transactionService.update(result.id, { attachments }, user);
+              await transactionService.update(result.id, { attachments }, user, tenantId);
               toast.success(`${attachments.length} archivo(s) subido(s) exitosamente`);
             }
             
@@ -546,7 +565,14 @@ const TransactionForm = ({
       try {
         setLoadingGenerals(true);
         setGeneralsError(null);
-        const allGenerals = await generalService.getAll();
+        
+        const tenantId = tenantInfo?.id;
+        if (!tenantId) {
+          setGeneralsError('No tenant ID available');
+          return;
+        }
+        
+        const allGenerals = await generalService.getAll(tenantId);
         // Filter by transaction type if provided
         const filtered = allGenerals.filter(g => !formData.type || g.type === formData.type);
         setGenerals(filtered);

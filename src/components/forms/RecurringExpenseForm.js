@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { useAuth } from "../../context/AuthContext";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useAuth } from "../../context/AuthContextMultiTenant";
 import { useToast } from "../ui/Toast";
 import { recurringExpenseService } from "../../lib/services/recurringExpenseService";
 import { conceptService } from "../../lib/services/conceptService";
@@ -21,7 +21,8 @@ const FREQUENCIES = {
 };
 
 const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
-  const { user } = useAuth();
+  const { user, tenantInfo } = useAuth();
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
   const toast = useToast();
   const conceptSelectorRef = useRef();
   const subconceptSelectorRef = useRef();
@@ -54,11 +55,12 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
 
   // Load generals when component mounts
   useEffect(() => {
+    if (!tenantId) return;
     const loadGenerals = async () => {
       try {
         setLoadingGenerals(true);
         setGeneralsError(null);
-        const allGenerals = await generalService.getAll();
+        const allGenerals = await generalService.getAll(tenantId);
         // Filter salidas and ambos for recurring expenses
         const filtered = allGenerals.filter(g => g.type === "salida" || g.type === "ambos");
         setGenerals(filtered);
@@ -69,20 +71,21 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
       }
     };
     loadGenerals();
-  }, []);
+  }, [tenantId]);
 
   // Load concepts for SubconceptModal
   useEffect(() => {
+    if (!tenantId) return;
     const loadConcepts = async () => {
       try {
-        const allConcepts = await conceptService.getAll();
+        const allConcepts = await conceptService.getAll(tenantId);
         setConcepts(allConcepts.filter(c => c.type === "salida" || c.type === "ambos"));
       } catch (err) {
         console.error('Error loading concepts:', err);
       }
     };
     loadConcepts();
-  }, []);
+  }, [tenantId]);
 
   const formatNumberWithCommas = (value) => {
     if (!value) return '';
@@ -229,7 +232,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
         lastGenerated: null
       };
 
-      const result = await recurringExpenseService.create(recurringData, user);
+      const result = await recurringExpenseService.create(recurringData, tenantId);
       
       toast.success("Salida recurrente creada exitosamente");
       
@@ -264,7 +267,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
       try {
         setLoadingGenerals(true);
         setGeneralsError(null);
-        const allGenerals = await generalService.getAll();
+        const allGenerals = await generalService.getAll(tenantId);
         const filtered = allGenerals.filter(g => g.type === "salida" || g.type === "ambos");
         setGenerals(filtered);
       } catch (err) {
@@ -597,7 +600,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
           type="salida"
           isOpen={showGeneralModal}
           onClose={() => setShowGeneralModal(false)}
-          onCreated={handleGeneralCreated}
+          onSuccess={handleGeneralCreated}
         />
       )}
 
@@ -606,7 +609,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
           type="salida"
           isOpen={showConceptModal}
           onClose={() => setShowConceptModal(false)}
-          onCreated={handleConceptCreated}
+          onSuccess={handleConceptCreated}
           generals={generals}
         />
       )}
@@ -615,7 +618,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
         <SubconceptModal
           isOpen={showSubconceptModal}
           onClose={() => setShowSubconceptModal(false)}
-          onCreated={handleSubconceptCreated}
+          onSuccess={handleSubconceptCreated}
           concepts={concepts}
         />
       )}

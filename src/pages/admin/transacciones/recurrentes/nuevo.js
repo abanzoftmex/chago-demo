@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useRouter } from "next/router";
 import AdminLayout from "../../../../components/layout/AdminLayout";
 import ProtectedRoute from "../../../../components/auth/ProtectedRoute";
-import { useAuth } from "../../../../context/AuthContext";
+import { useAuth } from "../../../../context/AuthContextMultiTenant";
 import RecurringExpenseForm from "../../../../components/forms/RecurringExpenseForm";
 
 const CreateRecurringExpense = () => {

@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { generalService } from '../../lib/services/generalService';
+import { useAuth } from '../../context/AuthContextMultiTenant';
 
 export default function CsvImportModal({ isOpen, onClose, onSuccess }) {
+  const { tenantInfo } = useAuth();
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
   const [uploadSuccess, setUploadSuccess] = useState(null);
@@ -91,7 +94,7 @@ export default function CsvImportModal({ isOpen, onClose, onSuccess }) {
             name: name,
             type: type,
             description: description
-          });
+          }, tenantId);
           successCount++;
         } catch (error) {
           const name = row.name || row.nombre;

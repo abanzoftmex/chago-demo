@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { useToast } from "../../components/ui/Toast";
 import { Button } from "../../components/ui/Button";
@@ -13,7 +13,7 @@ import { transactionService } from "../../lib/services/transactionService";
 import { providerService } from "../../lib/services/providerService";
 import { carryoverService } from "../../lib/services/carryoverService";
 import { DIVISIONS, formatDivision } from "../../lib/constants/divisions";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/AuthContextMultiTenant";
 import useReportStore from "../../lib/stores/reportStore";
 import TreeComparisonSection from "../../components/reports/TreeComparisonSection";
 import WeeklyBreakdownEntradas from "../../components/reports/WeeklyBreakdownEntradas";
@@ -42,7 +42,8 @@ import {
 
 const Reportes = () => {
   const { success, error } = useToast();
-  const { user } = useAuth();
+  const { user, tenantInfo } = useAuth();
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
   const { showIncomeInBreakdown, toggleShowIncomeInBreakdown } = useReportStore();
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -83,12 +84,15 @@ const Reportes = () => {
 
   useEffect(() => {
     const initializePage = async () => {
-      await loadReferenceData();
-      // Set initial date range (report will generate only when user selects a type)
-      handleDateChange(currentDate);
+      // Only load if we have tenant info
+      if (tenantId) {
+        await loadReferenceData();
+        // Set initial date range (report will generate only when user selects a type)
+        handleDateChange(currentDate);
+      }
     };
     initializePage();
-  }, []);
+  }, [tenantId]);
 
   const handleDateChange = (newDate) => {
     setCurrentDate(newDate);
@@ -132,11 +136,16 @@ const Reportes = () => {
 
   const loadReferenceData = async () => {
     try {
+      if (!tenantId) {
+        console.error("No tenant ID available");
+        return;
+      }
+
       const [generalsData, conceptsData, subconceptsData, providersData] = await Promise.all([
-        generalService.getAll(),
-        conceptService.getAll(),
-        subconceptService.getAll(),
-        providerService.getAll(),
+        generalService.getAll(tenantId),
+        conceptService.getAll(tenantId),
+        subconceptService.getAll(tenantId),
+        providerService.getAll(tenantId),
       ]);
       setGenerals(generalsData);
       setConcepts(conceptsData);
@@ -246,10 +255,11 @@ const Reportes = () => {
 
       // Cargar transacciones filtradas por período
       const transactionsData =
-        await reportService.getFilteredTransactions(filterData);
+        await reportService.getFilteredTransactions(filterData, tenantInfo?.id);
       const statsData = await reportService.generateReportStats(
         transactionsData,
-        filterData
+        filterData,
+        tenantInfo?.id
       );
 
       // Cargar TODAS las transacciones (sin filtro de fecha) para calcular arrastre
@@ -257,7 +267,7 @@ const Reportes = () => {
         ...filterData,
         startDate: null,
         endDate: null
-      });
+      }, tenantInfo?.id);
 
       // Enriquecer allTransactions con nombre de proveedor
       const enrichedAllTransactions = allTransactionsData.map(transaction => {
@@ -315,10 +325,15 @@ const Reportes = () => {
       // });
 
       // Get reference data for display
+      if (!tenantId) {
+        console.error("No tenant ID available");
+        return;
+      }
+
       const [conceptsData, providersData, generalsData] = await Promise.all([
-        conceptService.getAll(),
-        providerService.getAll(),
-        generalService.getAll()
+        conceptService.getAll(tenantId),
+        providerService.getAll(tenantId),
+        generalService.getAll(tenantId)
       ]);
 
       // Enrich transactions with reference data
@@ -356,11 +371,16 @@ const Reportes = () => {
       });
 
       // Get reference data for display
+      if (!tenantId) {
+        console.error("No tenant ID available");
+        return;
+      }
+
       const [conceptsData, subconceptsData, providersData, generalsData] = await Promise.all([
-        conceptService.getAll(),
-        subconceptService.getAll(),
-        providerService.getAll(),
-        generalService.getAll()
+        conceptService.getAll(tenantId),
+        subconceptService.getAll(tenantId),
+        providerService.getAll(tenantId),
+        generalService.getAll(tenantId)
       ]);
 
       // Enrich transactions with reference data

@@ -1,5 +1,5 @@
 import "@/styles/globals.css";
-import { AuthProvider } from "../context/AuthContext";
+import { AuthProvider } from "../context/AuthContextMultiTenant";
 import { ToastProvider } from "../components/ui/Toast";
 
 export default function App({ Component, pageProps }) {

@@ -15,16 +15,25 @@ import { db } from '../firebase/firebaseConfig';
 
 const COLLECTION_NAME = 'concepts';
 
+// Helper function to get the correct collection path
+const getConceptsCollection = (tenantId) => {
+  return tenantId ? `tenants/${tenantId}/concepts` : COLLECTION_NAME;
+};
+
 export const conceptService = {
   // Create a new concept
-  async create(conceptData) {
+  async create(conceptData, tenantId) {
     try {
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
       // Validar que type sea 'entrada', 'salida' o 'ambos'
       if (!['entrada', 'salida', 'ambos'].includes(conceptData.type)) {
         throw new Error('Tipo inválido. Debe ser: entrada, salida o ambos');
       }
       
-      const docRef = await addDoc(collection(db, COLLECTION_NAME), {
+      const docRef = await addDoc(collection(db, getConceptsCollection(tenantId)), {
         ...conceptData,
         createdAt: serverTimestamp(),
         isActive: true
@@ -38,9 +47,13 @@ export const conceptService = {
   },
 
   // Get concept by ID
-  async getById(id) {
+  async getById(id, tenantId) {
     try {
-      const docRef = doc(db, COLLECTION_NAME, id);
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
+      const docRef = doc(db, getConceptsCollection(tenantId), id);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
@@ -55,10 +68,14 @@ export const conceptService = {
   },
 
   // Get concepts by general category
-  async getByGeneral(generalId) {
+  async getByGeneral(generalId, tenantId) {
     try {
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
       const q = query(
-        collection(db, COLLECTION_NAME),
+        collection(db, getConceptsCollection(tenantId)),
         where('generalId', '==', generalId),
         where('isActive', '==', true),
         orderBy('name', 'asc')
@@ -80,10 +97,14 @@ export const conceptService = {
 
   // Get concepts by type (entrada/salida/ambos)
   // Incluye conceptos del tipo específico Y los de tipo 'ambos'
-  async getByType(type) {
+  async getByType(type, tenantId) {
     try {
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
       const q = query(
-        collection(db, COLLECTION_NAME),
+        collection(db, getConceptsCollection(tenantId)),
         where('isActive', '==', true),
         orderBy('name', 'asc')
       );
@@ -107,10 +128,14 @@ export const conceptService = {
   },
 
   // Get all concepts
-  async getAll() {
+  async getAll(tenantId) {
     try {
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
       const q = query(
-        collection(db, COLLECTION_NAME),
+        collection(db, getConceptsCollection(tenantId)),
         where('isActive', '==', true),
         orderBy('type', 'asc'),
         orderBy('name', 'asc')
@@ -132,14 +157,18 @@ export const conceptService = {
   },
 
   // Update concept
-  async update(id, updateData) {
+  async update(id, updateData, tenantId) {
     try {
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
       // Validar tipo si se está actualizando
       if (updateData.type && !['entrada', 'salida', 'ambos'].includes(updateData.type)) {
         throw new Error('Tipo inválido. Debe ser: entrada, salida o ambos');
       }
       
-      const docRef = doc(db, COLLECTION_NAME, id);
+      const docRef = doc(db, getConceptsCollection(tenantId), id);
       await updateDoc(docRef, updateData);
 
       return { id, ...updateData };
@@ -150,17 +179,21 @@ export const conceptService = {
   },
 
   // Soft delete concept (set isActive to false)
-  async delete(id) {
+  async delete(id, tenantId) {
     try {
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
       // Check if concept has associated transactions
-      const hasTransactions = await this.hasAssociatedTransactions(id);
+      const hasTransactions = await this.hasAssociatedTransactions(id, tenantId);
 
       if (hasTransactions) {
         // Soft delete - just deactivate
-        await this.update(id, { isActive: false });
+        await this.update(id, { isActive: false }, tenantId);
       } else {
         // Hard delete if no transactions
-        const docRef = doc(db, COLLECTION_NAME, id);
+        const docRef = doc(db, getConceptsCollection(tenantId), id);
         await deleteDoc(docRef);
       }
 
@@ -172,9 +205,13 @@ export const conceptService = {
   },
 
   // Check if concept has associated descriptions
-  async hasAssociatedDescriptions(conceptId) {
+  async hasAssociatedDescriptions(conceptId, tenantId) {
     try {
-      const descriptionsRef = collection(db, 'descriptions');
+      if (!tenantId) {
+        return false;
+      }
+      
+      const descriptionsRef = collection(db, `tenants/${tenantId}/descriptions`);
       const q = query(descriptionsRef, where('conceptId', '==', conceptId), where('isActive', '==', true));
       const querySnapshot = await getDocs(q);
 
@@ -186,9 +223,13 @@ export const conceptService = {
   },
 
   // Check if concept has associated transactions
-  async hasAssociatedTransactions(conceptId) {
+  async hasAssociatedTransactions(conceptId, tenantId) {
     try {
-      const transactionsRef = collection(db, 'transactions');
+      if (!tenantId) {
+        return false;
+      }
+      
+      const transactionsRef = collection(db, `tenants/${tenantId}/transacciones`);
       const q = query(transactionsRef, where('conceptId', '==', conceptId));
       const querySnapshot = await getDocs(q);
 
@@ -200,9 +241,13 @@ export const conceptService = {
   },
 
   // Get concepts for dropdown/select by type
-  async getForSelect(type) {
+  async getForSelect(type, tenantId) {
     try {
-      const concepts = await this.getByType(type);
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
+      const concepts = await this.getByType(type, tenantId);
       return concepts.map(concept => ({
         value: concept.id,
         label: concept.name,

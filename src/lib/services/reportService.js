@@ -12,7 +12,7 @@ import * as XLSX from 'xlsx';
 export const reportService = {
   // Obtener transacciones filtradas para reportes incluyendo el arrastre de pendientes
   // El "arrastre" incluye TODOS los gastos pendientes de todos los meses (no solo anteriores)
-  async getFilteredTransactions(filters) {
+  async getFilteredTransactions(filters, tenantId) {
     try {
       let transactions = [];
 
@@ -28,12 +28,13 @@ export const reportService = {
             conceptId: filters.conceptId,
             subconceptId: filters.subconceptId,
             division: filters.division
-          }
+          },
+          tenantId
         );
 
         // Obtener TODAS las transacciones pendientes hasta el mes del reporte
         // Solo incluir gastos pendientes que sean del mes del reporte o anteriores
-        const allTransactions = await transactionService.getAll();
+        const allTransactions = await transactionService.getAll({}, tenantId);
         const reportEndDate = new Date(filters.endDate);
         const reportYear = reportEndDate.getFullYear();
         const reportMonth = reportEndDate.getMonth(); // 0-based (0=enero, 11=diciembre)
@@ -46,6 +47,11 @@ export const reportService = {
           }
 
           const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
+          // Validar que la fecha sea válida
+          if (isNaN(transactionDate.getTime())) {
+            return false;
+          }
+          
           const transactionYear = transactionDate.getFullYear();
           const transactionMonth = transactionDate.getMonth();
 
@@ -98,6 +104,7 @@ export const reportService = {
         // Debug específico: buscar transacciones de agosto 2025
         const augustTransactions = allTransactions.filter(transaction => {
           const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
+          if (isNaN(transactionDate.getTime())) return false;
           return transactionDate.getMonth() === 7 && transactionDate.getFullYear() === 2025; // Agosto = mes 7
         });
 
@@ -105,12 +112,14 @@ export const reportService = {
         // Debug específico: buscar transacciones tipo 'salida' de agosto
         const augustSalidas = allTransactions.filter(transaction => {
           const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
+          if (isNaN(transactionDate.getTime())) return false;
           return transactionDate.getMonth() === 7 && transactionDate.getFullYear() === 2025 && transaction.type === 'salida';
         });
 
         // Debug específico: buscar la transacción del 5 de agosto 2025
         const specificDateTransactions = allTransactions.filter(transaction => {
           const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
+          if (isNaN(transactionDate.getTime())) return false;
           const dateStr = transactionDate.toISOString().split('T')[0];
           return dateStr === '2025-08-05' || dateStr === '2025-08-04' || dateStr === '2025-08-06'; // Rango por si hay diferencia de zona horaria
         });
@@ -146,7 +155,7 @@ export const reportService = {
           conceptId: filters.conceptId,
           subconceptId: filters.subconceptId,
           division: filters.division
-        });
+        }, tenantId);
       }
 
       return transactions;
@@ -157,7 +166,7 @@ export const reportService = {
   },
 
   // Generar estadísticas del reporte con balance de arrastre mejorado
-  async generateReportStats(transactions, filters = {}) {
+  async generateReportStats(transactions, filters = {}, tenantId) {
     try {
       // console.log(`🔍 generateReportStats: filters recibidos:`, filters);
 
@@ -239,11 +248,11 @@ export const reportService = {
 
       // Get reference data
       const [concepts, providers, descriptions, generals, subconcepts] = await Promise.all([
-        conceptService.getAll(),
-        providerService.getAll(),
-        descriptionService.getAll(),
-        generalService.getAll(),
-        subconceptService.getAll()
+        conceptService.getAll(tenantId),
+        providerService.getAll(tenantId),
+        descriptionService.getAll(tenantId),
+        generalService.getAll(tenantId),
+        subconceptService.getAll(tenantId)
       ]);
 
       const conceptMap = {};
@@ -315,6 +324,13 @@ export const reportService = {
         const generalName = generalMap[transaction.generalId] || 'Sin categoría general';
         const subconceptName = subconceptMap[transaction.subconceptId] || 'Sin subconcepto';
         const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
+        
+        // Validar que la fecha sea válida
+        if (isNaN(transactionDate.getTime())) {
+          console.warn('Transacción con fecha inválida, omitiendo:', transaction.id);
+          return; // Skip this transaction
+        }
+        
         const month = transactionDate.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
 
         // Determine if this transaction is from the current period or carried over
@@ -723,6 +739,12 @@ export const reportService = {
       // Procesar cada transacción
       transactions.forEach(transaction => {
         const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
+        
+        // Validar que la fecha sea válida
+        if (isNaN(transactionDate.getTime())) {
+          return; // Skip transactions with invalid dates
+        }
+        
         const transactionTime = transactionDate.getTime();
 
         // Encontrar en qué semana cae esta transacción
@@ -877,6 +899,11 @@ export const reportService = {
           // Para salidas, solo incluir las del período del reporte (no gastos pendientes de meses anteriores)
           if (transaction.type === 'salida') {
             const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
+            // Validar que la fecha sea válida
+            if (isNaN(transactionDate.getTime())) {
+              return false;
+            }
+            
             const transactionYear = transactionDate.getFullYear();
             const transactionMonth = transactionDate.getMonth();
 

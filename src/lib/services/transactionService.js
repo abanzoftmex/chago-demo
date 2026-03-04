@@ -17,13 +17,21 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage
 import { db, storage } from "../firebase/firebaseConfig";
 import { logService } from "./logService";
 
-const COLLECTION_NAME = "transactions";
+// Helper function to get collection path for tenant
+const getTransactionsCollection = (tenantId) => {
+  if (tenantId) {
+    return `tenants/${tenantId}/transacciones`;
+  }
+  // Fallback to global collection for backwards compatibility
+  return "transactions";
+};
 
 export const transactionService = {
   // Create a new transaction
-  async create(transactionData, user) {
+  async create(transactionData, user, tenantId = null) {
     try {
-      const docRef = await addDoc(collection(db, COLLECTION_NAME), {
+      const collectionPath = getTransactionsCollection(tenantId);
+      const docRef = await addDoc(collection(db, collectionPath), {
         ...transactionData,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -52,9 +60,10 @@ export const transactionService = {
   },
 
   // Get transaction by ID
-  async getById(id) {
+  async getById(id, tenantId = null) {
     try {
-      const docRef = doc(db, COLLECTION_NAME, id);
+      const collectionPath = getTransactionsCollection(tenantId);
+      const docRef = doc(db, collectionPath, id);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
@@ -69,9 +78,10 @@ export const transactionService = {
   },
 
   // Get all transactions with optional filters
-  async getAll(filters = {}) {
+  async getAll(filters = {}, tenantId = null) {
     try {
-      let q = collection(db, COLLECTION_NAME);
+      const collectionPath = getTransactionsCollection(tenantId);
+      let q = collection(db, collectionPath);
 
       // Apply filters
       if (filters.type) {
@@ -137,7 +147,8 @@ export const transactionService = {
       console.error("Error getting transactions:", error);
       // Fallback to original method if date filtering fails
       try {
-        let fallbackQ = collection(db, COLLECTION_NAME);
+        const collectionPath = getTransactionsCollection(tenantId);
+        let fallbackQ = collection(db, collectionPath);
 
         // Apply basic filters without date filtering
         if (filters.type) {
@@ -175,9 +186,10 @@ export const transactionService = {
   },
 
   // Update transaction
-  async update(id, updateData, user) {
+  async update(id, updateData, user, tenantId = null) {
     try {
-      const docRef = doc(db, COLLECTION_NAME, id);
+      const collectionPath = getTransactionsCollection(tenantId);
+      const docRef = doc(db, collectionPath, id);
 
       // Get the current transaction data before updating
       let previousData = null;
@@ -213,7 +225,7 @@ export const transactionService = {
   },
 
   // Delete transaction
-  async delete(id, user, deletionReason = null) {
+  async delete(id, user, deletionReason = null, tenantId = null) {
     try {
       // Check if user has permission to delete (contador and director_general roles cannot delete)
       if (user && ['contador', 'director_general'].includes(user.role)) {
@@ -221,7 +233,8 @@ export const transactionService = {
       }
 
       // Get the transaction data before deleting it
-      const docRef = doc(db, COLLECTION_NAME, id);
+      const collectionPath = getTransactionsCollection(tenantId);
+      const docRef = doc(db, collectionPath, id);
       const docSnap = await getDoc(docRef);
 
       if (!docSnap.exists()) {
@@ -276,9 +289,10 @@ export const transactionService = {
   },
 
   // Get transactions by date range
-  async getByDateRange(startDate, endDate, filters = {}) {
+  async getByDateRange(startDate, endDate, filters = {}, tenantId = null) {
     try {
-      let q = collection(db, COLLECTION_NAME);
+      const collectionPath = getTransactionsCollection(tenantId);
+      let q = collection(db, collectionPath);
 
       // Apply date range filter
       q = query(
@@ -424,9 +438,10 @@ export const transactionService = {
   },
 
   // Create an initial expense without creating entities in the system
-  async createInitialExpense(transactionData, user) {
+  async createInitialExpense(transactionData, user, tenantId = null) {
     try {
-      const docRef = await addDoc(collection(db, COLLECTION_NAME), {
+      const collectionPath = getTransactionsCollection(tenantId);
+      const docRef = await addDoc(collection(db, collectionPath), {
         ...transactionData,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -617,9 +632,10 @@ export const transactionService = {
   },
 
   // Get transaction statistics for a date range (only counts, not full data)
-  async getStatsByDateRange(startDate, endDate, filters = {}) {
+  async getStatsByDateRange(startDate, endDate, filters = {}, tenantId = null) {
     try {
-      let q = collection(db, COLLECTION_NAME);
+      const collectionPath = getTransactionsCollection(tenantId);
+      let q = collection(db, collectionPath);
 
       // Apply date range filter
       q = query(

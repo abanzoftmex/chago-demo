@@ -1,5 +1,6 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { subconceptService } from '../../lib/services/subconceptService';
+import { useAuth } from '../../context/AuthContextMultiTenant';
 
 const SubconceptSelector = forwardRef(({ 
   conceptId,
@@ -11,6 +12,7 @@ const SubconceptSelector = forwardRef(({
   required = false,
   disabled = false 
 }, ref) => {
+  const { tenantInfo } = useAuth();
   const [subconcepts, setSubconcepts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -26,8 +28,14 @@ const SubconceptSelector = forwardRef(({
         return;
       }
       
+      const tenantId = tenantInfo?.id;
+      if (!tenantId) {
+        setError('No tenant ID available');
+        return;
+      }
+      
       // Load all subconcepts and filter by conceptId
-      const allSubconcepts = await subconceptService.getAll();
+      const allSubconcepts = await subconceptService.getAll(tenantId);
       const filteredSubconcepts = allSubconcepts.filter(subconcept => 
         subconcept.conceptId === conceptId
       );
@@ -38,7 +46,7 @@ const SubconceptSelector = forwardRef(({
     } finally {
       setLoading(false);
     }
-  }, [conceptId]);
+  }, [conceptId, tenantInfo]);
 
   useEffect(() => {
     loadSubconcepts();

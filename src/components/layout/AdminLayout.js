@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/AuthContextMultiTenant";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import Toast from "../ui/Toast";

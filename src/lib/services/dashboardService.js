@@ -3,13 +3,13 @@ import { conceptService } from './conceptService';
 
 export const dashboardService = {
   // Get current month summary
-  async getCurrentMonthSummary() {
+  async getCurrentMonthSummary(tenantId) {
     try {
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-      return this.getMonthSummary(startOfMonth, endOfMonth);
+      return this.getMonthSummary(startOfMonth, endOfMonth, tenantId);
     } catch (error) {
       console.error('Error getting current month summary:', error);
       throw new Error('Error al obtener el resumen del mes actual');
@@ -17,9 +17,9 @@ export const dashboardService = {
   },
 
   // Get summary for a specific date range
-  async getMonthSummary(startDate, endDate) {
+  async getMonthSummary(startDate, endDate, tenantId) {
     try {
-      const transactions = await transactionService.getByDateRange(startDate, endDate);
+      const transactions = await transactionService.getByDateRange(startDate, endDate, {}, tenantId);
 
       const summary = {
         entradas: 0,
@@ -58,13 +58,13 @@ export const dashboardService = {
   },
 
   // Get transactions by concept for current month
-  async getTransactionsByConcept() {
+  async getTransactionsByConcept(tenantId) {
     try {
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-      return this.getTransactionsByConceptForDateRange(startOfMonth, endOfMonth);
+      return this.getTransactionsByConceptForDateRange(startOfMonth, endOfMonth, tenantId);
     } catch (error) {
       console.error('Error getting transactions by concept:', error);
       throw new Error('Error al obtener transacciones por concepto');
@@ -72,10 +72,10 @@ export const dashboardService = {
   },
 
   // Get transactions by concept for a specific date range
-  async getTransactionsByConceptForDateRange(startDate, endDate) {
+  async getTransactionsByConceptForDateRange(startDate, endDate, tenantId) {
     try {
-      const transactions = await transactionService.getByDateRange(startDate, endDate);
-      const concepts = await conceptService.getAll();
+      const transactions = await transactionService.getByDateRange(startDate, endDate, {}, tenantId);
+      const concepts = await conceptService.getAll(tenantId);
 
       // Create a map of concept names
       const conceptMap = {};
@@ -117,7 +117,7 @@ export const dashboardService = {
   },
 
   // Get monthly trends for the last 6 months
-  async getMonthlyTrends() {
+  async getMonthlyTrends(tenantId) {
     try {
       const trends = [];
       const now = new Date();
@@ -128,7 +128,7 @@ export const dashboardService = {
         const startOfMonth = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
         const endOfMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0, 23, 59, 59);
 
-        const transactions = await transactionService.getByDateRange(startOfMonth, endOfMonth);
+        const transactions = await transactionService.getByDateRange(startOfMonth, endOfMonth, {}, tenantId);
 
         const monthData = {
           month: monthDate.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' }),
@@ -158,9 +158,9 @@ export const dashboardService = {
   },
 
   // Get payment status summary
-  async getPaymentStatusSummary() {
+  async getPaymentStatusSummary(tenantId) {
     try {
-      const transactions = await transactionService.getAll({ type: 'salida' });
+      const transactions = await transactionService.getAll({ type: 'salida' }, tenantId);
 
       const summary = {
         pendiente: { count: 0, amount: 0 },
@@ -184,9 +184,9 @@ export const dashboardService = {
   },
 
   // Get available months and years with data
-  async getAvailableMonthsAndYears() {
+  async getAvailableMonthsAndYears(tenantId) {
     try {
-      const transactions = await transactionService.getAll();
+      const transactions = await transactionService.getAll({}, tenantId);
 
       if (transactions.length === 0) {
         return { months: [], years: [] };
@@ -248,12 +248,12 @@ export const dashboardService = {
   },
 
   // Get available months for a specific year
-  async getAvailableMonthsForYear(year) {
+  async getAvailableMonthsForYear(year, tenantId) {
     try {
       const startOfYear = new Date(year, 0, 1);
       const endOfYear = new Date(year, 11, 31, 23, 59, 59);
 
-      const transactions = await transactionService.getByDateRange(startOfYear, endOfYear);
+      const transactions = await transactionService.getByDateRange(startOfYear, endOfYear, {}, tenantId);
 
       if (transactions.length === 0) {
         return [];

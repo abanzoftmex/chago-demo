@@ -1,13 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { subconceptService } from '../../lib/services/subconceptService';
+import { useAuth } from "../../context/AuthContextMultiTenant";
 
-const SubconceptModal = ({ 
-  isOpen, 
-  onClose, 
-  onSuccess, 
+const SubconceptModal = ({
+  isOpen,
+  onClose,
+  onSuccess,
   initialData = null,
-  concepts = []
+  concepts = [],
 }) => {
+  const { tenantInfo } = useAuth();
+  
+  // Memoize tenantId to prevent unnecessary re-renders
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
+  
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
     conceptId: initialData?.conceptId || ''
@@ -59,19 +65,24 @@ const SubconceptModal = ({
     try {
       setLoading(true);
       
+      if (!tenantId) {
+        throw new Error('No tenant ID available');
+      }
+      
       console.log('📝 Guardando subconcepto con datos:', formData);
       
+      let result;
       if (initialData?.id) {
         // Update existing subconcept
-        await subconceptService.update(initialData.id, formData);
+        result = await subconceptService.update(initialData.id, formData, tenantId);
         console.log('✅ Subconcepto actualizado exitosamente');
       } else {
         // Create new subconcept
-        const result = await subconceptService.create(formData);
+        result = await subconceptService.create(formData, tenantId);
         console.log('✅ Subconcepto creado exitosamente:', result);
       }
       
-      onSuccess?.(formData);
+      onSuccess?.(result);
       onClose();
       
       // Reset form

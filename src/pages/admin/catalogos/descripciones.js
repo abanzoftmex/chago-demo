@@ -1,13 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/router";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import DescriptionModal from "../../../components/forms/DescriptionModal";
 import { descriptionService } from "../../../lib/services/descriptionService";
-import { useAuth } from "../../../context/AuthContext";
+import { useAuth } from '../../../context/AuthContextMultiTenant';
 
 export default function DescripcionesPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, tenantInfo } = useAuth();
   const router = useRouter();
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
 
   const [descriptions, setDescriptions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,15 +26,20 @@ export default function DescripcionesPage() {
     if (user) {
       loadData();
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, tenantId]);
 
   const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
 
+      if (!tenantId) {
+        setLoading(false);
+        return;
+      }
+
       // Load descriptions only - no need for concepts and generals anymore
-      const descriptionsData = await descriptionService.getAll();
+      const descriptionsData = await descriptionService.getAll(tenantId);
 
       setDescriptions(descriptionsData);
     } catch (err) {
@@ -64,7 +70,7 @@ export default function DescripcionesPage() {
     }
 
     try {
-      await descriptionService.delete(description.id);
+      await descriptionService.delete(description.id, tenantId);
       await loadData(); // Reload the list
     } catch (error) {
       alert(`Error al eliminar la descripción: ${error.message}`);

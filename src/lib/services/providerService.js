@@ -15,11 +15,20 @@ import { db } from '../firebase/firebaseConfig';
 
 const COLLECTION_NAME = 'providers';
 
+// Helper function to get the correct collection path
+const getProvidersCollection = (tenantId) => {
+  return tenantId ? `tenants/${tenantId}/proveedores` : COLLECTION_NAME;
+};
+
 export const providerService = {
   // Create a new provider
-  async create(providerData) {
+  async create(providerData, tenantId) {
     try {
-      const docRef = await addDoc(collection(db, COLLECTION_NAME), {
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
+      const docRef = await addDoc(collection(db, getProvidersCollection(tenantId)), {
         ...providerData,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
@@ -33,9 +42,13 @@ export const providerService = {
   },
 
   // Get provider by ID
-  async getById(id) {
+  async getById(id, tenantId) {
     try {
-      const docRef = doc(db, COLLECTION_NAME, id);
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
+      const docRef = doc(db, getProvidersCollection(tenantId), id);
       const docSnap = await getDoc(docRef);
       
       if (docSnap.exists()) {
@@ -50,9 +63,13 @@ export const providerService = {
   },
 
   // Get all providers
-  async getAll(searchTerm = '') {
+  async getAll(tenantId, searchTerm = '') {
     try {
-      let q = collection(db, COLLECTION_NAME);
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
+      let q = collection(db, getProvidersCollection(tenantId));
       q = query(q, orderBy('name', 'asc'));
       
       const querySnapshot = await getDocs(q);
@@ -80,9 +97,13 @@ export const providerService = {
   },
 
   // Update provider
-  async update(id, updateData) {
+  async update(id, updateData, tenantId) {
     try {
-      const docRef = doc(db, COLLECTION_NAME, id);
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
+      const docRef = doc(db, getProvidersCollection(tenantId), id);
       await updateDoc(docRef, {
         ...updateData,
         updatedAt: serverTimestamp()
@@ -96,20 +117,24 @@ export const providerService = {
   },
 
   // Delete provider
-  async delete(id, user = null) {
+  async delete(id, tenantId, user = null) {
     try {
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
       // Check if user has permission to delete (contador and director_general roles cannot delete)
       if (user && ['contador', 'director_general'].includes(user.role)) {
         throw new Error("No tienes permisos para eliminar proveedores");
       }
       // First check if provider has associated transactions
-      const hasTransactions = await this.hasAssociatedTransactions(id);
+      const hasTransactions = await this.hasAssociatedTransactions(id, tenantId);
       
       if (hasTransactions) {
         throw new Error('No se puede eliminar el proveedor porque tiene transacciones asociadas');
       }
       
-      const docRef = doc(db, COLLECTION_NAME, id);
+      const docRef = doc(db, getProvidersCollection(tenantId), id);
       await deleteDoc(docRef);
       return true;
     } catch (error) {
@@ -119,9 +144,13 @@ export const providerService = {
   },
 
   // Check if provider has active (non-deleted) associated transactions
-  async hasAssociatedTransactions(providerId) {
+  async hasAssociatedTransactions(providerId, tenantId) {
     try {
-      const transactionsRef = collection(db, 'transactions');
+      if (!tenantId) {
+        return false;
+      }
+      
+      const transactionsRef = collection(db, `tenants/${tenantId}/transacciones`);
       const q = query(
         transactionsRef, 
         where('providerId', '==', providerId),
@@ -175,9 +204,13 @@ export const providerService = {
   },
 
   // Get providers for dropdown/select
-  async getForSelect() {
+  async getForSelect(tenantId) {
     try {
-      const providers = await this.getAll();
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
+      const providers = await this.getAll(tenantId);
       return providers.map(provider => ({
         value: provider.id,
         label: provider.name,

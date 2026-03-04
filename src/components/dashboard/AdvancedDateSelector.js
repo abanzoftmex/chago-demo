@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, CalendarIcon } from "@heroicons/react/24/outline";
 import { dashboardService } from "../../lib/services/dashboardService";
+import { useAuth } from "../../context/AuthContextMultiTenant";
 
 const AdvancedDateSelector = ({ currentDate, onDateChange, onSuccess, onError }) => {
+  const { tenantInfo } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
   const [showYearSelector, setShowYearSelector] = useState(false);
   const [availableData, setAvailableData] = useState({ months: [], years: [] });
@@ -41,7 +43,7 @@ const AdvancedDateSelector = ({ currentDate, onDateChange, onSuccess, onError })
   const loadAvailableData = async () => {
     try {
       setLoading(true);
-      const data = await dashboardService.getAvailableMonthsAndYears();
+      const data = await dashboardService.getAvailableMonthsAndYears(tenantInfo?.id);
       setAvailableData(data);
     } catch (error) {
       console.error('Error loading available data:', error);
@@ -53,7 +55,7 @@ const AdvancedDateSelector = ({ currentDate, onDateChange, onSuccess, onError })
 
   const loadMonthsForYear = async (year) => {
     try {
-      const months = await dashboardService.getAvailableMonthsForYear(year);
+      const months = await dashboardService.getAvailableMonthsForYear(year, tenantInfo?.id);
       setAvailableMonthsForSelectedYear(months);
     } catch (error) {
       console.error('Error loading months for year:', error);

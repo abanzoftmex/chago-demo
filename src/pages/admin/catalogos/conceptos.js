@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/router";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import ConceptModal from "../../../components/forms/ConceptModal";
 import MassiveCsvImportModal from "../../../components/forms/MassiveCsvImportModal";
 import { conceptService } from "../../../lib/services/conceptService";
 import { generalService } from "../../../lib/services/generalService";
-import { useAuth } from "../../../context/AuthContext";
+import { useAuth } from "../../../context/AuthContextMultiTenant";
 import { 
   PencilIcon,
   TrashIcon,
@@ -14,11 +14,12 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function ConceptosPage() {
-  const { user, loading: authLoading, checkPermission } = useAuth();
+  const { user, loading: authLoading, tenantInfo, TENANT_ROLES } = useAuth();
   const router = useRouter();
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
 
-  // Check permissions
-  const canDeleteCatalogItems = checkPermission("canDeleteCatalogItems");
+  // Check permissions - admin or contador can delete
+  const canDeleteCatalogItems = TENANT_ROLES && (tenantInfo?.role === TENANT_ROLES.ADMIN || tenantInfo?.role === TENANT_ROLES.CONTADOR);
 
   const [concepts, setConcepts] = useState([]);
   const [generals, setGenerals] = useState([]);
@@ -41,17 +42,22 @@ export default function ConceptosPage() {
     if (user) {
       loadData();
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, tenantId]);
 
   const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
 
+      if (!tenantId) {
+        setLoading(false);
+        return;
+      }
+
       // Load both concepts and generals
       const [conceptsData, generalsData] = await Promise.all([
-        conceptService.getAll(),
-        generalService.getAll()
+        conceptService.getAll(tenantId),
+        generalService.getAll(tenantId)
       ]);
 
       setConcepts(conceptsData);
@@ -84,7 +90,11 @@ export default function ConceptosPage() {
     }
 
     try {
-      await conceptService.delete(concept.id);
+      if (!tenantId) {
+        throw new Error('No tenant ID available');
+      }
+      
+      await conceptService.delete(concept.id, tenantId);
       await loadData(); // Reload the list
     } catch (error) {
       alert(`Error al eliminar el concepto: ${error.message}`);

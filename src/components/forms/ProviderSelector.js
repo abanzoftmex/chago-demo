@@ -1,5 +1,6 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { providerService } from '../../lib/services/providerService';
+import { useAuth } from '../../context/AuthContextMultiTenant';
 
 const ProviderSelector = forwardRef(({ 
   value, 
@@ -10,6 +11,7 @@ const ProviderSelector = forwardRef(({
   required = false,
   disabled = false 
 }, ref) => {
+  const { tenantInfo } = useAuth();
   const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -22,7 +24,14 @@ const ProviderSelector = forwardRef(({
     try {
       setLoading(true);
       setError(null);
-      const providersData = await providerService.getAll();
+      
+      const tenantId = tenantInfo?.id;
+      if (!tenantId) {
+        setError('No tenant ID available');
+        return;
+      }
+      
+      const providersData = await providerService.getAll(tenantId);
       setProviders(providersData);
     } catch (err) {
       setError(err.message);

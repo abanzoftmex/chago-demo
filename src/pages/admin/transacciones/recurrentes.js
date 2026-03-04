@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/router";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import ProtectedRoute from "../../../components/auth/ProtectedRoute";
-import { useAuth } from "../../../context/AuthContext";
+import { useAuth } from "../../../context/AuthContextMultiTenant";
 import { useToast } from "../../../components/ui/Toast";
 import Switch from "../../../components/ui/Switch";
 import RecurringExpenseDetailsModal from "../../../components/forms/RecurringExpenseDetailsModal";
@@ -21,7 +21,11 @@ import {
 
 const GastosRecurrentes = () => {
   const router = useRouter();
-  const { checkPermission } = useAuth();
+  const { checkPermission, tenantInfo } = useAuth();
+  
+  // Memoize tenantId to prevent unnecessary re-renders
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
+  
   const [recurringExpenses, setRecurringExpenses] = useState([]);
   const [concepts, setConcepts] = useState([]);
   const [subconcepts, setSubconcepts] = useState([]);
@@ -40,12 +44,20 @@ const GastosRecurrentes = () => {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
+
+      // Check if we have tenant ID
+      if (!tenantId) {
+        console.error("No tenant ID available");
+        setLoading(false);
+        return;
+      }
+
       const [expensesData, conceptsData, subconceptsData, providersData, generalsData] = await Promise.all([
-        recurringExpenseService.getAll(),
-        conceptService.getAll(),
-        subconceptService.getAll(),
-        providerService.getAll(),
-        generalService.getAll(),
+        recurringExpenseService.getAll(tenantId),
+        conceptService.getAll(tenantId),
+        subconceptService.getAll(tenantId),
+        providerService.getAll(tenantId),
+        generalService.getAll(tenantId),
       ]);
       
       setRecurringExpenses(expensesData);
@@ -59,11 +71,14 @@ const GastosRecurrentes = () => {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, tenantId]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    // Only load if we have tenant info
+    if (tenantId) {
+      loadData();
+    }
+  }, [loadData, tenantId]);
 
   const getConceptName = (conceptId) => {
     const concept = concepts.find((c) => c.id === conceptId);
@@ -109,7 +124,7 @@ const GastosRecurrentes = () => {
 
     try {
       setTogglingExpense(expenseId);
-      const newStatus = await recurringExpenseService.toggleActive(expenseId);
+      const newStatus = await recurringExpenseService.toggleActive(expenseId, tenantId);
       setRecurringExpenses(prev => 
         prev.map(expense => 
           expense.id === expenseId 
@@ -152,7 +167,7 @@ const GastosRecurrentes = () => {
     }
 
     try {
-      await recurringExpenseService.delete(expenseId);
+      await recurringExpenseService.delete(expenseId, tenantId);
       setRecurringExpenses(prev => prev.filter(expense => expense.id !== expenseId));
       toast.success("Salida recurrente eliminada exitosamente");
     } catch (error) {

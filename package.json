@@ -8,6 +8,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "setup-multi-tenant": "chmod +x scripts/setup-multi-tenant.sh && scripts/setup-multi-tenant.sh",
+    "deploy-rules": "firebase deploy --only firestore:rules",
+    "deploy-indexes": "firebase deploy --only firestore:indexes", 
     "simulate-september": "node scripts/simulate-september-2025-clean.cjs simulate",
     "simulate-october": "node scripts/simulate-october-2025.cjs simulate",
     "simulate-help": "node scripts/simulate-september-2025-clean.cjs help"
@@ -29,6 +32,7 @@
     "react-select": "^5.10.2",
     "recharts": "^3.1.2",
     "resend": "^4.0.0",
+    "uuid": "^13.0.0",
     "xlsx": "^0.18.5",
     "zustand": "^5.0.6"
   },

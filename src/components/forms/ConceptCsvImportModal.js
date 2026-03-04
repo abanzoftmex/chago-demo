@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { conceptService } from '../../lib/services/conceptService';
 import { generalService } from '../../lib/services/generalService';
+import { useAuth } from '../../context/AuthContextMultiTenant';
 
 export default function ConceptCsvImportModal({ isOpen, onClose, onSuccess }) {
+  const { tenantInfo } = useAuth();
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
   const [uploadSuccess, setUploadSuccess] = useState(null);
@@ -17,7 +20,7 @@ export default function ConceptCsvImportModal({ isOpen, onClose, onSuccess }) {
 
   const loadGenerals = async () => {
     try {
-      const generalsData = await generalService.getAll();
+      const generalsData = await generalService.getAll(tenantId);
       setGenerals(generalsData);
     } catch (error) {
       console.error('Error loading generals:', error);
@@ -121,7 +124,7 @@ export default function ConceptCsvImportModal({ isOpen, onClose, onSuccess }) {
             name: name,
             generalId: general.id,
             description: description
-          });
+          }, tenantId);
           successCount++;
         } catch (error) {
           const name = row.name || row.nombre;

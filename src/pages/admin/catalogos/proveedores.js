@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import ProviderForm from '../../../components/forms/ProviderForm';
 import ProviderCsvImportModal from '../../../components/admin/ProviderCsvImportModal';
 import { providerService } from '../../../lib/services/providerService';
 import { useToast } from '../../../components/ui/Toast';
-import { useAuth } from '../../../context/AuthContext';
+import { useAuth } from '../../../context/AuthContextMultiTenant';
 import { 
   PlusIcon, 
   MagnifyingGlassIcon,
@@ -29,13 +29,16 @@ const Proveedores = () => {
   const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
   
   const { success, error } = useToast();
-  const { user, userRole } = useAuth();
+  const { user, userRole, tenantInfo } = useAuth();
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
   const itemsPerPage = 10;
 
   // Load providers
   useEffect(() => {
-    loadProviders();
-  }, []);
+    if (tenantId) {
+      loadProviders();
+    }
+  }, [tenantId]);
 
   // Filter providers based on search term
   useEffect(() => {
@@ -57,7 +60,13 @@ const Proveedores = () => {
   const loadProviders = async () => {
     try {
       setLoading(true);
-      const data = await providerService.getAll();
+      
+      if (!tenantId) {
+        setLoading(false);
+        return;
+      }
+      
+      const data = await providerService.getAll(tenantId);
       setProviders(data);
       setFilteredProviders(data);
     } catch (err) {
@@ -73,8 +82,13 @@ const Proveedores = () => {
     
     try {
       setDeleting(true);
+      
+      if (!tenantId) {
+        throw new Error('No tenant ID available');
+      }
+      
       // Pass the user with the role property that matches what the service expects
-      await providerService.delete(selectedProvider.id, { role: user?.userRole });
+      await providerService.delete(selectedProvider.id, tenantId, { role: user?.userRole });
       success('Proveedor eliminado exitosamente');
       setShowDeleteModal(false);
       setSelectedProvider(null);

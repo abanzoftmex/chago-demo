@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/router";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import RoleProtectedRoute from "../../../components/auth/RoleProtectedRoute";
 import { logService } from "../../../lib/services";
-import { useAuth } from "../../../context/AuthContext";
+import { useAuth } from "../../../context/AuthContextMultiTenant";
 import { useToast } from "../../../components/ui/Toast";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -32,7 +32,10 @@ import { StickyNote } from "lucide-react";
 
 const LogsPage = () => {
   const router = useRouter();
-  const { user, checkPermission } = useAuth();
+  const { user, checkPermission, tenantInfo } = useAuth();
+  
+  // Memoize tenantId to prevent unnecessary re-renders
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
   const toast = useToast();
 
   // Función para obtener el tipo de transacción desde diferentes fuentes
@@ -231,18 +234,25 @@ const LogsPage = () => {
   const [providers, setProviders] = useState([]);
 
   useEffect(() => {
-    loadLogs();
-    loadReferenceData();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (tenantId) {
+      loadLogs();
+      loadReferenceData();
+    }
+  }, [tenantId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cargar datos de referencia (generales, conceptos, subconceptos, proveedores)
   const loadReferenceData = async () => {
     try {
+      if (!tenantId) {
+        console.error("No tenant ID available");
+        return;
+      }
+
       const [generalsData, conceptsData, subconceptsData, providersData] = await Promise.all([
-        generalService.getAll(),
-        conceptService.getAll(),
-        subconceptService.getAll(),
-        providerService.getAll()
+        generalService.getAll(tenantId),
+        conceptService.getAll(tenantId),
+        subconceptService.getAll(tenantId),
+        providerService.getAll(tenantId)
       ]);
 
       setGenerals(generalsData);

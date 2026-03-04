@@ -1,16 +1,16 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/AuthContextMultiTenant";
 import AdminLayout from "../../components/layout/AdminLayout";
 import ProtectedRoute from "../../components/auth/ProtectedRoute";
 import CreateUserModal from "../../components/admin/CreateUserModal";
 import RolePermissionsModal from "../../components/admin/RolePermissionsModal";
 import UserList from "../../components/admin/UserList";
-import { getAllUsers } from "../../lib/services/roleService";
+import { getTenantUsers } from "../../lib/services/roleServiceMultiTenant";
 import { PlusIcon, AdjustmentsHorizontalIcon } from "@heroicons/react/24/outline";
 import Toast from "../../components/ui/Toast";
 
 const UsersPage = () => {
-  const { user, userRole, checkPermission } = useAuth();
+  const { user, userRole, tenantInfo, TENANT_ROLES, loading: authLoading, tenantLoading } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -18,30 +18,42 @@ const UsersPage = () => {
   const [editingUser, setEditingUser] = useState(null);
   const [toast, setToast] = useState(null);
 
-  // Check if user can manage users
-  const canManageUsers = checkPermission("canManageUsers");
-
-  // Sistema de permisos funcionando correctamente
-  // Usuario: enrique.valdes@santiagofc.mx
-  // Rol: administrativo
-  // Permisos: canManageUsers = true
+  console.log("🎨 RENDER - authLoading:", authLoading);
+  console.log("🎨 RENDER - tenantLoading:", tenantLoading);
+  console.log("🎨 RENDER - tenantInfo:", tenantInfo);
+  console.log("🎨 RENDER - user:", user?.email);
 
   const loadUsers = async () => {
     setLoading(true);
     try {
-      const result = await getAllUsers();
+      console.log("🔍 loadUsers - tenantInfo:", tenantInfo);
+      console.log("🔍 loadUsers - tenantId:", tenantInfo?.id);
+      console.log("🔍 loadUsers - user:", user);
+      
+      if (!tenantInfo?.id) {
+        console.error("❌ No hay tenant asignado");
+        throw new Error("No hay tenant asignado");
+      }
+      
+      console.log(`📋 Cargando usuarios del tenant: ${tenantInfo.id}`);
+      const result = await getTenantUsers(tenantInfo.id);
+      console.log("📊 Resultado getTenantUsers:", result);
+      
       if (result.success) {
+        console.log(`✅ Usuarios cargados: ${result.users.length}`);
         setUsers(result.users);
       } else {
+        console.error("❌ Error en getTenantUsers:", result.error);
         setToast({
           type: "error",
           message: "Error cargando usuarios: " + result.error,
         });
       }
     } catch (error) {
+      console.error("❌ Error en loadUsers:", error);
       setToast({
         type: "error",
-        message: "Error cargando usuarios",
+        message: "Error cargando usuarios: " + error.message,
       });
     } finally {
       setLoading(false);
@@ -52,12 +64,6 @@ const UsersPage = () => {
     setEditingUser(userData);
   };
 
-  useEffect(() => {
-    if (canManageUsers) {
-      loadUsers();
-    }
-  }, [canManageUsers]);
-
   const handleUserUpdated = () => {
     loadUsers();
     setShowCreateModal(false);
@@ -67,6 +73,54 @@ const UsersPage = () => {
       message: editingUser ? "Usuario actualizado exitosamente" : "Usuario creado exitosamente",
     });
   };
+
+  // useEffect - Siempre se ejecuta, lógica condicional dentro
+  useEffect(() => {
+    // Solo cargar si no está cargando auth/tenant y hay tenantInfo
+    if (authLoading || tenantLoading || !tenantInfo?.id || !TENANT_ROLES) {
+      console.log("🔄 useEffect - Skip: loading o sin tenant");
+      return;
+    }
+    
+    // Verificar si es admin
+    const isAdmin = tenantInfo?.role === TENANT_ROLES.ADMIN;
+    console.log("🔄 useEffect - isAdmin:", isAdmin, "role:", tenantInfo?.role);
+    
+    if (isAdmin) {
+      console.log(`✅ Es admin, llamando loadUsers()`);
+      loadUsers();
+    } else {
+      console.log(`❌ No es admin, skip loadUsers`);
+      setLoading(false);
+    }
+  }, [authLoading, tenantLoading, tenantInfo?.id, tenantInfo?.role, TENANT_ROLES]);
+  
+  // Early returns DESPUÉS de todos los hooks
+  if (authLoading || tenantLoading) {
+    return (
+      <AdminLayout>
+        <div className="text-center py-8">
+          <p className="text-gray-600">Cargando información del tenant...</p>
+        </div>
+      </AdminLayout>
+    );
+  }
+  
+  // Verificar que tenga tenant asignado (solo después de que termine de cargar)
+  if (!tenantInfo?.id) {
+    return (
+      <AdminLayout>
+        <div className="text-center py-8">
+          <p className="text-red-600">No tienes acceso a un tenant. Contacta al administrador.</p>
+          <p className="text-sm text-gray-500 mt-2">User: {user?.email}</p>
+          <p className="text-sm text-gray-500">TenantInfo: {JSON.stringify(tenantInfo)}</p>
+        </div>
+      </AdminLayout>
+    );
+  }
+  
+  // Check if user can manage users
+  const canManageUsers = TENANT_ROLES && tenantInfo?.role === TENANT_ROLES.ADMIN;
 
 
 

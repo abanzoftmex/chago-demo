@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { descriptionService } from '../../lib/services/descriptionService';
+import { useAuth } from '../../context/AuthContextMultiTenant';
 
 const DescriptionModal = ({ 
   isOpen, 
@@ -7,6 +8,9 @@ const DescriptionModal = ({
   onSuccess, 
   initialData = null 
 }) => {
+  const { tenantInfo } = useAuth();
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
+  
   const [formData, setFormData] = useState({
     name: initialData?.name || ''
   });
@@ -54,10 +58,10 @@ const DescriptionModal = ({
       let result;
       if (initialData) {
         // Update existing description
-        result = await descriptionService.update(initialData.id, formData);
+        result = await descriptionService.update(initialData.id, formData, tenantId);
       } else {
         // Create new description
-        result = await descriptionService.create(formData);
+        result = await descriptionService.create(formData, tenantId);
       }
       
       onSuccess && onSuccess(result);

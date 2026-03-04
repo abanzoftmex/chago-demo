@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/AuthContextMultiTenant";
 import {
   TrashIcon,
   UserIcon,
@@ -7,17 +7,24 @@ import {
 } from "@heroicons/react/24/outline";
 
 const UserList = ({ users, currentUserId, onUserUpdated, onEditUser }) => {
-  const { user, userRole, ROLES } = useAuth();
+  const { user, tenantInfo, TENANT_ROLES } = useAuth();
   const [loading, setLoading] = useState({});
+  
+  // Fallback para TENANT_ROLES en caso de que no esté definido
+  const safeRoles = TENANT_ROLES || {
+    ADMIN: "admin",
+    CONTADOR: "contador",
+    VIEWER: "viewer"
+  };
 
   const getRoleDisplayName = (role) => {
     switch (role) {
-      case ROLES.ADMINISTRATIVO:
+      case safeRoles.ADMIN:
         return "Administrador";
-      case ROLES.CONTADOR:
+      case safeRoles.CONTADOR:
         return "Contador";
-      case ROLES.DIRECTOR_GENERAL:
-        return "Director General";
+      case safeRoles.VIEWER:
+        return "Visualizador";
       default:
         return "Sin rol";
     }
@@ -25,12 +32,12 @@ const UserList = ({ users, currentUserId, onUserUpdated, onEditUser }) => {
 
   const getRoleBadgeColor = (role) => {
     switch (role) {
-      case ROLES.ADMINISTRATIVO:
+      case safeRoles.ADMIN:
         return "bg-blue-100 text-blue-800";
-      case ROLES.CONTADOR:
+      case safeRoles.CONTADOR:
         return "bg-green-100 text-green-800";
-      case ROLES.DIRECTOR_GENERAL:
-        return "bg-purple-100 text-purple-800";
+      case safeRoles.VIEWER:
+        return "bg-yellow-100 text-yellow-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -115,10 +122,10 @@ const UserList = ({ users, currentUserId, onUserUpdated, onEditUser }) => {
                 <div className="flex items-center space-x-4">
                   <span
                     className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(
-                      userData.role
+                      userData.tenantRole || userData.role
                     )}`}
                   >
-                    {getRoleDisplayName(userData.role)}
+                    {getRoleDisplayName(userData.tenantRole || userData.role)}
                   </span>
 
                   <div className="flex items-center space-x-2">
@@ -133,7 +140,7 @@ const UserList = ({ users, currentUserId, onUserUpdated, onEditUser }) => {
                     )}
                   </div>
 
-                  {(userData.id !== currentUserId || userRole === ROLES.ADMINISTRATIVO) && (
+                  {(userData.id !== currentUserId || tenantInfo?.role === safeRoles.ADMIN) && (
                     <div className="flex items-center space-x-2">
                       <button
                         onClick={() => onEditUser(userData)}

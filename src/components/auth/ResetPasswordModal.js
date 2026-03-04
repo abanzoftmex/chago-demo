@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/AuthContextMultiTenant";
 import { useToast } from "../ui/Toast";
 
 const ResetPasswordModal = ({ isOpen, onClose, defaultEmail = "" }) => {

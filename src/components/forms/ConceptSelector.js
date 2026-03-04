@@ -1,5 +1,6 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { conceptService } from '../../lib/services/conceptService';
+import { useAuth } from '../../context/AuthContextMultiTenant';
 
 const ConceptSelector = forwardRef(({ 
   type, 
@@ -12,6 +13,7 @@ const ConceptSelector = forwardRef(({
   required = false,
   disabled = false 
 }, ref) => {
+  const { tenantInfo } = useAuth();
   const [concepts, setConcepts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -27,8 +29,14 @@ const ConceptSelector = forwardRef(({
         return;
       }
       
+      const tenantId = tenantInfo?.id;
+      if (!tenantId) {
+        setError('No tenant ID available');
+        return;
+      }
+      
       // Fetch all concepts and filter by general and type
-      const allConcepts = await conceptService.getAll();
+      const allConcepts = await conceptService.getAll(tenantId);
       const filteredConcepts = allConcepts.filter(concept => 
         concept.generalId === generalId && (concept.type === type || concept.type === 'ambos')
       );
@@ -39,7 +47,7 @@ const ConceptSelector = forwardRef(({
     } finally {
       setLoading(false);
     }
-  }, [type, generalId]);
+  }, [type, generalId, tenantInfo]);
 
   useEffect(() => {
     loadConcepts();

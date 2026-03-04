@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/AuthContextMultiTenant";
 import { useRouter } from "next/router";
 import ResetPasswordModal from "./ResetPasswordModal";
 

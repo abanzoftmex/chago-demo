@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { providerService } from '../../lib/services/providerService';
 import { useToast } from '../ui/Toast';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '../../context/AuthContextMultiTenant';
 
 const ProviderForm = ({ provider = null, onSubmit, onCancel, isOpen }) => {
+  const { tenantInfo } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     rfc: '',
@@ -150,6 +152,11 @@ const ProviderForm = ({ provider = null, onSubmit, onCancel, isOpen }) => {
     try {
       setLoading(true);
       
+      const tenantId = tenantInfo?.id;
+      if (!tenantId) {
+        throw new Error('No tenant ID available');
+      }
+      
       // Clean up empty contacts and bank accounts
       const cleanedData = {
         ...formData,
@@ -163,10 +170,10 @@ const ProviderForm = ({ provider = null, onSubmit, onCancel, isOpen }) => {
 
       let result;
       if (provider) {
-        result = await providerService.update(provider.id, cleanedData);
+        result = await providerService.update(provider.id, cleanedData, tenantId);
         success('Proveedor actualizado exitosamente');
       } else {
-        result = await providerService.create(cleanedData);
+        result = await providerService.create(cleanedData, tenantId);
         success('Proveedor creado exitosamente');
       }
 

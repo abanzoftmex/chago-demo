@@ -1,8 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { recurringExpenseService } from "../../lib/services/recurringExpenseService";
 import { useToast } from "../ui/Toast";
+import { useAuth } from "../../context/AuthContextMultiTenant";
 
 const RecurringExpenseDetailsModal = ({ expense, isOpen, onClose, conceptName, subconceptName, providerName }) => {
+  const { tenantInfo } = useAuth();
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
   const [monthsHistory, setMonthsHistory] = useState([]);
   const [generatedTransactions, setGeneratedTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -19,8 +22,8 @@ const RecurringExpenseDetailsModal = ({ expense, isOpen, onClose, conceptName, s
     try {
       setLoading(true);
       const [historyData, transactionsData] = await Promise.all([
-        recurringExpenseService.getGeneratedMonthsHistory(expense.id),
-        recurringExpenseService.getGeneratedTransactions(expense.id)
+        recurringExpenseService.getGeneratedMonthsHistory(expense.id, tenantId),
+        recurringExpenseService.getGeneratedTransactions(expense.id, tenantId)
       ]);
       
       setMonthsHistory(historyData);

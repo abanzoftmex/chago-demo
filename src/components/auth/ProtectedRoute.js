@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useRouter } from "next/router";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/AuthContextMultiTenant";
 
 const ProtectedRoute = ({ children }) => {
   const { user, userRole, loading, roleLoading, canUserAccessRoute } =

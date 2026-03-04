@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/router";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import SubconceptModal from "../../../components/forms/SubconceptModal";
 import { subconceptService } from "../../../lib/services/subconceptService";
 import { conceptService } from "../../../lib/services/conceptService";
 import { generalService } from "../../../lib/services/generalService";
-import { useAuth } from "../..//..//context/AuthContext";
+import { useAuth } from "../..//..//context/AuthContextMultiTenant";
 import { 
   PencilIcon,
   TrashIcon,
@@ -14,8 +14,11 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function SubconceptosPage() {
-  const { user, userRole, loading: authLoading } = useAuth();
+  const { user, userRole, loading: authLoading, tenantInfo } = useAuth();
   const router = useRouter();
+  
+  // Memoize tenantId to prevent unnecessary re-renders
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
 
   const [subconcepts, setSubconcepts] = useState([]);
   const [concepts, setConcepts] = useState([]);
@@ -37,18 +40,24 @@ export default function SubconceptosPage() {
     if (user) {
       loadData();
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, tenantId]);
 
   const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
 
+      if (!tenantId) {
+        console.error("No tenant ID available");
+        setLoading(false);
+        return;
+      }
+
       // Load both subconcepts and concepts
       const [subconceptsData, conceptsData, generalsData] = await Promise.all([
-        subconceptService.getAll(),
-        conceptService.getAll(),
-        generalService.getAll()
+        subconceptService.getAll(tenantId),
+        conceptService.getAll(tenantId),
+        generalService.getAll(tenantId)
       ]);
 
       console.log('📊 Datos cargados en subconceptos:', {
@@ -97,7 +106,11 @@ export default function SubconceptosPage() {
     }
 
     try {
-      await subconceptService.delete(subconcept.id, { role: userRole });
+      if (!tenantId) {
+        throw new Error('No tenant ID available');
+      }
+      
+      await subconceptService.delete(subconcept.id, tenantId, { role: userRole });
       await loadData(); // Reload the list
     } catch (error) {
       alert(`Error al eliminar el subconcepto: ${error.message}`);

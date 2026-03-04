@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/router";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import AdvancedDateSelector from "../../../components/dashboard/AdvancedDateSelector";
@@ -27,9 +27,15 @@ import {
   Layers
 } from "lucide-react";
 import Select from "react-select";
+import { useAuth } from "../../../context/AuthContextMultiTenant";
 
 const Historial = () => {
   const router = useRouter();
+  const { tenantInfo } = useAuth();
+  
+  // Memoize tenantId to prevent unnecessary re-renders
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
+  
   const [transactions, setTransactions] = useState([]);
   const [transactionStats, setTransactionStats] = useState({ pendiente: 0, parcial: 0, pagado: 0, total: 0 });
   const [concepts, setConcepts] = useState([]);
@@ -160,11 +166,16 @@ const Historial = () => {
 
   const loadInitialData = async () => {
     try {
+      if (!tenantId) {
+        console.error("No tenant ID available");
+        return;
+      }
+
       const [conceptsData, subconceptsData, providersData, generalsData] = await Promise.all([
-        conceptService.getAll(),
-        subconceptService.getAll(),
-        providerService.getAll(),
-        generalService.getAll(),
+        conceptService.getAll(tenantId),
+        subconceptService.getAll(tenantId),
+        providerService.getAll(tenantId),
+        generalService.getAll(tenantId),
       ]);
 
       setConcepts(conceptsData);
@@ -181,7 +192,10 @@ const Historial = () => {
 
   // Load initial data and set default date range to current month
   useEffect(() => {
-    loadInitialData();
+    // Only load if we have tenant info
+    if (tenantId) {
+      loadInitialData();
+    }
     
     // Set default date to current month for AdvancedDateSelector
     const now = new Date();
@@ -204,7 +218,7 @@ const Historial = () => {
       startDate: formatDateForInput(firstDay),
       endDate: formatDateForInput(lastDay)
     }));
-  }, []);
+  }, [tenantId]);
 
   // Load statistics separately for efficiency
   const loadStatistics = async () => {
@@ -263,6 +277,10 @@ const Historial = () => {
           division: filters.division || undefined,
         };
 
+        if (!tenantId) {
+          throw new Error("No tenant ID available");
+        }
+
         // If date range is specified, use date range query
         if (filters.startDate && filters.endDate) {
           const startDate = new Date(filters.startDate);
@@ -272,14 +290,15 @@ const Historial = () => {
           transactionsData = await transactionService.getByDateRange(
             startDate,
             endDate,
-            appliedFilters
+            appliedFilters,
+            tenantId
           );
         } else {
           // Use regular getAll with filters
           transactionsData = await transactionService.getAll({
             ...appliedFilters,
             limit: itemsPerPage * 2, // Load more for client-side filtering
-          });
+          }, tenantId);
         }
 
         // Client-side search filtering

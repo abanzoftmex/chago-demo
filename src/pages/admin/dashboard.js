@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { useToast } from "../../components/ui/Toast";
+import { useAuth } from "../../context/AuthContextMultiTenant";
 import SummaryCards from "../../components/dashboard/SummaryCards";
 import MonthlyTrendsChart from "../../components/charts/MonthlyTrendsChart";
 import DailyTransactionsChart from "../../components/charts/DailyTransactionsChart";
@@ -19,6 +20,7 @@ import { formatCurrency, formatCurrencyWithBadge, calculateTreeComparison, getTr
 
 const Dashboard = () => {
   const { error, success } = useToast();
+  const { tenantInfo } = useAuth();
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState({
     entradas: 0,
@@ -47,14 +49,18 @@ const Dashboard = () => {
   });
 
   useEffect(() => {
-    loadDashboardData();
-    updateMonthName();
-  }, [currentDate]);
+    if (tenantInfo?.id) {
+      loadDashboardData();
+      updateMonthName();
+    }
+  }, [currentDate, tenantInfo]);
 
   // Separate useEffect for recurring transactions - only on component mount
   useEffect(() => {
-    checkAndGenerateRecurringTransactions();
-  }, []); // Empty dependency array means it only runs once on mount
+    if (tenantInfo?.id) {
+      checkAndGenerateRecurringTransactions();
+    }
+  }, [tenantInfo]); // Only run when tenantInfo becomes available
 
   const updateMonthName = () => {
     const monthName = currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
@@ -63,6 +69,10 @@ const Dashboard = () => {
 
   const checkAndGenerateRecurringTransactions = async () => {
     try {
+      if (!tenantInfo?.id) {
+        return; // Don't run if tenant not available
+      }
+      
       // First, run migration for existing expenses that don't have generatedMonths
       await recurringExpenseService.migrateExistingExpenses();
       
@@ -123,8 +133,13 @@ const Dashboard = () => {
   // Función para agrupar transacciones por categoría general
   const groupTransactionsByGeneral = async (transactions, concepts) => {
     try {
+      const tenantId = tenantInfo?.id;
+      if (!tenantId) {
+        return {};
+      }
+      
       // Obtener todas las categorías generales de tipo 'salida' (gastos)
-      const generals = await generalService.getByType('salida');
+      const generals = await generalService.getByType('salida', tenantId);
       
       // Crear un mapa de conceptos a categorías generales
       const conceptToGeneralMap = {};
@@ -209,6 +224,11 @@ const Dashboard = () => {
         endDate: endDateStr
       });
 
+      const tenantId = tenantInfo?.id;
+      if (!tenantId) {
+        throw new Error('No tenant ID available');
+      }
+
       // Load all dashboard data in parallel for the selected month
       const [
         summaryData,
@@ -218,12 +238,12 @@ const Dashboard = () => {
         generalsData,
         subconceptsData
       ] = await Promise.all([
-        dashboardService.getMonthSummary(startOfMonth, endOfMonth),
-        dashboardService.getMonthlyTrends(),
-        transactionService.getByDateRange(startOfMonth, endOfMonth),
-        conceptService.getAll(),
-        generalService.getAll(),
-        subconceptService.getAll()
+        dashboardService.getMonthSummary(startOfMonth, endOfMonth, tenantId),
+        dashboardService.getMonthlyTrends(tenantId),
+        transactionService.getByDateRange(startOfMonth, endOfMonth, {}, tenantId),
+        conceptService.getAll(tenantId),
+        generalService.getAll(tenantId),
+        subconceptService.getAll(tenantId)
       ]);
 
       // Generate report stats for report components
@@ -237,8 +257,8 @@ const Dashboard = () => {
         division: null
       };
 
-      const transactionsForReport = await reportService.getFilteredTransactions(filterData);
-      const statsData = await reportService.generateReportStats(transactionsForReport, filterData);
+      const transactionsForReport = await reportService.getFilteredTransactions(filterData, tenantId);
+      const statsData = await reportService.generateReportStats(transactionsForReport, filterData, tenantId);
 
       // Store data for report components
       setGenerals(generalsData);
@@ -248,7 +268,7 @@ const Dashboard = () => {
       setTransactionsReport(transactionsForReport);
       
       // Get all transactions without date filter for tree comparison
-      const allTransactionsComplete = await transactionService.getAll({});
+      const allTransactionsComplete = await transactionService.getAll({}, tenantId);
       setAllTransactionsReport(allTransactionsComplete);
 
       // Agrupar transacciones por día

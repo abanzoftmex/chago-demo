@@ -15,11 +15,20 @@ import { db } from '../firebase/firebaseConfig';
 
 const COLLECTION_NAME = 'subconcepts';
 
+// Helper function to get the correct collection path
+const getSubconceptsCollection = (tenantId) => {
+  return tenantId ? `tenants/${tenantId}/subconcepts` : COLLECTION_NAME;
+};
+
 export const subconceptService = {
   // Create a new subconcept
-  async create(subconceptData) {
+  async create(subconceptData, tenantId) {
     try {
-      const docRef = await addDoc(collection(db, COLLECTION_NAME), {
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
+      const docRef = await addDoc(collection(db, getSubconceptsCollection(tenantId)), {
         ...subconceptData,
         createdAt: serverTimestamp(),
         isActive: true
@@ -33,9 +42,13 @@ export const subconceptService = {
   },
 
   // Get subconcept by ID
-  async getById(id) {
+  async getById(id, tenantId) {
     try {
-      const docRef = doc(db, COLLECTION_NAME, id);
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
+      const docRef = doc(db, getSubconceptsCollection(tenantId), id);
       const docSnap = await getDoc(docRef);
       
       if (docSnap.exists()) {
@@ -50,10 +63,14 @@ export const subconceptService = {
   },
 
   // Get subconcepts by concept ID
-  async getByConcept(conceptId) {
+  async getByConcept(conceptId, tenantId) {
     try {
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
       const q = query(
-        collection(db, COLLECTION_NAME),
+        collection(db, getSubconceptsCollection(tenantId)),
         where('conceptId', '==', conceptId),
         where('isActive', '==', true),
         orderBy('name', 'asc')
@@ -74,10 +91,14 @@ export const subconceptService = {
   },
 
   // Get all subconcepts
-  async getAll() {
+  async getAll(tenantId) {
     try {
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
       const q = query(
-        collection(db, COLLECTION_NAME),
+        collection(db, getSubconceptsCollection(tenantId)),
         where('isActive', '==', true),
         orderBy('conceptId', 'asc'),
         orderBy('name', 'asc')
@@ -98,9 +119,13 @@ export const subconceptService = {
   },
 
   // Update subconcept
-  async update(id, updateData) {
+  async update(id, updateData, tenantId) {
     try {
-      const docRef = doc(db, COLLECTION_NAME, id);
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
+      const docRef = doc(db, getSubconceptsCollection(tenantId), id);
       await updateDoc(docRef, updateData);
       
       return { id, ...updateData };
@@ -111,22 +136,26 @@ export const subconceptService = {
   },
 
   // Soft delete subconcept (set isActive to false)
-  async delete(id, user = null) {
+  async delete(id, tenantId, user = null) {
     try {
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
       // Check if user has permission to delete (contador and director_general roles cannot delete)
       const userRole = user?.role || user?.userRole;
       if (user && ['contador', 'director_general'].includes(userRole)) {
         throw new Error("No tienes permisos para eliminar subconceptos");
       }
       // Check if subconcept has associated transactions
-      const hasTransactions = await this.hasAssociatedTransactions(id);
+      const hasTransactions = await this.hasAssociatedTransactions(id, tenantId);
       
       if (hasTransactions) {
         // Soft delete - just deactivate
-        await this.update(id, { isActive: false });
+        await this.update(id, { isActive: false }, tenantId);
       } else {
         // Hard delete if no transactions
-        const docRef = doc(db, COLLECTION_NAME, id);
+        const docRef = doc(db, getSubconceptsCollection(tenantId), id);
         await deleteDoc(docRef);
       }
       
@@ -138,9 +167,13 @@ export const subconceptService = {
   },
 
   // Check if subconcept has associated transactions
-  async hasAssociatedTransactions(subconceptId) {
+  async hasAssociatedTransactions(subconceptId, tenantId) {
     try {
-      const transactionsRef = collection(db, 'transactions');
+      if (!tenantId) {
+        return false;
+      }
+      
+      const transactionsRef = collection(db, `tenants/${tenantId}/transacciones`);
       const q = query(transactionsRef, where('subconceptId', '==', subconceptId));
       const querySnapshot = await getDocs(q);
       
@@ -152,9 +185,13 @@ export const subconceptService = {
   },
 
   // Get subconcepts for dropdown/select by concept
-  async getForSelect(conceptId) {
+  async getForSelect(conceptId, tenantId) {
     try {
-      const subconcepts = await this.getByConcept(conceptId);
+      if (!tenantId) {
+        throw new Error('Tenant ID es requerido');
+      }
+      
+      const subconcepts = await this.getByConcept(conceptId, tenantId);
       return subconcepts.map(subconcept => ({
         value: subconcept.id,
         label: subconcept.name,

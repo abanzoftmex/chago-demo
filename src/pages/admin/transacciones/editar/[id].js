@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/router";
 import AdminLayout from "../../../../components/layout/AdminLayout";
 import TransactionForm from "../../../../components/forms/TransactionForm";
 import ProtectedRoute from "../../../../components/auth/ProtectedRoute";
-import { useAuth } from "../../../../context/AuthContext";
+import { useAuth } from "../../../../context/AuthContextMultiTenant";
 import { useToast } from "../../../../components/ui/Toast";
 import { transactionService } from "../../../../lib/services/transactionService";
 import { conceptService } from "../../../../lib/services/conceptService";
@@ -12,7 +12,11 @@ import { providerService } from "../../../../lib/services/providerService";
 const EditTransaction = () => {
   const router = useRouter();
   const { id } = router.query;
-  const { checkPermission } = useAuth();
+  const { checkPermission, tenantInfo } = useAuth();
+  
+  // Memoize tenantId to prevent unnecessary re-renders
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
+  
   const [transaction, setTransaction] = useState(null);
   const [concepts, setConcepts] = useState([]);
   const [providers, setProviders] = useState([]);
@@ -25,10 +29,17 @@ const EditTransaction = () => {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
+
+      if (!tenantId) {
+        console.error("No tenant ID available");
+        setLoading(false);
+        return;
+      }
+
       const [transactionData, conceptsData, providersData] = await Promise.all([
-        transactionService.getById(id),
-        conceptService.getAll(),
-        providerService.getAll(),
+        transactionService.getById(id, tenantId),
+        conceptService.getAll(tenantId),
+        providerService.getAll(tenantId),
       ]);
 
       if (!transactionData) {
@@ -47,7 +58,7 @@ const EditTransaction = () => {
     } finally {
       setLoading(false);
     }
-  }, [id, router, toast]);
+  }, [id, router, toast, tenantId]);
 
   useEffect(() => {
     if (!canManageTransactions) {
