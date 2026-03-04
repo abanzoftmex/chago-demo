@@ -34,37 +34,46 @@ const LoginPage = () => {
       <div className="relative flex-1 min-h-[30vh] lg:min-h-auto lg:order-2">
         <img
           className="absolute inset-0 h-full w-full object-cover"
-          src="/login_back.jpg"
-          alt="Demo"
+          src="/Gemini_Generated_Image_d0o4mhd0o4mhd0o4.png"
+          alt="Sistema Multi-Tenant"
         />
-        <div className="absolute inset-0 bg-primary/30"></div>
-        <div className="absolute inset-4 lg:bottom-8 lg:left-8 lg:right-8 lg:top-auto flex items-center lg:items-end">
-          <div className="bg-white/50 backdrop-blur-sm rounded-lg p-4 lg:p-6 w-full shadow-2xl">
-            <h3 className="text-lg lg:text-xl font-semibold text-gray-900 mb-2">
-              Sistema de Gestión Administrativa
+        <div className="absolute inset-0 bg-black/40"></div>
+        <div className="absolute inset-4 lg:bottom-12 lg:left-12 lg:right-12 lg:top-auto flex items-center lg:items-end">
+          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 lg:p-8 w-full border border-white/20 shadow-2xl">
+            <h3 className="text-xl lg:text-3xl font-bold text-white mb-3">
+              Sistema de Gestión
             </h3>
-            <p className="text-sm lg:text-base text-gray-800">
-              Administra tus entradas, salidas, proveedores y reportes de manera eficiente y segura.
+            <p className="text-base lg:text-lg text-gray-100">
+              La plataforma más completa para administrar múltiples negocios, 
+              controlar transacciones y generar reportes inteligentes.
             </p>
           </div>
         </div>
       </div>
 
       {/* Left side - Login Form - Now second on mobile */}
-      <div className="flex-1 flex flex-col justify-center py-8 lg:py-12 px-4 sm:px-6 lg:flex-none lg:px-20 xl:px-24 lg:order-1">
+      <div className="flex-1 flex flex-col justify-center py-8 lg:py-12 px-4 sm:px-6 lg:flex-none lg:px-20 xl:px-24 lg:order-1 bg-white">
         <div className="mx-auto w-full max-w-sm lg:w-96">
           <div className="text-center">
-            <img
-              className="rounded-2xl mx-auto h-24 lg:h-32 w-auto shadow-2xl"
-              src="/logo.jpg"
-              alt="Logo"
-            />
-            <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mt-3 lg:mt-5">
-              Bienvenido <br /> <span className="text-primary">Sistema Administrativo</span>
+            <div className="bg-gray-50 p-4 rounded-3xl inline-block shadow-sm mb-6">
+              <img
+                className="h-20 lg:h-24 w-auto object-contain"
+                src="/demo-button-label-filled-icon.jpg"
+                alt="Logo Demo"
+              />
+            </div>
+            <h2 className="text-3xl lg:text-4xl font-extrabold text-gray-900 tracking-tight">
+              Bienvenido <br /> 
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-orange-600 to-red-600">
+                Portal de Acceso
+              </span>
             </h2>
+            <p className="mt-4 text-gray-600 font-medium">
+              Ingresa tus credenciales para continuar
+            </p>
           </div>
 
-          <div className="mt-6 lg:mt-8">
+          <div className="mt-8 lg:mt-10">
             <LoginForm />
           </div>
         </div>
