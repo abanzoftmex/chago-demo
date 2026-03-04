@@ -1,4 +1,6 @@
 import { recurringExpenseService } from "../../../lib/services/recurringExpenseService";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../../../lib/firebase/firebaseConfig";
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -6,29 +8,32 @@ export default async function handler(req, res) {
   }
 
   try {
-    // This would typically be called by a cron job or scheduled task
-    // For now, we'll allow manual triggering with proper authentication
-    
     const { authorization } = req.headers;
     
-    // Basic security check - in production, implement proper API key validation
     if (!authorization || !authorization.startsWith('Bearer ')) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    // First, run migration for existing expenses that don't have generatedMonths
-    await recurringExpenseService.migrateExistingExpenses();
-    
-    // Generate pending transactions for current month
-    const generatedTransactions = await recurringExpenseService.generatePendingTransactions({
-      uid: 'system', // System user for automated generation
-      email: 'system@santiago-fc.com'
-    });
+    // Iterate all tenants
+    const tenantsSnap = await getDocs(collection(db, 'tenants'));
+    const systemUser = { uid: 'system', email: 'system@cron' };
+    let totalGenerated = 0;
+
+    for (const tenantDoc of tenantsSnap.docs) {
+      const tenantId = tenantDoc.id;
+      try {
+        await recurringExpenseService.migrateExistingExpenses(tenantId);
+        const generated = await recurringExpenseService.generatePendingTransactions(tenantId, systemUser);
+        totalGenerated += generated.length;
+      } catch (tenantError) {
+        console.error(`Error for tenant ${tenantId}:`, tenantError.message);
+      }
+    }
 
     res.status(200).json({
       success: true,
-      message: `Generated ${generatedTransactions.length} pending transactions`,
-      transactions: generatedTransactions
+      message: `Generated ${totalGenerated} pending transactions`,
+      totalGenerated
     });
 
   } catch (error) {

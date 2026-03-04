@@ -13,20 +13,31 @@ import {
 
 const Header = ({ title, breadcrumbs = [], onMenuClick, onToggleCollapse, sidebarCollapsed, isMobile }) => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const { user, logout, userRole, ROLES } = useAuth();
+  const { user, logout, userRole, ROLES, TENANT_ROLES } = useAuth();
   const userMenuRef = useRef(null);
   const router = useRouter();
   
   const getRoleDisplayName = (role) => {
     switch (role) {
-      case ROLES?.ADMINISTRATIVO:
+      // Tenant roles (new)
+      case TENANT_ROLES?.ADMIN:
+      case 'admin':
         return "Administrador";
-      case ROLES?.CONTADOR:
+      case TENANT_ROLES?.CONTADOR:
+      case 'contador':
         return "Contador";
+      case TENANT_ROLES?.VIEWER:
+      case 'viewer':
+        return "Visor";
+      // Legacy roles
+      case ROLES?.ADMINISTRATIVO:
+      case 'administrativo':
+        return "Administrador";
       case ROLES?.DIRECTOR_GENERAL:
+      case 'director_general':
         return "Director General";
       default:
-        return "Sin rol";
+        return role || "Sin rol";
     }
   };
 

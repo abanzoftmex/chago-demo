@@ -20,7 +20,7 @@ import { formatCurrency, formatCurrencyWithBadge, calculateTreeComparison, getTr
 
 const Dashboard = () => {
   const { error, success } = useToast();
-  const { tenantInfo } = useAuth();
+  const { tenantInfo, user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState({
     entradas: 0,
@@ -74,10 +74,10 @@ const Dashboard = () => {
       }
       
       // First, run migration for existing expenses that don't have generatedMonths
-      await recurringExpenseService.migrateExistingExpenses();
+      await recurringExpenseService.migrateExistingExpenses(tenantInfo.id);
       
       // Then generate pending transactions for current month
-      const generatedTransactions = await recurringExpenseService.generatePendingTransactions();
+      const generatedTransactions = await recurringExpenseService.generatePendingTransactions(tenantInfo.id, user);
       
       if (generatedTransactions.length > 0) {
         const currentMonthName = new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });

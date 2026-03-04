@@ -1,4 +1,6 @@
 import { recurringExpenseService } from "../../../lib/services/recurringExpenseService";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../../../lib/firebase/firebaseConfig";
 
 export default async function handler(req, res) {
   // Vercel cron jobs send GET requests, but we also support POST for manual testing
@@ -22,27 +24,31 @@ export default async function handler(req, res) {
     }
 
     const today = new Date();
-    
-    // First, run migration for existing expenses that don't have the new fields
-    await recurringExpenseService.migrateExistingExpenses();
-    
-    // Generate pending transactions for today (supports all frequencies)
-    const generatedTransactions = await recurringExpenseService.generatePendingTransactions({
-      uid: 'system-cron',
-      email: 'system@santiago-fc.com'
-    });
 
-    // Log the generation for monitoring
-    console.log(`[CRON] Generated ${generatedTransactions.length} recurring transactions on ${today.toISOString()}`);
+    // Get all tenants and run for each
+    const tenantsSnap = await getDocs(collection(db, 'tenants'));
+    const systemUser = { uid: 'system-cron', email: 'system@cron' };
+    let totalGenerated = 0;
+
+    for (const tenantDoc of tenantsSnap.docs) {
+      const tenantId = tenantDoc.id;
+      try {
+        await recurringExpenseService.migrateExistingExpenses(tenantId);
+        const generated = await recurringExpenseService.generatePendingTransactions(tenantId, systemUser);
+        totalGenerated += generated.length;
+        console.log(`[CRON] Tenant ${tenantId}: generated ${generated.length} transactions`);
+      } catch (tenantError) {
+        console.error(`[CRON] Error for tenant ${tenantId}:`, tenantError.message);
+      }
+    }
+
+    console.log(`[CRON] Total generated ${totalGenerated} recurring transactions on ${today.toISOString()}`);
 
     res.status(200).json({
       success: true,
-      message: `Generated ${generatedTransactions.length} recurring transactions`,
-      transactions: generatedTransactions,
+      message: `Generated ${totalGenerated} recurring transactions`,
+      totalGenerated,
       date: today.toISOString(),
-      executionDay: today.getDate(),
-      dayOfWeek: today.getDay(), // 0 = Sunday, 1 = Monday, etc.
-      lastDayOfMonth: new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate() === today.getDate()
     });
 
   } catch (error) {
