@@ -1,0 +1,136 @@
+import { useEffect, useRef, useState } from "react";
+import AdminLayout from "../../../components/layout/AdminLayout";
+import { settingsService } from "../../../lib/services/settingsService";
+import { useToast } from "../../../components/ui/Toast";
+import { PhotoIcon } from "@heroicons/react/24/outline";
+
+const ConfiguracionLogo = () => {
+  const [currentLogoUrl, setCurrentLogoUrl] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [file, setFile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef(null);
+  const toast = useToast();
+
+  useEffect(() => {
+    settingsService.getLogo().then((url) => {
+      setCurrentLogoUrl(url);
+    }).catch((err) => {
+      toast.error(err.message || "Error al cargar el logo");
+    }).finally(() => setLoading(false));
+  }, []);
+
+  const handleFileChange = (e) => {
+    const selected = e.target.files[0];
+    if (!selected) return;
+    if (!selected.type.startsWith("image/")) {
+      toast.error("Solo se permiten archivos de imagen");
+      return;
+    }
+    setFile(selected);
+    setPreview(URL.createObjectURL(selected));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!file) return;
+    try {
+      setSaving(true);
+      const url = await settingsService.uploadLogo(file);
+      setCurrentLogoUrl(url);
+      setPreview(null);
+      setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      toast.success("Logo actualizado correctamente");
+    } catch (err) {
+      toast.error(err.message || "Error al subir el logo");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const displayLogo = preview || currentLogoUrl || "/logo.jpg";
+
+  return (
+    <AdminLayout
+      title="Logo"
+      breadcrumbs={[
+        { name: "Dashboard", href: "/admin/dashboard" },
+        { name: "Configuración" },
+        { name: "Logo" },
+      ]}
+    >
+      <div className="bg-white border border-gray-200 rounded-2xl p-6 max-w-lg">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">Logo del sistema</h2>
+          <p className="text-gray-600 mt-1">
+            Sube el logo que aparecerá en el menú lateral.
+          </p>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center h-24">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Vista previa */}
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-40 h-40 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-center overflow-hidden bg-gray-50">
+                {displayLogo ? (
+                  <img
+                    src={displayLogo}
+                    alt="Logo actual"
+                    className="max-w-full max-h-full object-contain"
+                  />
+                ) : (
+                  <PhotoIcon className="h-16 w-16 text-gray-300" />
+                )}
+              </div>
+              {preview && (
+                <span className="text-xs text-amber-600 font-medium">
+                  Vista previa — aún no guardado
+                </span>
+              )}
+            </div>
+
+            {/* Input de archivo */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Seleccionar imagen
+              </label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="block w-full text-sm text-gray-500
+                  file:mr-4 file:py-2 file:px-4
+                  file:rounded-md file:border-0
+                  file:text-sm file:font-semibold
+                  file:bg-primary file:text-white
+                  hover:file:opacity-90 cursor-pointer"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                PNG, JPG, SVG o WebP. Recomendado: fondo transparente.
+              </p>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={saving || !file}
+                className="px-5 py-2.5 text-sm font-semibold text-white bg-primary rounded-md disabled:opacity-50"
+              >
+                {saving ? "Subiendo..." : "Guardar logo"}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </AdminLayout>
+  );
+};
+
+export default ConfiguracionLogo;

@@ -62,7 +62,8 @@ const useSidebarStore = create(
           }
         } else if (pathname.includes('/configuracion/correos-notificacion') ||
                    pathname.includes('/configuracion/logs') ||
-                   pathname.includes('/configuracion/dev-tools')) {
+                   pathname.includes('/configuracion/dev-tools') ||
+                   pathname.includes('/configuracion/logo')) {
           if (!currentExpanded.configuracion) {
             get().expandSection('configuracion');
           }

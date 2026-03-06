@@ -1,5 +1,6 @@
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../firebase/firebaseConfig";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage } from "../firebase/firebaseConfig";
 
 const SETTINGS_COLLECTION = "settings";
 const EMAILS_DOC_ID = "emails";
@@ -71,6 +72,37 @@ export const settingsService = {
     } catch (error) {
       console.error("Error saving emails settings:", error);
       throw new Error("Error al guardar configuración de correos");
+    }
+  },
+
+  async getLogo() {
+    try {
+      const brandingRef = doc(db, SETTINGS_COLLECTION, "branding");
+      const snap = await getDoc(brandingRef);
+      if (snap.exists()) {
+        return snap.data().logoUrl || null;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error getting logo:", error);
+      throw new Error("Error al obtener el logo");
+    }
+  },
+
+  async uploadLogo(file) {
+    try {
+      const storageRef = ref(storage, "branding/logo");
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      await setDoc(
+        doc(db, SETTINGS_COLLECTION, "branding"),
+        { logoUrl: url, updatedAt: serverTimestamp() },
+        { merge: true }
+      );
+      return url;
+    } catch (error) {
+      console.error("Error uploading logo:", error);
+      throw new Error("Error al subir el logo");
     }
   },
 };

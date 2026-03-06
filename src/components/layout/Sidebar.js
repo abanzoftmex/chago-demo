@@ -2,6 +2,7 @@ import { useRouter } from "next/router";
 import React, { useEffect } from "react";
 import { useAuth } from "../../context/AuthContextMultiTenant";
 import useSidebarStore from "../../lib/stores/sidebarStore";
+import { useLogoUrl } from "../../lib/hooks/useLogoUrl";
 import {
   HomeIcon,
   DocumentTextIcon,
@@ -29,6 +30,7 @@ const Sidebar = ({
 }) => {
   const router = useRouter();
   const { checkPermission, userRole } = useAuth();
+  const logoUrl = useLogoUrl();
 
 
 
@@ -79,9 +81,9 @@ const Sidebar = ({
         <div className="flex flex-col w-full bg-white border-r border-gray-200">
           {/* Logo */}
           <div className="flex items-center justify-center mb-4 mt-4 px-2">
-            <img 
-              src="/logo.jpg" 
-              alt="Logo" 
+            <img
+              src={logoUrl}
+              alt="Logo"
               className={`h-auto rounded-2xl shadow-md ${collapsed ? 'w-full' : 'max-w-[120px]'}`}
             />
           </div>
@@ -340,6 +342,17 @@ const Sidebar = ({
                     <div className="space-y-1 transition-all duration-300 ease-in-out">
                       <button
                         onClick={() =>
+                          handleNavigation("/admin/configuracion/logo")
+                        }
+                        className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/configuracion/logo"
+                          ? "bg-blue-50 text-primary"
+                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                          }`}
+                      >
+                        <span className="ml-3">Logo</span>
+                      </button>
+                      <button
+                        onClick={() =>
                           handleNavigation(
                             "/admin/configuracion/correos-notificacion"
                           )
@@ -424,7 +437,7 @@ const Sidebar = ({
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-center px-4 py-6 border-b border-gray-200 relative">
-            <img src="/logo.jpg" alt="Logo" className="max-w-[120px] h-auto rounded-2xl shadow-md" />
+            <img src={logoUrl} alt="Logo" className="max-w-[120px] h-auto rounded-2xl shadow-md" />
             <button
               onClick={onClose}
               className="absolute top-6 right-4 p-2 rounded-lg text-gray-500 hover:text-gray-700"
@@ -685,6 +698,17 @@ const Sidebar = ({
                 {/* Submenú de Configuración */}
                 {expandedSections.configuracion && (
                   <div className="space-y-1">
+                    <button
+                      onClick={() =>
+                        handleNavigation("/admin/configuracion/logo")
+                      }
+                      className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/configuracion/logo"
+                        ? "bg-blue-50 text-primary"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                        }`}
+                    >
+                      <span className="ml-3">Logo</span>
+                    </button>
                     <button
                       onClick={() =>
                         handleNavigation(
