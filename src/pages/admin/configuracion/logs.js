@@ -272,6 +272,7 @@ const LogsPage = () => {
 
       const paginationFilters = {
         ...filters,
+        tenantId,
         startAfter: page > 1 ? pagination.lastDoc : null,
       };
 

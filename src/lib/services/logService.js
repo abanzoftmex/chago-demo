@@ -17,6 +17,13 @@ import { db } from "../firebase/firebaseConfig";
 
 const COLLECTION_NAME = "logs";
 
+const getLogsCollection = (tenantId) => {
+  if (tenantId) {
+    return `tenants/${tenantId}/logs`;
+  }
+  return COLLECTION_NAME;
+};
+
 export const logService = {
   // Función auxiliar para sanitizar datos complejos
   sanitizeData(obj) {
@@ -79,7 +86,8 @@ export const logService = {
         timestamp: serverTimestamp(),
       };
 
-      const docRef = await addDoc(collection(db, COLLECTION_NAME), finalData);
+      const collectionPath = getLogsCollection(logData?.tenantId);
+      const docRef = await addDoc(collection(db, collectionPath), finalData);
 
       return { id: docRef.id, ...logData };
     } catch (error) {
@@ -93,7 +101,8 @@ export const logService = {
   // Get all logs with optional filters
   async getAll(filters = {}) {
     try {
-      let q = collection(db, COLLECTION_NAME);
+      const collectionPath = getLogsCollection(filters.tenantId);
+      let q = collection(db, collectionPath);
 
       // Apply filters
       if (filters.action) {
@@ -174,7 +183,7 @@ export const logService = {
   },
 
   // Log a transaction deletion
-  async logTransactionDeletion({ user, transactionId, transactionData, deletionReason = null }) {
+  async logTransactionDeletion({ user, transactionId, transactionData, deletionReason = null, tenantId = null }) {
     try {
       const userId = user.uid;
       const userName = user.displayName || user.email || "Usuario desconocido";
@@ -196,6 +205,7 @@ export const logService = {
         entityData: transactionData,
         userId,
         userName,
+        tenantId,
         transactionType: transactionType, // Guardar el tipo de transacción original
         deletionReason: deletionReason || null, // Guardar el motivo si existe
         details: details
@@ -208,7 +218,7 @@ export const logService = {
   },
 
   // Log user creation
-  async logUserCreation({ user, userId, userData }) {
+  async logUserCreation({ user, userId, userData, tenantId = null }) {
     try {
       const currentUserId = user.uid;
       const currentUserName = user.displayName || user.email || "Usuario desconocido";
@@ -220,6 +230,7 @@ export const logService = {
         entityData: userData,
         userId: currentUserId,
         userName: currentUserName,
+        tenantId,
         details: `Usuario ${currentUserName} creó la cuenta de ${userData.displayName || userData.email}`
       });
     } catch (error) {
@@ -229,7 +240,7 @@ export const logService = {
   },
 
   // Log user update
-  async logUserUpdate({ user, userId, userData, previousData }) {
+  async logUserUpdate({ user, userId, userData, previousData, tenantId = null }) {
     try {
       console.log("=== LOG USER UPDATE DEBUG ===");
       console.log("User performing action:", user);
@@ -276,6 +287,7 @@ export const logService = {
         previousData: cleanPreviousData,
         userId: currentUserId,
         userName: currentUserName,
+        tenantId,
         details: details
       };
 
@@ -293,7 +305,7 @@ export const logService = {
   },
 
   // Log user status change (enable/disable)
-  async logUserStatusChange({ user, userId, userData, action, previousStatus }) {
+  async logUserStatusChange({ user, userId, userData, action, previousStatus, tenantId = null }) {
     try {
       const currentUserId = user.uid;
       const currentUserName = user.displayName || user.email || "Usuario desconocido";
@@ -310,6 +322,7 @@ export const logService = {
         previousData: { isActive: previousStatus },
         userId: currentUserId,
         userName: currentUserName,
+        tenantId,
         details: details
       });
     } catch (error) {
@@ -319,7 +332,7 @@ export const logService = {
   },
 
   // Log user deletion
-  async logUserDeletion({ user, userId, userData }) {
+  async logUserDeletion({ user, userId, userData, tenantId = null }) {
     try {
       const currentUserId = user.uid;
       const currentUserName = user.displayName || user.email || "Usuario desconocido";
@@ -332,6 +345,7 @@ export const logService = {
         entityData: userData,
         userId: currentUserId,
         userName: currentUserName,
+        tenantId,
         details: `Usuario ${currentUserName} eliminó la cuenta de ${targetUserName}`
       });
     } catch (error) {
@@ -367,7 +381,7 @@ export const logService = {
   },
 
   // Log a transaction creation
-  async logTransactionCreation({ user, transactionId, transactionData }) {
+  async logTransactionCreation({ user, transactionId, transactionData, tenantId = null }) {
     try {
       if (!user) {
         console.warn("No user provided for transaction creation log");
@@ -390,6 +404,7 @@ export const logService = {
         entityData: transactionData || {},
         userId,
         userName,
+        tenantId,
         transactionType: transactionData?.type || 'unknown',
         details: `Usuario ${userName} creó un ${transactionType} (${safeTransactionId})`
       });
@@ -401,7 +416,7 @@ export const logService = {
   },
 
   // Log a transaction update
-  async logTransactionUpdate({ user, transactionId, transactionData, previousData }) {
+  async logTransactionUpdate({ user, transactionId, transactionData, previousData, tenantId = null }) {
     try {
       const userId = user.uid;
       const userName = user.displayName || user.email || "Usuario desconocido";
@@ -417,6 +432,7 @@ export const logService = {
         previousData: previousData,
         userId,
         userName,
+        tenantId,
         transactionType: transactionData.type, // Guardar el tipo de transacción
         details: `Usuario ${userName} actualizó un ${transactionType} (${transactionId})`
       });

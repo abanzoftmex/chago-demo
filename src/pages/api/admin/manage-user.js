@@ -95,13 +95,14 @@ export default async function handler(req, res) {
             await logService.logUserStatusChange({
               user: {
                 uid: currentUser.uid,
-                displayName: currentUserData.displayName,
-                email: currentUserData.email
+                displayName: currentUser.name || currentUser.email,
+                email: currentUser.email
               },
               userId: userId,
               userData: { ...userDataBefore, isActive: false },
               action: "disable",
-              previousStatus: true
+              previousStatus: true,
+              tenantId
             });
           }
 
@@ -129,13 +130,14 @@ export default async function handler(req, res) {
             await logService.logUserStatusChange({
               user: {
                 uid: currentUser.uid,
-                displayName: currentUserData.displayName,
-                email: currentUserData.email
+                displayName: currentUser.name || currentUser.email,
+                email: currentUser.email
               },
               userId: userId,
               userData: { ...userDataBefore, isActive: true },
               action: "enable",
-              previousStatus: false
+              previousStatus: false,
+              tenantId
             });
           }
 

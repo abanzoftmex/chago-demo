@@ -48,7 +48,8 @@ export const transactionService = {
         await logService.logTransactionCreation({
           user,
           transactionId: docRef.id,
-          transactionData: newTransaction
+          transactionData: newTransaction,
+          tenantId
         });
       }
 
@@ -213,7 +214,8 @@ export const transactionService = {
           user,
           transactionId: id,
           transactionData: updatedTransaction,
-          previousData
+          previousData,
+          tenantId
         });
       }
 
@@ -252,7 +254,8 @@ export const transactionService = {
           user,
           transactionId: id,
           transactionData,
-          deletionReason // Pasar el motivo de eliminación
+          deletionReason,
+          tenantId
         });
       }
 
@@ -464,7 +467,8 @@ export const transactionService = {
         await logService.logTransactionCreation({
           user,
           transactionId: docRef.id,
-          transactionData: newTransaction
+          transactionData: newTransaction,
+          tenantId
         });
       }
 
