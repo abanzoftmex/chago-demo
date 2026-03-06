@@ -496,7 +496,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
           </div>
         </div>
 
-        {/* Tercera fila: Proveedor / División */}
+        {/* Tercera fila: Proveedor */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -518,7 +518,8 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
             )}
           </div>
 
-          <div>
+          {/* División oculta temporalmente */}
+          {/* <div>
             <label htmlFor="division" className="block text-sm font-medium text-gray-700 mb-2">
               División *
             </label>
@@ -538,7 +539,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
             {errors.division && (
               <p className="mt-1 text-sm text-red-600">{errors.division}</p>
             )}
-          </div>
+          </div> */}
         </div>
 
         {/* Descripción - Ancho completo */}
