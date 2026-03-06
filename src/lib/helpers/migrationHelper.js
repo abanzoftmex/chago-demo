@@ -39,7 +39,7 @@ export const migrateUserToMultiTenant = async (userId, nombreEmpresa) => {
     }
 
     const userData = userSnap.data();
-    
+
     // Verificar si ya tiene tenant asignado
     if (userData.tenantId) {
       return {
@@ -72,7 +72,7 @@ export const migrateUserToMultiTenant = async (userId, nombreEmpresa) => {
     await migrateLegacyDataToTenant(userId, tenantId);
 
     console.log(`✅ Usuario ${userId} migrado exitosamente a tenant ${tenantId}`);
-    
+
     return {
       success: true,
       userId,
@@ -216,7 +216,7 @@ const migrateLegacyCollection = async (legacyCollection, tenantId, userId, tenan
 
       batchDocs.forEach((legacyDoc) => {
         const legacyData = legacyDoc.data();
-        
+
         // Preparar datos para el tenant
         const tenantData = {
           ...legacyData,
@@ -432,7 +432,7 @@ export const generatePreMigrationReport = async () => {
     usersSnap.forEach((doc) => {
       const userData = doc.data();
       const role = userData.role || "sin_rol";
-      
+
       if (!report.users.byRole[role]) {
         report.users.byRole[role] = 0;
       }
@@ -441,7 +441,7 @@ export const generatePreMigrationReport = async () => {
 
     // Analizar datos legacy
     const collections = ["transactions", "concepts", "subconcepts", "providers", "descriptions", "generals"];
-    
+
     for (const collectionName of collections) {
       try {
         const collRef = collection(db, collectionName);
@@ -454,7 +454,7 @@ export const generatePreMigrationReport = async () => {
 
     // Determinar complejidad
     const totalData = Object.values(report.data).reduce((sum, count) => sum + count, 0);
-    
+
     if (totalData > 10000 || report.users.total > 50) {
       report.complexity = "HIGH";
     } else if (totalData > 1000 || report.users.total > 10) {
@@ -534,8 +534,8 @@ export const createDemoTenant = async (ownerEmail, ownerPassword, ownerName, nom
 
     // 2. Crear tenant
     const tenantResult = await createTenant(
-      user.uid, 
-      nombreEmpresa, 
+      user.uid,
+      nombreEmpresa,
       {
         email: user.email,
         displayName: ownerName
@@ -576,6 +576,89 @@ export const createDemoTenant = async (ownerEmail, ownerPassword, ownerName, nom
 
   } catch (error) {
     console.error("❌ Error creando tenant demo:", error);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+};
+
+/**
+ * Crea un nuevo tenant (sin datos de ejemplo)
+ * @param {string} ownerEmail - Email del administrador
+ * @param {string} ownerPassword - Contraseña del administrador
+ * @param {string} ownerName - Nombre del administrador
+ * @param {string} nombreEmpresa - Nombre de la empresa
+ * @returns {Promise<Object>} - Resultado de la creación
+ */
+export const createNewTenant = async (ownerEmail, ownerPassword, ownerName, nombreEmpresa) => {
+  try {
+    console.log(`🏢 Creando nuevo tenant: ${nombreEmpresa}`);
+
+    // Importar servicios necesarios de Firebase Auth
+    const { createUserWithEmailAndPassword, signOut } = await import("firebase/auth");
+    const { auth } = await import("../firebase/firebaseConfig");
+
+    // 1. Crear usuario administrador
+    let userCredential;
+    try {
+      userCredential = await createUserWithEmailAndPassword(auth, ownerEmail, ownerPassword);
+    } catch (authError) {
+      if (authError.code === 'auth/email-already-in-use') {
+        return {
+          success: false,
+          error: `El email ${ownerEmail} ya está en uso. Usa otro email.`,
+        };
+      }
+      throw authError;
+    }
+
+    const user = userCredential.user;
+    console.log(`✅ Usuario creado: ${user.uid}`);
+
+    // Cerrar sesión automática para no afectar al admin actual
+    await signOut(auth);
+    console.log(`🔒 Sesión del nuevo usuario cerrada (evitar auto-login)`);
+
+    // 2. Crear tenant
+    const tenantResult = await createTenant(
+      user.uid,
+      nombreEmpresa,
+      {
+        email: user.email,
+        displayName: ownerName
+      }
+    );
+
+    if (!tenantResult.success) {
+      throw new Error(tenantResult.error);
+    }
+
+    const tenantId = tenantResult.tenantId;
+    console.log(`✅ Tenant creado: ${tenantId}`);
+
+    // 3. Actualizar datos adicionales del usuario
+    const userRef = doc(db, "users", user.uid);
+    await setDoc(userRef, {
+      displayName: ownerName,
+      createdAt: serverTimestamp(),
+    }, { merge: true });
+    console.log(`✅ Datos del usuario actualizados`);
+
+    return {
+      success: true,
+      tenantId: tenantId,
+      user: {
+        uid: user.uid,
+        email: user.email,
+        displayName: ownerName,
+      },
+      nombreEmpresa,
+      message: "Tenant creado exitosamente",
+    };
+
+  } catch (error) {
+    console.error("❌ Error creando tenant:", error);
     return {
       success: false,
       error: error.message,
