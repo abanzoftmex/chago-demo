@@ -500,7 +500,8 @@ const Reportes = () => {
       const filename = await reportService.exportToExcel(
         transactions,
         stats,
-        filters
+        filters,
+        tenantId
       );
       success(`Reporte exportado a Excel: ${filename}`);
     } catch (err) {

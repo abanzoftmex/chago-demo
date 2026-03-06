@@ -818,7 +818,7 @@ export const reportService = {
   },
 
   // Export to Excel
-  async exportToExcel(transactions, stats, filters) {
+  async exportToExcel(transactions, stats, filters, tenantId = null) {
     try {
       // Validar que stats tenga todas las propiedades necesarias
       if (!stats) {
@@ -857,10 +857,10 @@ export const reportService = {
 
       // Get reference data for lookups
       const [concepts, providers, descriptions, generals] = await Promise.all([
-        conceptService.getAll(),
-        providerService.getAll(),
-        descriptionService.getAll(),
-        generalService.getAll()
+        conceptService.getAll(tenantId),
+        providerService.getAll(tenantId),
+        descriptionService.getAll(tenantId),
+        generalService.getAll(tenantId)
       ]);
 
       const conceptMap = {};
