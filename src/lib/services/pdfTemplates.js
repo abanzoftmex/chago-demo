@@ -6,6 +6,7 @@
 import { jsPDF } from 'jspdf';
 import { autoTable } from 'jspdf-autotable';
 import { addLogoToPDF } from '../utils/logoUtils';
+import { settingsService } from './settingsService';
 
 // Define colors matching email template
 const COLORS = {
@@ -30,9 +31,7 @@ const formatCurrency = (amount) => {
 /**
  * Helper function to add page header with Santiago FC branding
  */
-export const addPageHeader = async (doc, title = 'Reporte Administrativo', totalTransactions = null) => {
-    console.log('Generando header del PDF...');
-    
+export const addPageHeader = async (doc, title = 'Reporte Administrativo', totalTransactions = null, logoUrl = null) => {
     // Header background with gradient effect
     doc.setFillColor(...COLORS.primary);
     doc.rect(0, 0, 210, 40, 'F');
@@ -41,15 +40,9 @@ export const addPageHeader = async (doc, title = 'Reporte Administrativo', total
     doc.setFillColor(0, 0, 0, 0.1);
     doc.rect(0, 40, 210, 2, 'F');
 
-    // Add Santiago FC logo
-    console.log('Añadiendo logo al PDF...');
+    // Add logo or EYS fallback
     try {
-        const logoAdded = await addLogoToPDF(doc, 15, 8, 25);
-        if (logoAdded) {
-            console.log('Logo añadido exitosamente');
-        } else {
-            console.log('Logo fallback aplicado');
-        }
+        await addLogoToPDF(doc, 15, 8, 25, logoUrl);
     } catch (error) {
         console.error('Error añadiendo logo:', error);
     }
@@ -181,8 +174,11 @@ export const createEnhancedPDFReport = async (transactions, stats, filters, conc
         format: 'a4'
     });
 
+    // Fetch logo URL once from Firebase
+    const logoUrl = await settingsService.getLogo().catch(() => null);
+
     // Start first page
-    await addPageHeader(doc, 'Reporte Administrativo', stats.totalTransactions);
+    await addPageHeader(doc, 'Reporte Administrativo', stats.totalTransactions, logoUrl);
 
     // Helper function to parse date string as local date without timezone conversion
     const parseDateLocal = (dateInput) => {
@@ -344,7 +340,7 @@ export const createEnhancedPDFReport = async (transactions, stats, filters, conc
         // Check if we need a new page
         if (currentY > 180) {
             doc.addPage();
-            await addPageHeader(doc, 'Reporte Administrativo');
+            await addPageHeader(doc, 'Reporte Administrativo', null, logoUrl);
             currentY = 50;
         }
 
@@ -402,7 +398,7 @@ export const createEnhancedPDFReport = async (transactions, stats, filters, conc
         // Check if we need a new page
         if (currentY > 200) {
             doc.addPage();
-            await addPageHeader(doc, 'Reporte Administrativo');
+            await addPageHeader(doc, 'Reporte Administrativo', null, logoUrl);
             currentY = 50;
         }
 
@@ -460,7 +456,7 @@ export const createEnhancedPDFReport = async (transactions, stats, filters, conc
         // Check if we need a new page
         if (currentY > 220) {
             doc.addPage();
-            await addPageHeader(doc, 'Reporte Administrativo');
+            await addPageHeader(doc, 'Reporte Administrativo', null, logoUrl);
             currentY = 50;
         }
 
@@ -518,7 +514,7 @@ export const createEnhancedPDFReport = async (transactions, stats, filters, conc
         // Check if we need a new page
         if (currentY > 220) {
             doc.addPage();
-            await addPageHeader(doc, 'Reporte Administrativo');
+            await addPageHeader(doc, 'Reporte Administrativo', null, logoUrl);
             currentY = 50;
         }
 
@@ -618,7 +614,7 @@ export const createEnhancedPDFReport = async (transactions, stats, filters, conc
     // Transactions detail (limited to first 100 for performance)
     if (transactions.length > 0) {
         doc.addPage();
-        await addPageHeader(doc, 'Detalle de Transacciones');
+        await addPageHeader(doc, 'Detalle de Transacciones', null, logoUrl);
 
         currentY = addSectionHeader(doc, 'Listado de Transacciones', 50);
 

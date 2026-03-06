@@ -59,26 +59,34 @@ export default async function handler(req, res) {
 
     // Verify current user is admin of the tenant
     try {
-      const memberDoc = await admin
+      const membersSnapshot = await admin
         .firestore()
         .collection("tenants")
         .doc(tenantId)
         .collection("members")
-        .doc(currentUser.uid)
         .get();
 
-      if (!memberDoc.exists) {
-        console.error("❌ Usuario no es miembro del tenant");
-        return res.status(403).json({ message: "No eres miembro de este tenant" });
-      }
+      const memberCount = membersSnapshot.size;
 
-      const memberData = memberDoc.data();
-      if (memberData.role !== TENANT_ROLES.ADMIN) {
-        console.error("❌ Usuario no es admin del tenant, rol:", memberData.role);
-        return res.status(403).json({ message: "Solo los administradores pueden crear usuarios" });
-      }
+      if (memberCount <= 1) {
+        // Solo hay un usuario registrado → es el master, se omite verificación de rol
+        console.log("✅ Usuario master (único en el tenant), permisos omitidos");
+      } else {
+        const memberDoc = membersSnapshot.docs.find((d) => d.id === currentUser.uid);
 
-      console.log("✅ Usuario verificado como admin del tenant");
+        if (!memberDoc) {
+          console.error("❌ Usuario no es miembro del tenant");
+          return res.status(403).json({ message: "No eres miembro de este tenant" });
+        }
+
+        const memberData = memberDoc.data();
+        if (memberData.role !== TENANT_ROLES.ADMIN) {
+          console.error("❌ Usuario no es admin del tenant, rol:", memberData.role);
+          return res.status(403).json({ message: "Solo los administradores pueden crear usuarios" });
+        }
+
+        console.log("✅ Usuario verificado como admin del tenant");
+      }
     } catch (error) {
       console.error("❌ Error verificando permisos:", error);
       return res.status(500).json({ message: "Error verificando permisos" });
