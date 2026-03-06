@@ -81,11 +81,17 @@ const Sidebar = ({
         <div className="flex flex-col w-full bg-white border-r border-gray-200">
           {/* Logo */}
           <div className="flex items-center justify-center mb-4 mt-4 px-2">
-            <img
-              src={logoUrl}
-              alt="Logo"
-              className={`h-auto rounded-2xl shadow-md ${collapsed ? 'w-full' : 'max-w-[120px]'}`}
-            />
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt="Logo"
+                className={`h-auto rounded-2xl shadow-md ${collapsed ? 'w-full' : 'max-w-[120px]'}`}
+              />
+            ) : (
+              <div className={`flex items-center justify-center rounded-2xl shadow-md bg-primary text-white font-bold tracking-widest ${collapsed ? 'w-10 h-10 text-xs' : 'w-[120px] h-[60px] text-xl'}`}>
+                EYS
+              </div>
+            )}
           </div>
 
           {/* Navigation */}
@@ -437,7 +443,13 @@ const Sidebar = ({
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-center px-4 py-6 border-b border-gray-200 relative">
-            <img src={logoUrl} alt="Logo" className="max-w-[120px] h-auto rounded-2xl shadow-md" />
+            {logoUrl ? (
+              <img src={logoUrl} alt="Logo" className="max-w-[120px] h-auto rounded-2xl shadow-md" />
+            ) : (
+              <div className="flex items-center justify-center w-[120px] h-[60px] rounded-2xl shadow-md bg-primary text-white font-bold text-xl tracking-widest">
+                EYS
+              </div>
+            )}
             <button
               onClick={onClose}
               className="absolute top-6 right-4 p-2 rounded-lg text-gray-500 hover:text-gray-700"

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import { settingsService } from "../../../lib/services/settingsService";
 import { useToast } from "../../../components/ui/Toast";
-import { PhotoIcon } from "@heroicons/react/24/outline";
 
 const ConfiguracionLogo = () => {
   const [currentLogoUrl, setCurrentLogoUrl] = useState(null);
@@ -50,7 +49,7 @@ const ConfiguracionLogo = () => {
     }
   };
 
-  const displayLogo = preview || currentLogoUrl || "/logo.jpg";
+  const displayLogo = preview || currentLogoUrl;
 
   return (
     <AdminLayout
@@ -85,7 +84,9 @@ const ConfiguracionLogo = () => {
                     className="max-w-full max-h-full object-contain"
                   />
                 ) : (
-                  <PhotoIcon className="h-16 w-16 text-gray-300" />
+                  <div className="flex items-center justify-center w-full h-full bg-primary text-white font-bold text-3xl tracking-widest rounded-2xl">
+                    EYS
+                  </div>
                 )}
               </div>
               {preview && (

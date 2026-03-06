@@ -10,5 +10,5 @@ export function useLogoUrl() {
     }).catch(() => {});
   }, []);
 
-  return logoUrl || "/logo.jpg";
+  return logoUrl;
 }
