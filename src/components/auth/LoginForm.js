@@ -76,7 +76,7 @@ const LoginForm = () => {
               type="email"
               autoComplete="email"
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors shadow-sm"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e172a] focus:border-transparent transition-colors shadow-sm"
               placeholder="tu@email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -97,7 +97,7 @@ const LoginForm = () => {
               type="password"
               autoComplete="current-password"
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors shadow-sm"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e172a] focus:border-transparent transition-colors shadow-sm"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -115,7 +115,7 @@ const LoginForm = () => {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-gradient-to-r from-orange-600 to-red-600 text-white py-3.5 px-4 rounded-xl font-bold hover:from-orange-700 hover:to-red-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 shadow-lg shadow-orange-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:-translate-y-0.5"
+          className="w-full bg-[#0e172a] text-white py-3.5 px-4 rounded-xl font-bold hover:bg-[#1e293b] focus:outline-none focus:ring-2 focus:ring-[#0e172a] focus:ring-offset-2 shadow-lg shadow-[#0e172a]/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:-translate-y-0.5"
         >
           {loading ? (
             <div className="flex items-center justify-center">
@@ -131,7 +131,7 @@ const LoginForm = () => {
           <button
             type="button"
             onClick={() => setIsResetOpen(true)}
-            className="text-sm font-semibold text-orange-600 hover:text-orange-800 transition-colors"
+            className="text-sm font-semibold text-[#0e172a] hover:text-[#1e293b] transition-colors"
           >
             ¿Olvidaste tu contraseña?
           </button>
