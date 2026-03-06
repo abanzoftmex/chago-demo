@@ -734,8 +734,8 @@ const Historial = () => {
                 />
               </div>
 
-              {/* Division Filter */}
-              <div className="flex flex-col">
+              {/* Division Filter - Oculto temporalmente */}
+              {/* <div className="flex flex-col">
                 <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
                   <Layers className="w-4 h-4 mr-1.5" />
                   División
@@ -749,7 +749,7 @@ const Historial = () => {
                   isClearable
                   isSearchable={false}
                 />
-              </div>
+              </div> */}
 
               {/* Clear Filters */}
               {getActiveFilters().length > 0 && (
@@ -876,9 +876,9 @@ const Historial = () => {
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Proveedor
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      {/* <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         División
-                      </th>
+                      </th> */}
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Monto
                       </th>
@@ -919,9 +919,9 @@ const Historial = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                           {getProviderName(transaction.providerId, transaction)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                        {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                           {transaction.type === 'salida' ? formatDivision(transaction.division) : '-'}
-                        </td>
+                        </td> */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
                           {formatCurrency(transaction.amount)}
                         </td>
@@ -974,11 +974,11 @@ const Historial = () => {
                         <p className="text-sm text-muted-foreground">
                           {getProviderName(transaction.providerId, transaction)}
                         </p>
-                        {transaction.type === 'salida' && transaction.division && (
+                        {/* {transaction.type === 'salida' && transaction.division && (
                           <p className="text-sm text-muted-foreground">
                             {formatDivision(transaction.division)}
                           </p>
-                        )}
+                        )} */}
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-semibold text-foreground">
