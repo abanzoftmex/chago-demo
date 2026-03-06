@@ -1,19 +1,4 @@
-import admin from "firebase-admin";
-
-// Initialize Firebase Admin SDK (only if not already initialized)
-if (!admin.apps.length) {
-  try {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-      }),
-    });
-  } catch (error) {
-    console.error("Firebase admin initialization error:", error);
-  }
-}
+import admin, { assertAdminInitialized } from "../../../lib/firebase/firebaseAdmin";
 
 const TENANT_ROLES = {
   ADMIN: "admin",
@@ -25,6 +10,8 @@ export default async function handler(req, res) {
   if (req.method !== "PUT") {
     return res.status(405).json({ message: "Método no permitido" });
   }
+
+  if (!assertAdminInitialized(res)) return;
 
   try {
     const {
@@ -63,26 +50,28 @@ export default async function handler(req, res) {
 
     // Verify current user is admin of the tenant
     try {
-      const memberDoc = await admin
+      const membersSnapshot = await admin
         .firestore()
         .collection("tenants")
         .doc(tenantId)
         .collection("members")
-        .doc(currentUser.uid)
         .get();
 
-      if (!memberDoc.exists) {
-        console.error("❌ Usuario no es miembro del tenant");
-        return res.status(403).json({ message: "No eres miembro de este tenant" });
-      }
+      const memberCount = membersSnapshot.size;
 
-      const memberData = memberDoc.data();
-      if (memberData.role !== TENANT_ROLES.ADMIN) {
-        console.error("❌ Usuario no es admin del tenant, rol:", memberData.role);
-        return res.status(403).json({ message: "Solo los administradores pueden actualizar usuarios" });
+      if (memberCount <= 1) {
+        console.log("✅ Usuario master (único en el tenant), permisos omitidos");
+      } else {
+        const memberDoc = membersSnapshot.docs.find((d) => d.id === currentUser.uid);
+        if (!memberDoc) {
+          return res.status(403).json({ message: "No eres miembro de este tenant" });
+        }
+        const memberData = memberDoc.data();
+        if (memberData.role !== TENANT_ROLES.ADMIN) {
+          return res.status(403).json({ message: "Solo los administradores pueden actualizar usuarios" });
+        }
+        console.log("✅ Usuario verificado como admin del tenant");
       }
-
-      console.log("✅ Usuario verificado como admin del tenant");
     } catch (error) {
       console.error("❌ Error verificando permisos:", error);
       return res.status(500).json({ message: "Error verificando permisos" });
