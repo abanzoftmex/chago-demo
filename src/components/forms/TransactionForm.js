@@ -747,7 +747,7 @@ const TransactionForm = ({
           </div>
         </div>
 
-        {/* Tercera fila: Proveedor / División - Solo para salidas */}
+        {/* Tercera fila: Proveedor - Solo para salidas */}
         {formData.type === "salida" && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -770,7 +770,8 @@ const TransactionForm = ({
               )}
             </div>
 
-            <div>
+            {/* División oculta temporalmente */}
+            {/* <div>
               <label htmlFor="division" className="block text-sm font-medium text-gray-700 mb-2">
                 División *
               </label>
@@ -790,7 +791,7 @@ const TransactionForm = ({
               {errors.division && (
                 <p className="mt-1 text-sm text-red-600">{errors.division}</p>
               )}
-            </div>
+            </div> */}
           </div>
         )}
 
