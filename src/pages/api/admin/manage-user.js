@@ -27,16 +27,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { userId, action, currentUserToken } = req.body;
+    const { userId, action, currentUserToken, tenantId } = req.body;
 
     // Verify the current user is authenticated and has admin permissions
     if (!currentUserToken) {
-      return res
-        .status(401)
-        .json({ message: "Token de autenticación requerido" });
+      return res.status(401).json({ message: "Token de autenticación requerido" });
     }
 
-    // Verify the token and get user info
+    if (!tenantId) {
+      return res.status(400).json({ message: "ID de tenant requerido" });
+    }
+
+    // Verify the token
     let currentUser;
     try {
       currentUser = await admin.auth().verifyIdToken(currentUserToken);
@@ -44,45 +46,39 @@ export default async function handler(req, res) {
       return res.status(401).json({ message: "Token inválido" });
     }
 
-    // Verify current user has admin permissions
-    // Check if user exists in Firestore and has admin role or is master user
-    let currentUserData;
-    const MASTER_EMAIL = "juan@jhernandez.mx";
-    const isMasterUser = currentUser.email === MASTER_EMAIL;
-    
+    // Verify current user is admin of the tenant (same logic as create-user-tenant)
     try {
-      // Get user document from Firestore using Admin SDK
-      const userDoc = await admin.firestore().collection('users').doc(currentUser.uid).get();
+      const membersSnapshot = await admin
+        .firestore()
+        .collection("tenants")
+        .doc(tenantId)
+        .collection("members")
+        .get();
 
-      if (!userDoc.exists && !isMasterUser) {
-        return res.status(403).json({ message: "Usuario no encontrado en la base de datos" });
-      }
+      const memberCount = membersSnapshot.size;
 
-      currentUserData = userDoc.exists ? userDoc.data() : { email: currentUser.email };
-      
-      // Allow master user or users with canManageUsers permission
-      if (!isMasterUser) {
-        // Get role permissions
-        const roleDoc = await admin.firestore().collection('roles').doc(currentUserData.role).get();
-        const rolePermissions = roleDoc.exists ? roleDoc.data().permissions : {};
-        
-        if (!rolePermissions.canManageUsers && currentUserData.role !== "administrativo") {
-          return res.status(403).json({ message: "No tienes permisos para gestionar usuarios" });
+      if (memberCount <= 1) {
+        console.log("✅ Usuario master (único en el tenant), permisos omitidos");
+      } else {
+        const memberDoc = membersSnapshot.docs.find((d) => d.id === currentUser.uid);
+
+        if (!memberDoc) {
+          return res.status(403).json({ message: "No eres miembro de este tenant" });
+        }
+
+        const memberData = memberDoc.data();
+        if (memberData.role !== "admin") {
+          return res.status(403).json({ message: "Solo los administradores pueden gestionar usuarios" });
         }
       }
-      
-      console.log(`User ${currentUser.email} ${isMasterUser ? '(MASTER)' : '(role: ' + currentUserData.role + ')'} is managing user ${userId}`);
     } catch (error) {
       console.error("Error verificando permisos:", error);
-      return res.status(500).json({ message: "Error interno del servidor" });
+      return res.status(500).json({ message: "Error verificando permisos" });
     }
 
-    // Check if trying to modify themselves
-    // Allow administrators to edit their own profile, but prevent non-admins from self-modification
-    if (currentUser.uid === userId && currentUserData.role !== "administrativo") {
-      return res
-        .status(400)
-        .json({ message: "No puedes modificar tu propio usuario" });
+    // Prevent modifying yourself
+    if (currentUser.uid === userId) {
+      return res.status(400).json({ message: "No puedes modificar tu propio usuario" });
     }
 
     // Validate input
@@ -165,33 +161,27 @@ export default async function handler(req, res) {
         break;
 
       case "DELETE":
-        // Get user data before deleting for logging
-        const userDataBeforeDelete = await getUserInfo(userId);
-
         // Delete user from Firebase Auth
         await admin.auth().deleteUser(userId);
 
-        // Delete user from Firestore
-        const deleteResult = await deleteUser(userId);
-        if (!deleteResult.success) {
-          console.error(
-            "Error deleting user from Firestore:",
-            deleteResult.error
-          );
-          // Continue anyway since user was deleted from Auth
+        // Remove from tenant members
+        try {
+          await admin
+            .firestore()
+            .collection("tenants")
+            .doc(tenantId)
+            .collection("members")
+            .doc(userId)
+            .delete();
+        } catch (err) {
+          console.error("Error removing member from tenant:", err);
         }
 
-        // Log the user deletion
-        if (userDataBeforeDelete) {
-          await logService.logUserDeletion({
-            user: {
-              uid: currentUser.uid,
-              displayName: currentUserData.displayName,
-              email: currentUserData.email
-            },
-            userId: userId,
-            userData: userDataBeforeDelete
-          });
+        // Delete user document from Firestore
+        try {
+          await admin.firestore().collection("users").doc(userId).delete();
+        } catch (err) {
+          console.error("Error deleting user doc:", err);
         }
 
         res.status(200).json({ message: "Usuario eliminado exitosamente" });

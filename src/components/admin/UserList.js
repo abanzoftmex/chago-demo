@@ -60,6 +60,7 @@ const UserList = ({ users, currentUserId, onUserUpdated, onEditUser }) => {
           userId,
           action,
           currentUserToken: token,
+          tenantId: tenantInfo?.id,
         }),
       });
 
