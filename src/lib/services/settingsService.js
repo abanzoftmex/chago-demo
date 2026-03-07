@@ -75,9 +75,11 @@ export const settingsService = {
     }
   },
 
-  async getLogo() {
+  async getLogo(tenantId) {
     try {
-      const brandingRef = doc(db, SETTINGS_COLLECTION, "branding");
+      const brandingRef = tenantId
+        ? doc(db, "tenants", tenantId, "settings", "branding")
+        : doc(db, SETTINGS_COLLECTION, "branding");
       const snap = await getDoc(brandingRef);
       if (snap.exists()) {
         return snap.data().logoUrl || null;
@@ -89,17 +91,18 @@ export const settingsService = {
     }
   },
 
-  async uploadLogo(file) {
+  async uploadLogo(file, tenantId) {
     try {
-      const storageRef = ref(storage, 'branding/logo');
+      const storagePath = tenantId ? `branding/${tenantId}/logo` : 'branding/logo';
+      const storageRef = ref(storage, storagePath);
       await uploadBytes(storageRef, file, { contentType: file.type });
       const url = await getDownloadURL(storageRef);
 
-      await setDoc(
-        doc(db, SETTINGS_COLLECTION, "branding"),
-        { logoUrl: url, updatedAt: serverTimestamp() },
-        { merge: true }
-      );
+      const brandingRef = tenantId
+        ? doc(db, "tenants", tenantId, "settings", "branding")
+        : doc(db, SETTINGS_COLLECTION, "branding");
+
+      await setDoc(brandingRef, { logoUrl: url, updatedAt: serverTimestamp() }, { merge: true });
       return url;
     } catch (error) {
       console.error("Error uploading logo:", error);

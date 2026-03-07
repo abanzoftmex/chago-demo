@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import { settingsService } from "../../../lib/services/settingsService";
 import { useToast } from "../../../components/ui/Toast";
+import { useAuth } from "../../../context/AuthContextMultiTenant";
 
 const ConfiguracionLogo = () => {
+  const { tenantInfo } = useAuth();
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
   const [currentLogoUrl, setCurrentLogoUrl] = useState(null);
   const [preview, setPreview] = useState(null);
   const [file, setFile] = useState(null);
@@ -13,12 +16,12 @@ const ConfiguracionLogo = () => {
   const toast = useToast();
 
   useEffect(() => {
-    settingsService.getLogo().then((url) => {
+    settingsService.getLogo(tenantId).then((url) => {
       setCurrentLogoUrl(url);
     }).catch((err) => {
       toast.error(err.message || "Error al cargar el logo");
     }).finally(() => setLoading(false));
-  }, []);
+  }, [tenantId]);
 
   const handleFileChange = (e) => {
     const selected = e.target.files[0];
@@ -36,7 +39,7 @@ const ConfiguracionLogo = () => {
     if (!file) return;
     try {
       setSaving(true);
-      const url = await settingsService.uploadLogo(file);
+      const url = await settingsService.uploadLogo(file, tenantId);
       setCurrentLogoUrl(url);
       setPreview(null);
       setFile(null);
