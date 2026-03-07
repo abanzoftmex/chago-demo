@@ -1,6 +1,7 @@
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../firebase/firebaseConfig";
+import { mutate } from "swr";
 
 const SETTINGS_COLLECTION = "settings";
 const EMAILS_DOC_ID = "emails";
@@ -103,6 +104,8 @@ export const settingsService = {
         : doc(db, SETTINGS_COLLECTION, "branding");
 
       await setDoc(brandingRef, { logoUrl: url, updatedAt: serverTimestamp() }, { merge: true });
+      // Invalidate SWR cache so sidebar and any consumer re-fetches immediately
+      await mutate(["logo", tenantId], url, false);
       return url;
     } catch (error) {
       console.error("Error uploading logo:", error);
