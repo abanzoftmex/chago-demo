@@ -1,4 +1,5 @@
-import * as admin from 'firebase-admin';
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getStorage } from 'firebase-admin/storage';
 import dotenv from 'dotenv';
 
 // Load environment variables from .env
@@ -19,9 +20,9 @@ if (!projectId || !clientEmail || !privateKey) {
 }
 
 try {
-    admin.initializeApp({
-        credential: admin.credential.cert({ projectId, clientEmail, privateKey }),
-        storageBucket: "chago-demo.appspot.com" // You can find this in your firebaseConfig.js
+    initializeApp({
+        credential: cert({ projectId, clientEmail, privateKey }),
+        storageBucket: "chago-demo.firebasestorage.app",
     });
     console.log("Firebase Admin initialized.");
 } catch (error) {
@@ -29,7 +30,7 @@ try {
     process.exit(1);
 }
 
-const bucket = admin.storage().bucket();
+const bucket = getStorage().bucket();
 
 const corsConfiguration = [
     {
