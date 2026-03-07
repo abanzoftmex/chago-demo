@@ -22,7 +22,7 @@ export default async function handler(req, res) {
             return res.status(400).json({ message: 'Missing file data' });
         }
 
-        const bucket = admin.storage().bucket('chago-demo.appspot.com'); // Force using this bucket
+        const bucket = admin.storage().bucket();
         const destination = 'branding/logo';
 
         const fileBuffer = Buffer.from(fileBase64, 'base64');
@@ -34,7 +34,6 @@ export default async function handler(req, res) {
                 contentType: mimeType,
                 cacheControl: 'public, max-age=31536000',
             },
-            public: true, // Make publicly accessible without tokens
         });
 
         // Public URL format
@@ -42,7 +41,11 @@ export default async function handler(req, res) {
 
         return res.status(200).json({ url: publicUrl });
     } catch (error) {
-        console.error('API Upload error:', error);
+        console.error('API Upload error details:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code
+        });
         return res.status(500).json({ message: 'Error uploading logo', error: error.message });
     }
 }

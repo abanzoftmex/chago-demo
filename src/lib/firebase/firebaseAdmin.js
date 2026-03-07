@@ -21,6 +21,7 @@ if (!admin.apps.length) {
     try {
       admin.initializeApp({
         credential: admin.credential.cert({ projectId, clientEmail, privateKey }),
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET || `${projectId}.appspot.com`,
       });
       console.log("✅ Firebase Admin inicializado correctamente");
     } catch (error) {
