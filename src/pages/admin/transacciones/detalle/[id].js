@@ -135,7 +135,7 @@ const ProviderDetailsModal = ({ isOpen, onClose, provider }) => {
 const TransactionDetail = () => {
   const router = useRouter();
   const { id } = router.query;
-  const { user, userRole } = useAuth();
+  const { user, userRole, tenantInfo } = useAuth();
 
   const [transaction, setTransaction] = useState(null);
   const [concept, setConcept] = useState(null);
@@ -159,10 +159,10 @@ const TransactionDetail = () => {
   const [deletingFile, setDeletingFile] = useState(false);
 
   useEffect(() => {
-    if (id) {
+    if (id && tenantInfo?.id) {
       loadTransactionDetails();
     }
-  }, [id]);
+  }, [id, tenantInfo?.id]);
 
   const handleDelete = async () => {
     // Check user role first
@@ -186,8 +186,13 @@ const TransactionDetail = () => {
       setDeleteReasonError(""); // Limpiar error anterior
       setError(""); // Clear any previous errors
 
+      // Check if we have tenant ID
+      if (!tenantInfo?.id) {
+        throw new Error("No se pudo identificar el tenant");
+      }
+
       // Delete the transaction with deletion reason
-      await transactionService.delete(id, user, deleteReason.trim());
+      await transactionService.delete(id, user, deleteReason.trim(), tenantInfo.id);
       setShowDeleteModal(false);
       router.push("/admin/transacciones/historial");
     } catch (error) {
@@ -202,18 +207,25 @@ const TransactionDetail = () => {
       setLoading(true);
       setError("");
 
+      // Check if we have tenant ID
+      if (!tenantInfo?.id) {
+        throw new Error("No se pudo identificar el tenant");
+      }
+
+      const tenantId = tenantInfo.id;
+
       // Load transaction
-      const transactionData = await transactionService.getById(id);
+      const transactionData = await transactionService.getById(id, tenantId);
       setTransaction(transactionData);
 
       // Load related data
       const conceptPromise = transactionData.conceptId
-        ? conceptService.getById(transactionData.conceptId)
+        ? conceptService.getById(transactionData.conceptId, tenantId)
         : Promise.resolve(null);
       const subconceptPromise = transactionData.subconceptId
-        ? subconceptService.getById(transactionData.subconceptId)
+        ? subconceptService.getById(transactionData.subconceptId, tenantId)
         : Promise.resolve(null);
-      const paymentsPromise = paymentService.getByTransaction(id);
+      const paymentsPromise = paymentService.getByTransaction(id, tenantId);
 
       const [conceptData, subconceptData, paymentsData] = await Promise.all([
         conceptPromise,
@@ -230,7 +242,7 @@ const TransactionDetail = () => {
       try {
         const generalId = transactionData.generalId || conceptData?.generalId;
         if (generalId) {
-          generalData = await generalService.getById(generalId);
+          generalData = await generalService.getById(generalId, tenantId);
         }
       } catch (e) {
         console.error("Error loading general:", e);
@@ -240,7 +252,8 @@ const TransactionDetail = () => {
       // Load provider if it's a salida
       if (transactionData.providerId) {
         const providerData = await providerService.getById(
-          transactionData.providerId
+          transactionData.providerId,
+          tenantId
         );
         setProvider(providerData);
       }
@@ -414,7 +427,12 @@ const TransactionDetail = () => {
     
     setDeletingFile(true);
     try {
-      await transactionService.removeAttachment(id, fileToDelete.fileName, user);
+      // Check if we have tenant ID
+      if (!tenantInfo?.id) {
+        throw new Error("No se pudo identificar el tenant");
+      }
+
+      await transactionService.removeAttachment(id, fileToDelete.fileName, user, tenantInfo.id);
       
       // Actualizar el estado local
       setTransaction(prev => ({
@@ -444,7 +462,12 @@ const TransactionDetail = () => {
   const handleUploadFiles = async (files) => {
     setUploadingFiles(true);
     try {
-      const newAttachments = await transactionService.addAttachments(id, files, user);
+      // Check if we have tenant ID
+      if (!tenantInfo?.id) {
+        throw new Error("No se pudo identificar el tenant");
+      }
+
+      const newAttachments = await transactionService.addAttachments(id, files, user, tenantInfo.id);
       
       // Actualizar el estado local
       setTransaction(prev => ({

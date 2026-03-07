@@ -547,9 +547,9 @@ export const transactionService = {
   },
 
   // Remove attachment from transaction
-  async removeAttachment(transactionId, fileName, user) {
+  async removeAttachment(transactionId, fileName, user, tenantId = null) {
     try {
-      const transaction = await this.getById(transactionId);
+      const transaction = await this.getById(transactionId, tenantId);
 
       // Remove attachment from array
       const updatedAttachments = (transaction.attachments || []).filter(
@@ -565,7 +565,7 @@ export const transactionService = {
       }
 
       // Update transaction document
-      await this.update(transactionId, { attachments: updatedAttachments }, user);
+      await this.update(transactionId, { attachments: updatedAttachments }, user, tenantId);
 
       return true;
     } catch (error) {
@@ -575,9 +575,9 @@ export const transactionService = {
   },
 
   // Add attachments to transaction
-  async addAttachments(transactionId, files, user) {
+  async addAttachments(transactionId, files, user, tenantId = null) {
     try {
-      const transaction = await this.getById(transactionId);
+      const transaction = await this.getById(transactionId, tenantId);
       const existingAttachments = transaction.attachments || [];
       const newAttachments = [];
 
@@ -591,7 +591,7 @@ export const transactionService = {
       const allAttachments = [...existingAttachments, ...newAttachments];
 
       // Update transaction
-      await this.update(transactionId, { attachments: allAttachments }, user);
+      await this.update(transactionId, { attachments: allAttachments }, user, tenantId);
 
       return allAttachments;
     } catch (error) {

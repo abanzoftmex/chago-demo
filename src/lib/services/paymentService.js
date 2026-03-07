@@ -25,6 +25,14 @@ import { conceptService } from "./conceptService";
 import { providerService } from "./providerService";
 import { createEmailTemplate, createAdminPaymentNotificationContent } from "../emailTemplates";
 
+// Helper function to get the correct payments collection path
+const getPaymentsCollection = (tenantId = null) => {
+  if (tenantId) {
+    return `tenants/${tenantId}/payments`;
+  }
+  return "payments";
+};
+
 const COLLECTION_NAME = "payments";
 const STORAGE_PATH = "payment-attachments";
 
@@ -183,10 +191,11 @@ export const paymentService = {
   },
 
   // Get payments by transaction ID
-  async getByTransaction(transactionId) {
+  async getByTransaction(transactionId, tenantId = null) {
     try {
+      const collectionPath = getPaymentsCollection(tenantId);
       const q = query(
-        collection(db, COLLECTION_NAME),
+        collection(db, collectionPath),
         where("transactionId", "==", transactionId),
         orderBy("createdAt", "desc")
       );
