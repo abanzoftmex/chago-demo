@@ -91,39 +91,10 @@ export const settingsService = {
 
   async uploadLogo(file) {
     try {
-      // Create a promise to read the file as base64
-      const getBase64 = (file) => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = (error) => reject(error);
-      });
+      const storageRef = ref(storage, 'branding/logo');
+      await uploadBytes(storageRef, file, { contentType: file.type });
+      const url = await getDownloadURL(storageRef);
 
-      const base64String = await getBase64(file);
-      // Remove the prefix (data:image/png;base64,) to just send the bits
-      const base64Data = base64String.split(',')[1];
-
-      // Call our Next.js API route that uploads bypassing CORS rules
-      const response = await fetch('/api/admin/settings/upload-logo', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          fileBase64: base64Data,
-          mimeType: file.type,
-          fileName: file.name
-        })
-      });
-
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.message || 'Error en el servidor al subir la imagen');
-      }
-
-      const { url } = await response.json();
-
-      // Update Firestore document with the new logo URL
       await setDoc(
         doc(db, SETTINGS_COLLECTION, "branding"),
         { logoUrl: url, updatedAt: serverTimestamp() },
