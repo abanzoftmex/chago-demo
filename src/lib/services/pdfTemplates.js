@@ -166,7 +166,7 @@ export const addEnhancedFooter = (doc) => {
 /**
  * Create enhanced PDF report with modern design
  */
-export const createEnhancedPDFReport = async (transactions, stats, filters, conceptService, providerService, generalService, subconceptService) => {
+export const createEnhancedPDFReport = async (transactions, stats, filters, conceptService, providerService, generalService, subconceptService, tenantId = null) => {
     // Create document with custom options
     const doc = new jsPDF({
         orientation: 'portrait',
@@ -174,8 +174,8 @@ export const createEnhancedPDFReport = async (transactions, stats, filters, conc
         format: 'a4'
     });
 
-    // Fetch logo URL once from Firebase
-    const logoUrl = await settingsService.getLogo().catch(() => null);
+    // Fetch logo URL once from Firebase (tenant-scoped)
+    const logoUrl = await settingsService.getLogo(tenantId).catch(() => null);
 
     // Start first page
     await addPageHeader(doc, 'Reporte Administrativo', stats.totalTransactions, logoUrl);

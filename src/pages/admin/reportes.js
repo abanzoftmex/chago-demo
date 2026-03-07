@@ -518,7 +518,8 @@ const Reportes = () => {
       const filename = await reportService.exportToPDF(
         transactions,
         stats,
-        filters
+        filters,
+        tenantId
       );
       success(`Reporte exportado a PDF: ${filename}`);
     } catch (err) {

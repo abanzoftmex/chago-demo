@@ -1124,7 +1124,7 @@ export const reportService = {
   },
 
   // Enhanced PDF export with modern design
-  async exportToPDF(transactions, stats, filters) {
+  async exportToPDF(transactions, stats, filters, tenantId = null) {
     try {
       // Use the enhanced PDF template
       const doc = await createEnhancedPDFReport(
@@ -1134,7 +1134,8 @@ export const reportService = {
         conceptService,
         providerService,
         generalService,
-        subconceptService
+        subconceptService,
+        tenantId
       );
 
       // Generate filename with better naming
