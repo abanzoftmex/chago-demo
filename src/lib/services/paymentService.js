@@ -30,7 +30,7 @@ const STORAGE_PATH = "payment-attachments";
 
 export const paymentService = {
   // Create a new payment
-  async create(paymentData, files = []) {
+  async create(paymentData, files = [], tenantId = null) {
     try {
       // Upload files first if any
       const attachments = [];
@@ -54,7 +54,7 @@ export const paymentService = {
 
       // Update transaction payment status (don't block if this fails)
       try {
-        await this.updateTransactionPaymentStatus(paymentData.transactionId);
+        await this.updateTransactionPaymentStatus(paymentData.transactionId, tenantId);
       } catch (err) {
         console.error("Error updating transaction payment status:", err);
       }
@@ -62,7 +62,7 @@ export const paymentService = {
       // Send email notification to admin about new payment
       try {
         // Get transaction details
-        const transaction = await transactionService.getById(paymentData.transactionId);
+        const transaction = await transactionService.getById(paymentData.transactionId, tenantId);
         const { adminEmails } = await settingsService.getEmails();
         const recipients = Array.isArray(adminEmails) ? adminEmails : [];
 
@@ -76,7 +76,7 @@ export const paymentService = {
             // Get concept name if available
             if (transaction.conceptId) {
               try {
-                const concept = await conceptService.getById(transaction.conceptId);
+                const concept = await conceptService.getById(transaction.conceptId, tenantId);
                 if (concept) conceptName = concept.name;
               } catch (err) {
                 console.error("Error getting concept:", err);
@@ -86,7 +86,7 @@ export const paymentService = {
             // Get provider name if available
             if (transaction.providerId) {
               try {
-                const provider = await providerService.getById(transaction.providerId);
+                const provider = await providerService.getById(transaction.providerId, tenantId);
                 if (provider) {
                   providerName = provider.name;
 
@@ -112,7 +112,7 @@ export const paymentService = {
 
           // Calculate remaining balance using the total paid amount
           const totalAmount = transaction ? transaction.amount : 0;
-          const paymentSummary = await this.getPaymentSummary(paymentData.transactionId);
+          const paymentSummary = await this.getPaymentSummary(paymentData.transactionId, tenantId);
           const totalPaid = paymentSummary.totalPaid; // This includes all payments including current one
           const remainingBalance = paymentSummary.balance; // This is already calculated in getPaymentSummary
 
@@ -367,7 +367,7 @@ export const paymentService = {
   },
 
   // Update transaction payment status
-  async updateTransactionPaymentStatus(transactionId) {
+  async updateTransactionPaymentStatus(transactionId, tenantId = null) {
     try {
       // Get all payments for this transaction
       const payments = await this.getByTransaction(transactionId);
@@ -379,13 +379,14 @@ export const paymentService = {
       );
 
       // Get transaction to get total amount
-      const transaction = await transactionService.getById(transactionId);
+      const transaction = await transactionService.getById(transactionId, tenantId);
 
       // Update transaction status
       await transactionService.updatePaymentStatus(
         transactionId,
         totalPaid,
-        transaction.amount
+        transaction.amount,
+        tenantId
       );
 
       return { totalPaid, balance: transaction.amount - totalPaid };
@@ -442,10 +443,10 @@ export const paymentService = {
   },
 
   // Get payment summary for transaction
-  async getPaymentSummary(transactionId) {
+  async getPaymentSummary(transactionId, tenantId = null) {
     try {
       const payments = await this.getByTransaction(transactionId);
-      const transaction = await transactionService.getById(transactionId);
+      const transaction = await transactionService.getById(transactionId, tenantId);
 
       const totalPaid = payments.reduce(
         (sum, payment) => sum + payment.amount,

@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { paymentService } from "../../lib/services/paymentService";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/AuthContextMultiTenant";
 import FileUpload from "../ui/FileUpload";
 import Toast from "../ui/Toast";
 import { sendEmailWithRateLimit } from "../../lib/utils";
@@ -12,10 +12,11 @@ const PaymentManager = ({
   provider,
   transaction,
 }) => {
-  const { checkPermission, userRole } = useAuth();
-  const canDeletePayments = checkPermission("canDeletePayments");
+  const { checkPermission, userRole, tenantInfo } = useAuth();
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
+  const canDeletePayments = checkPermission ? checkPermission("canDeletePayments") : false;
   const canRegisterPayments = !['director', 'director_general'].includes(userRole);
-  
+
   const [payments, setPayments] = useState([]);
   const [paymentSummary, setPaymentSummary] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -55,7 +56,7 @@ const PaymentManager = ({
   const loadPaymentData = useCallback(async () => {
     try {
       setLoading(true);
-      const summary = await paymentService.getPaymentSummary(transactionId);
+      const summary = await paymentService.getPaymentSummary(transactionId, tenantId);
       setPaymentSummary(summary);
       setPayments(summary.payments);
     } catch (error) {
@@ -81,22 +82,22 @@ const PaymentManager = ({
     if (value === null || value === undefined || value === '') {
       return '';
     }
-    
+
     const stringValue = String(value);
-    
+
     // Remove non-numeric characters except decimal point
     const numericValue = stringValue.replace(/[^0-9.]/g, '');
-    
+
     // Split into integer and decimal parts
     const parts = numericValue.split('.');
     let integerPart = parts[0];
     const decimalPart = parts.length > 1 ? `.${parts[1]}` : '';
-    
+
     // Add thousand separators to integer part
     if (integerPart) {
       integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     }
-    
+
     return integerPart + decimalPart;
   };
 
@@ -105,9 +106,9 @@ const PaymentManager = ({
     if (value === null || value === undefined || value === '') {
       return '';
     }
-    
+
     const stringValue = String(value);
-    
+
     // Remove all non-numeric characters except decimal point
     return stringValue.replace(/[^0-9.]/g, '');
   };
@@ -115,7 +116,7 @@ const PaymentManager = ({
   // Handle form input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    
+
     // Special handling for amount field
     if (name === 'amount') {
       // If empty, set empty string
@@ -126,16 +127,16 @@ const PaymentManager = ({
         }));
         return;
       }
-      
+
       // Format the number with commas
       const formattedValue = formatNumberWithCommas(value);
-      
+
       // Update the display value with formatting
       e.target.value = formattedValue;
-      
+
       // Store the raw numeric value in form state (without commas)
       const rawValue = parseFormattedNumber(formattedValue);
-      
+
       setFormData(prev => ({
         ...prev,
         [name]: rawValue
@@ -160,7 +161,7 @@ const PaymentManager = ({
   // Handle file upload
   const handleFileUpload = async (files) => {
 
-   
+
 
     // Create previews for image files
     const filesWithPreviews = await Promise.all(
@@ -196,7 +197,7 @@ const PaymentManager = ({
 
   // Handle file removal
   const handleFileRemove = (fileToRemove) => {
-   
+
     // Find the file by name and remove it
     setFormFiles((prev) => {
       const updatedFiles = prev.filter(
@@ -261,12 +262,12 @@ const PaymentManager = ({
         notes: formData.notes,
       };
 
-      
+
 
       // Extract original File objects from wrappers
       const originalFiles = formFiles.map(fileWrapper => fileWrapper.file);
 
-      const created = await paymentService.create(paymentData, originalFiles);
+      const created = await paymentService.create(paymentData, originalFiles, tenantId);
 
       // Reset form
       setFormData({
@@ -381,9 +382,8 @@ const PaymentManager = ({
 
     return (
       <span
-        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-          badges[status] || badges.pendiente
-        }`}
+        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badges[status] || badges.pendiente
+          }`}
       >
         {labels[status] || labels.pendiente}
       </span>
@@ -473,9 +473,8 @@ const PaymentManager = ({
                   name="amount"
                   value={formatNumberWithCommas(formData.amount)}
                   onChange={handleInputChange}
-                  className={`mt-1 block w-full p-2 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-orange-500 ${
-                    formErrors.amount ? "border-red-300" : ""
-                  }`}
+                  className={`mt-1 block w-full p-2 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-orange-500 ${formErrors.amount ? "border-red-300" : ""
+                    }`}
                   placeholder="0.00"
                 />
                 {formErrors.amount && (
@@ -498,9 +497,8 @@ const PaymentManager = ({
                   name="date"
                   value={formData.date}
                   onChange={handleInputChange}
-                  className={`mt-1 block w-full p-2 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-orange-500 ${
-                    formErrors.date ? "border-red-300" : ""
-                  }`}
+                  className={`mt-1 block w-full p-2 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-orange-500 ${formErrors.date ? "border-red-300" : ""
+                    }`}
                 />
                 {formErrors.date && (
                   <p className="mt-1 text-sm text-red-600">{formErrors.date}</p>
@@ -899,11 +897,11 @@ const PaymentManager = ({
                     const amount = lastCreatedPayment?.amount || 0;
                     const date = lastCreatedPayment?.date
                       ? new Date(lastCreatedPayment.date).toLocaleDateString(
-                          "es-MX"
-                        )
+                        "es-MX"
+                      )
                       : new Date().toLocaleDateString("es-MX");
                     const txId = transaction?.id;
-                    
+
                     // Obtener información del concepto si está disponible
                     let conceptName = "N/A";
                     if (transaction?.conceptId) {
@@ -917,12 +915,12 @@ const PaymentManager = ({
                         console.error("Error fetching concept:", err);
                       }
                     }
-                    
+
                     // Calcular saldo restante
                     const totalAmount = transaction?.amount || 0;
                     const totalPaid = paymentSummary?.totalPaid || amount;
                     const remainingBalance = totalAmount - totalPaid;
-                    
+
                     // Obtener información del proveedor
                     let providerDetails = "";
                     if (provider) {
@@ -932,7 +930,7 @@ const PaymentManager = ({
                           ${provider.rfc ? `<br>RFC: ${provider.rfc}` : ""}
                         </li>
                       `;
-                      
+
                       // Añadir información de cuenta bancaria si está disponible
                       if (provider.bankAccounts && provider.bankAccounts.length > 0) {
                         const primaryAccount = provider.bankAccounts[0];
@@ -948,10 +946,10 @@ const PaymentManager = ({
                         `;
                       }
                     }
-                    
+
                     // Importar el template de correo
                     const { createEmailTemplate, createPaymentReceiptContent } = await import('../../lib/emailTemplates');
-                    
+
                     const subject = `Comprobante de pago - ${conceptName}${txId ? ` - #${String(txId).slice(-8)}` : ""}`;
                     const detailUrl = txId
                       ? `${window.location.origin}/admin/transacciones/detalle/${txId}`
@@ -966,12 +964,12 @@ const PaymentManager = ({
                             </ul>
                           </div>`
                         : "";
-                    
+
                     // Añadir notas si existen
                     const notesHtml = lastCreatedPayment?.notes
                       ? `<p><strong>Notas:</strong> ${lastCreatedPayment.notes}</p>`
                       : "";
-                    
+
                     // Crear el contenido del correo usando el template
                     const emailContent = createPaymentReceiptContent({
                       amount,
@@ -986,7 +984,7 @@ const PaymentManager = ({
                       detailUrl,
                       linksHtml
                     });
-                    
+
                     // Aplicar el template completo
                     const html = createEmailTemplate({
                       title: 'Comprobante de Pago',

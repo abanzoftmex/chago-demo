@@ -13,10 +13,10 @@ const RecurringExpenseDetailsModal = ({ expense, isOpen, onClose, conceptName, s
   const toast = useToast();
 
   useEffect(() => {
-    if (isOpen && expense) {
+    if (isOpen && expense && tenantId) {
       loadData();
     }
-  }, [isOpen, expense]);
+  }, [isOpen, expense, tenantId]);
 
   const loadData = async () => {
     try {
@@ -25,7 +25,7 @@ const RecurringExpenseDetailsModal = ({ expense, isOpen, onClose, conceptName, s
         recurringExpenseService.getGeneratedMonthsHistory(expense.id, tenantId),
         recurringExpenseService.getGeneratedTransactions(expense.id, tenantId)
       ]);
-      
+
       setMonthsHistory(historyData);
       setGeneratedTransactions(transactionsData);
     } catch (error) {
@@ -46,10 +46,10 @@ const RecurringExpenseDetailsModal = ({ expense, isOpen, onClose, conceptName, s
   const formatDate = (date) => {
     if (!date) return "N/A";
     const dateObj = date.toDate ? date.toDate() : new Date(date);
-    return dateObj.toLocaleDateString('es-ES', { 
-      day: '2-digit', 
-      month: 'long', 
-      year: 'numeric' 
+    return dateObj.toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric'
     });
   };
 
@@ -106,11 +106,10 @@ const RecurringExpenseDetailsModal = ({ expense, isOpen, onClose, conceptName, s
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500">Estado</p>
-                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                  expense.isActive 
-                    ? 'bg-green-100 text-green-800' 
+                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${expense.isActive
+                    ? 'bg-green-100 text-green-800'
                     : 'bg-gray-100 text-gray-800'
-                }`}>
+                  }`}>
                   {expense.isActive ? 'Activo' : 'Inactivo'}
                 </span>
               </div>
@@ -132,21 +131,19 @@ const RecurringExpenseDetailsModal = ({ expense, isOpen, onClose, conceptName, s
             <nav className="-mb-px flex space-x-8 px-6">
               <button
                 onClick={() => setActiveTab('history')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'history'
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'history'
                     ? 'border-rose-500 text-rose-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                  }`}
               >
                 Historial de Meses ({monthsHistory.length})
               </button>
               <button
                 onClick={() => setActiveTab('transactions')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'transactions'
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'transactions'
                     ? 'border-rose-500 text-rose-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                  }`}
               >
                 Transacciones Generadas ({generatedTransactions.length})
               </button>

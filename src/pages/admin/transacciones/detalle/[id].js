@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "../../../../context/AuthContextMultiTenant";
 import { useRouter } from "next/router";
 import AdminLayout from "../../../../components/layout/AdminLayout";
@@ -60,7 +60,7 @@ const ProviderDetailsModal = ({ isOpen, onClose, provider }) => {
             <X className="h-5 w-5" />
           </button>
         </div>
-        
+
         <div className="p-4 space-y-4">
           <div>
             <h4 className="font-medium text-gray-900">{provider.name}</h4>
@@ -68,7 +68,7 @@ const ProviderDetailsModal = ({ isOpen, onClose, provider }) => {
             <p className="text-sm text-gray-500">Teléfono: {provider.phone || 'No especificado'}</p>
             <p className="text-sm text-gray-500">Dirección: {provider.address || 'No especificada'}</p>
           </div>
-          
+
           {provider.bankAccounts && provider.bankAccounts.length > 0 ? (
             <div>
               <h4 className="font-medium text-gray-900 mb-2">Cuentas Bancarias</h4>
@@ -84,7 +84,7 @@ const ProviderDetailsModal = ({ isOpen, onClose, provider }) => {
                         {account.accountNumber && (
                           <div className="flex items-center mt-1">
                             <span className="text-sm text-gray-500">Número de cuenta: {account.accountNumber}</span>
-                            <button 
+                            <button
                               onClick={() => copyToClipboard(account.accountNumber)}
                               className="ml-1 text-blue-500 hover:text-blue-700"
                               title="Copiar número de cuenta"
@@ -96,7 +96,7 @@ const ProviderDetailsModal = ({ isOpen, onClose, provider }) => {
                         {account.clabe && (
                           <div className="flex items-center mt-1">
                             <span className="text-sm text-gray-500">CLABE: {account.clabe}</span>
-                            <button 
+                            <button
                               onClick={() => copyToClipboard(account.clabe)}
                               className="ml-1 text-blue-500 hover:text-blue-700"
                               title="Copiar CLABE"
@@ -117,7 +117,7 @@ const ProviderDetailsModal = ({ isOpen, onClose, provider }) => {
             </div>
           )}
         </div>
-        
+
         <div className="bg-gray-50 px-4 py-3 sm:px-6 flex justify-end space-x-3 rounded-b-lg">
           <button
             type="button"
@@ -135,7 +135,10 @@ const ProviderDetailsModal = ({ isOpen, onClose, provider }) => {
 const TransactionDetail = () => {
   const router = useRouter();
   const { id } = router.query;
-  const { user, userRole } = useAuth();
+  const { user, userRole, tenantInfo } = useAuth();
+
+  // Memoize tenantId to prevent unnecessary re-renders
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
 
   const [transaction, setTransaction] = useState(null);
   const [concept, setConcept] = useState(null);
@@ -150,7 +153,7 @@ const TransactionDetail = () => {
   const [showProviderModal, setShowProviderModal] = useState(false);
   const [deleteReasonError, setDeleteReasonError] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  
+
   // Estados para manejo de archivos
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [showFileUpload, setShowFileUpload] = useState(false);
@@ -159,10 +162,10 @@ const TransactionDetail = () => {
   const [deletingFile, setDeletingFile] = useState(false);
 
   useEffect(() => {
-    if (id) {
+    if (id && tenantId) {
       loadTransactionDetails();
     }
-  }, [id]);
+  }, [id, tenantId]);
 
   const handleDelete = async () => {
     // Check user role first
@@ -187,7 +190,7 @@ const TransactionDetail = () => {
       setError(""); // Clear any previous errors
 
       // Delete the transaction with deletion reason
-      await transactionService.delete(id, user, deleteReason.trim());
+      await transactionService.delete(id, user, deleteReason.trim(), tenantId);
       setShowDeleteModal(false);
       router.push("/admin/transacciones/historial");
     } catch (error) {
@@ -203,15 +206,15 @@ const TransactionDetail = () => {
       setError("");
 
       // Load transaction
-      const transactionData = await transactionService.getById(id);
+      const transactionData = await transactionService.getById(id, tenantId);
       setTransaction(transactionData);
 
       // Load related data
       const conceptPromise = transactionData.conceptId
-        ? conceptService.getById(transactionData.conceptId)
+        ? conceptService.getById(transactionData.conceptId, tenantId)
         : Promise.resolve(null);
       const subconceptPromise = transactionData.subconceptId
-        ? subconceptService.getById(transactionData.subconceptId)
+        ? subconceptService.getById(transactionData.subconceptId, tenantId)
         : Promise.resolve(null);
       const paymentsPromise = paymentService.getByTransaction(id);
 
@@ -230,7 +233,7 @@ const TransactionDetail = () => {
       try {
         const generalId = transactionData.generalId || conceptData?.generalId;
         if (generalId) {
-          generalData = await generalService.getById(generalId);
+          generalData = await generalService.getById(generalId, tenantId);
         }
       } catch (e) {
         console.error("Error loading general:", e);
@@ -240,7 +243,7 @@ const TransactionDetail = () => {
       // Load provider if it's a salida
       if (transactionData.providerId) {
         const providerData = await providerService.getById(
-          transactionData.providerId
+          transactionData.providerId, tenantId
         );
         setProvider(providerData);
       }
@@ -339,20 +342,20 @@ const TransactionDetail = () => {
   // File handling
   const handleDownloadFile = (url, fileName) => {
     console.log("Attempting to download file:", { url, fileName });
-    
+
     // Validate URL
     if (!url || typeof url !== 'string') {
       console.error("Invalid URL provided for download:", url);
       setError("URL de archivo inválida");
       return;
     }
-    
+
     try {
       // Test if URL is accessible by creating an image element for images
-      if (fileName && (fileName.toLowerCase().includes('.jpg') || 
-          fileName.toLowerCase().includes('.jpeg') || 
-          fileName.toLowerCase().includes('.png') || 
-          fileName.toLowerCase().includes('.gif'))) {
+      if (fileName && (fileName.toLowerCase().includes('.jpg') ||
+        fileName.toLowerCase().includes('.jpeg') ||
+        fileName.toLowerCase().includes('.png') ||
+        fileName.toLowerCase().includes('.gif'))) {
         const testImg = new Image();
         testImg.onload = () => {
           console.log("Image URL is accessible, proceeding with download");
@@ -386,14 +389,14 @@ const TransactionDetail = () => {
 
   const handleViewFile = (url) => {
     console.log("Attempting to view file:", url);
-    
+
     // Validate URL
     if (!url || typeof url !== 'string') {
       console.error("Invalid URL provided for viewing:", url);
       setError("URL de archivo inválida");
       return;
     }
-    
+
     try {
       window.open(url, "_blank");
       console.log("File view opened successfully");
@@ -411,17 +414,17 @@ const TransactionDetail = () => {
 
   const confirmDeleteFile = async () => {
     if (!fileToDelete) return;
-    
+
     setDeletingFile(true);
     try {
       await transactionService.removeAttachment(id, fileToDelete.fileName, user);
-      
+
       // Actualizar el estado local
       setTransaction(prev => ({
         ...prev,
         attachments: prev.attachments.filter(att => att.fileName !== fileToDelete.fileName)
       }));
-      
+
       setError("");
       console.log("File deleted successfully from transaction");
     } catch (err) {
@@ -445,13 +448,13 @@ const TransactionDetail = () => {
     setUploadingFiles(true);
     try {
       const newAttachments = await transactionService.addAttachments(id, files, user);
-      
+
       // Actualizar el estado local
       setTransaction(prev => ({
         ...prev,
         attachments: newAttachments
       }));
-      
+
       setError("");
       console.log(`${files.length} file(s) uploaded successfully`);
       setShowFileUpload(false);
@@ -529,55 +532,55 @@ const TransactionDetail = () => {
     <AdminLayout>
       <div className="px-5">
         {/* Transaction Header - Compact */}
-         <div className="flex items-center justify-between mb-6 bg-background rounded-lg border border-border p-4">
-           <div className="flex items-center space-x-3">
-             <div className={`w-10 h-10 rounded-full ${transaction.type === "entrada" ? "bg-green-100" : "bg-red-100"} flex items-center justify-center`}>
-               {transaction.type === "entrada" ? (
-                 <TrendingUp className={`w-5 h-5 ${transaction.type === "entrada" ? "text-green-600" : "text-red-600"}`} />
-               ) : (
-                 <TrendingDown className={`w-5 h-5 ${transaction.type === "entrada" ? "text-green-600" : "text-red-600"}`} />
-               )}
-             </div>
-             <div>
-               <h1 className="text-xl font-bold text-foreground">
-                 {transaction.type === "entrada" ? "Entrada" : "Salida"}: {formatCurrency(transaction.amount)}
-               </h1>
-               <div className="text-sm text-muted-foreground">
-                 {formatDate(transaction.date)} • {general?.name} • {concept?.name} • {subconcept?.name}
-               </div>
-             </div>
-           </div>
-           {getStatusBadge(transaction.status)}
-         </div>
+        <div className="flex items-center justify-between mb-6 bg-background rounded-lg border border-border p-4">
+          <div className="flex items-center space-x-3">
+            <div className={`w-10 h-10 rounded-full ${transaction.type === "entrada" ? "bg-green-100" : "bg-red-100"} flex items-center justify-center`}>
+              {transaction.type === "entrada" ? (
+                <TrendingUp className={`w-5 h-5 ${transaction.type === "entrada" ? "text-green-600" : "text-red-600"}`} />
+              ) : (
+                <TrendingDown className={`w-5 h-5 ${transaction.type === "entrada" ? "text-green-600" : "text-red-600"}`} />
+              )}
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-foreground">
+                {transaction.type === "entrada" ? "Entrada" : "Salida"}: {formatCurrency(transaction.amount)}
+              </h1>
+              <div className="text-sm text-muted-foreground">
+                {formatDate(transaction.date)} • {general?.name} • {concept?.name} • {subconcept?.name}
+              </div>
+            </div>
+          </div>
+          {getStatusBadge(transaction.status)}
+        </div>
 
         {/* Payment Progress */}
-         <div className="mb-6 border border-border rounded-lg p-4 bg-background">
-           <div className="flex items-center justify-between mb-2">
-             <h2 className="text-sm font-medium">Progreso de Pago</h2>
-             <span className="text-sm font-medium">{paymentMetrics.progress.toFixed(0)}%</span>
-           </div>
-           <div className="w-full bg-muted rounded-full h-2 mb-3">
-             <div
-               className="bg-primary h-2 rounded-full"
-               style={{ width: `${paymentMetrics.progress}%` }}
-             ></div>
-           </div>
-           <div className="flex justify-between text-sm">
-             <div>
-               <span className="text-muted-foreground">Pagado:</span>{" "}
-               <span className="font-medium">{formatCurrency(paymentMetrics.paid)}</span>
-             </div>
-             <div>
-               <span className="text-muted-foreground">Restante:</span>{" "}
-               <span className="font-medium">{formatCurrency(paymentMetrics.remaining)}</span>
-             </div>
-           </div>
-         </div>
+        <div className="mb-6 border border-border rounded-lg p-4 bg-background">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-medium">Progreso de Pago</h2>
+            <span className="text-sm font-medium">{paymentMetrics.progress.toFixed(0)}%</span>
+          </div>
+          <div className="w-full bg-muted rounded-full h-2 mb-3">
+            <div
+              className="bg-primary h-2 rounded-full"
+              style={{ width: `${paymentMetrics.progress}%` }}
+            ></div>
+          </div>
+          <div className="flex justify-between text-sm">
+            <div>
+              <span className="text-muted-foreground">Pagado:</span>{" "}
+              <span className="font-medium">{formatCurrency(paymentMetrics.paid)}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Restante:</span>{" "}
+              <span className="font-medium">{formatCurrency(paymentMetrics.remaining)}</span>
+            </div>
+          </div>
+        </div>
 
         {/* Transaction Details */}
-         <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-           <div className="border border-border rounded-lg p-4 bg-background">
-             <h2 className="text-sm font-medium mb-3">Detalles de la Transacción</h2>
+        <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="border border-border rounded-lg p-4 bg-background">
+            <h2 className="text-sm font-medium mb-3">Detalles de la Transacción</h2>
             <div className="space-y-3">
               <div className="flex items-start space-x-3">
                 <Tag className="w-4 h-4 text-primary mt-0.5" />
@@ -638,7 +641,7 @@ const TransactionDetail = () => {
           </div>
 
           <div className="border border-border rounded-lg p-4 bg-background">
-             <h2 className="text-sm font-medium mb-3">Información Adicional</h2>
+            <h2 className="text-sm font-medium mb-3">Información Adicional</h2>
             <div className="space-y-3">
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -657,7 +660,7 @@ const TransactionDetail = () => {
                     Agregar archivos
                   </button>
                 </div>
-                
+
                 {transaction.attachments && Array.isArray(transaction.attachments) && transaction.attachments.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {transaction.attachments.map((attachment, idx) => (
@@ -727,8 +730,8 @@ const TransactionDetail = () => {
                     {transaction.status === "pagado"
                       ? "Pagado"
                       : transaction.status === "parcial"
-                      ? "Parcial"
-                      : "Pendiente"}
+                        ? "Parcial"
+                        : "Pendiente"}
                   </div>
                 </div>
               </div>
@@ -753,10 +756,10 @@ const TransactionDetail = () => {
         </div>
 
         {/* Payment Management */}
-         <div className="mb-6">
-           <h2 className="text-lg font-semibold mb-4">Gestión de Pagos</h2>
-           <div className="border border-border rounded-lg p-4 bg-background">
-             <PaymentManager
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold mb-4">Gestión de Pagos</h2>
+          <div className="border border-border rounded-lg p-4 bg-background">
+            <PaymentManager
               transactionId={id}
               transactionAmount={transaction.amount}
               transactionType={transactionType}
@@ -841,17 +844,17 @@ const TransactionDetail = () => {
                               {attachment.fileName}
                             </div>
                             <div className="flex space-x-2">
-                            <button
-                              onClick={() =>
-                                handleViewFile(attachment.fileUrl)
-                              }
-                              className="py-1 px-3 text-xs bg-primary/10 text-primary hover:bg-primary/20 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary flex items-center rounded-sm"
-                              title="Ver archivo"
-                            >
-                              <Eye className="w-3 h-3 mr-1" />
-                              Ver
-                            </button>
-                           
+                              <button
+                                onClick={() =>
+                                  handleViewFile(attachment.fileUrl)
+                                }
+                                className="py-1 px-3 text-xs bg-primary/10 text-primary hover:bg-primary/20 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary flex items-center rounded-sm"
+                                title="Ver archivo"
+                              >
+                                <Eye className="w-3 h-3 mr-1" />
+                                Ver
+                              </button>
+
                             </div>
                           </div>
                         ))}
@@ -925,11 +928,10 @@ const TransactionDetail = () => {
                   value={deleteReason}
                   onChange={(e) => handleDeleteReasonChange(e.target.value)}
                   rows={4}
-                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500 ${
-                    deleteReasonError
-                      ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
-                      : 'border-gray-300'
-                  }`}
+                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500 ${deleteReasonError
+                    ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                    : 'border-gray-300'
+                    }`}
                   placeholder="Escribe el motivo de eliminación..."
                   disabled={deleting}
                   required
@@ -958,11 +960,10 @@ const TransactionDetail = () => {
                   type="button"
                   onClick={handleDelete}
                   disabled={deleting || !deleteReason.trim()}
-                  className={`flex items-center px-4 py-2 text-sm font-medium text-white rounded-md focus:ring-2 focus:ring-red-500 ${
-                    deleting || !deleteReason.trim()
-                      ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-red-600 hover:bg-red-700'
-                  }`}
+                  className={`flex items-center px-4 py-2 text-sm font-medium text-white rounded-md focus:ring-2 focus:ring-red-500 ${deleting || !deleteReason.trim()
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-red-600 hover:bg-red-700'
+                    }`}
                 >
                   {deleting ? (
                     <>
@@ -981,7 +982,7 @@ const TransactionDetail = () => {
           </div>
         )}
       </div>
-      
+
       {/* Modal para subir archivos */}
       {showFileUpload && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -999,10 +1000,10 @@ const TransactionDetail = () => {
                 multiple={true}
                 disabled={uploadingFiles}
                 acceptedTypes={[
-                  "image/jpeg", 
-                  "image/jpg", 
-                  "image/png", 
-                  "image/gif", 
+                  "image/jpeg",
+                  "image/jpg",
+                  "image/png",
+                  "image/gif",
                   "application/pdf",
                   "application/msword",
                   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",

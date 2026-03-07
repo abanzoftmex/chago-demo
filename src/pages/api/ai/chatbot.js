@@ -114,7 +114,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { question } = req.body;
+    const { question, tenantId } = req.body;
 
     if (!question || typeof question !== "string") {
       return res.status(400).json({
@@ -139,11 +139,11 @@ export default async function handler(req, res) {
     // Obtener todos los datos del sistema para el análisis completo
     const [transactions, concepts, providers, generals, subconcepts] =
       await Promise.all([
-        transactionService.getAll({ limit: transactionLimit }),
-        conceptService.getAll(),
-        providerService.getAll(),
-        generalService.getAll(),
-        subconceptService.getAll(),
+        transactionService.getAll({ limit: transactionLimit }, tenantId),
+        conceptService.getAll(tenantId),
+        providerService.getAll(tenantId),
+        generalService.getAll(tenantId),
+        subconceptService.getAll(tenantId),
       ]);
 
     // Agregar información de divisiones (datos estáticos)
@@ -404,11 +404,11 @@ function prepareFinancialData(transactions, concepts, providers) {
     fechaUltimaTransaccion:
       transactions.length > 0
         ? Math.max(
-            ...transactions.map((t) => {
-              const date = t.date.toDate ? t.date.toDate() : new Date(t.date);
-              return date.getTime();
-            })
-          )
+          ...transactions.map((t) => {
+            const date = t.date.toDate ? t.date.toDate() : new Date(t.date);
+            return date.getTime();
+          })
+        )
         : null,
 
     // Análisis de tendencias
@@ -823,7 +823,7 @@ function filterDataByQuestion(financialData, questionAnalysis) {
     '2da_division': '2nda división profesional',
     '3ra_division': '3ra división profesional'
   };
-  
+
   const gastosPorDivision = {};
   filteredGastos.forEach((t) => {
     if (t.division) {
@@ -941,11 +941,11 @@ function cleanAndConsolidateData(filteredData) {
     .sort((a, b) => b.total - a.total);
 
   // Incluir gastosPorDivision si existen
-  const cleanedGastosPorDivision = filteredData.gastosPorDivision 
+  const cleanedGastosPorDivision = filteredData.gastosPorDivision
     ? filteredData.gastosPorDivision.map((item) => ({
-        ...item,
-        porcentaje: totalGastos > 0 ? (item.total / totalGastos) * 100 : 0,
-      })).sort((a, b) => b.total - a.total)
+      ...item,
+      porcentaje: totalGastos > 0 ? (item.total / totalGastos) * 100 : 0,
+    })).sort((a, b) => b.total - a.total)
     : [];
 
   return {
@@ -998,10 +998,10 @@ async function generateChatbotResponse(
 
   // Generate unique request ID to prevent caching
   const requestTimestamp = new Date().toISOString();
-  const currentDate = new Date().toLocaleDateString('es-MX', { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
+  const currentDate = new Date().toLocaleDateString('es-MX', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
   });
 
   const prompt = `
@@ -1015,9 +1015,8 @@ IMPORTANTE: Esta es una consulta NUEVA y ÚNICA. NO reutilices respuestas anteri
 DATOS FINANCIEROS FILTRADOS PARA ESTA CONSULTA (${timeFrameText[cleanedData.periodo] || "período solicitado"}):
 ${JSON.stringify(cleanedData, null, 2)}
 
-${
-  querySpecificData
-    ? `
+${querySpecificData
+      ? `
 DATOS ESPECÍFICOS PARA ESTA CONSULTA:
 - Análisis por categorías generales: ${JSON.stringify(querySpecificData.chartData, null, 2)}
 - Métricas específicas: ${JSON.stringify(querySpecificData.metrics, null, 2)}
@@ -1062,17 +1061,16 @@ REGLAS DE INTERPRETACIÓN - CRÍTICO:
    - USA los datos de subconceptos proporcionados
    - Muestra el desglose por subconceptos
 `
-    : ""
-}
+      : ""
+    }
 
-${
-  visualizationComponents
-    ? `
+${visualizationComponents
+      ? `
 COMPONENTES DE VISUALIZACIÓN SUGERIDOS:
 ${visualizationComponents.map((comp) => `- ${comp.type}: ${comp.title} (prioridad: ${comp.priority})`).join("\n")}
 `
-    : ""
-}
+      : ""
+    }
 
 IMPORTANTE: 
 - Solo analiza y responde sobre los datos filtrados que corresponden EXACTAMENTE a la pregunta
