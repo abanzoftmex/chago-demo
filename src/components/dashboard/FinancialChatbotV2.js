@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   Loader2,
   Send,
@@ -16,8 +16,11 @@ import {
 import ReusableDataTable from "../chatbot/ReusableDataTable";
 import ReusableChart from "../chatbot/ReusableChart";
 import ReusableMetricsList from "../chatbot/ReusableMetricsList";
+import { useAuth } from "../../context/AuthContextMultiTenant";
 
 const FinancialChatbotV2 = () => {
+  const { tenantInfo } = useAuth();
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -57,10 +60,10 @@ const FinancialChatbotV2 = () => {
   ];
 
   const quickActions = [
-    { icon: <ChartCandlestick/>, label: "Balance actual", query: "¿Cuál es mi balance actual?" },
-    { icon: <ChartNoAxesCombined/>, label: "Gastos del mes", query: "¿Cuánto gasté este mes?" },
-    { icon: <CircleDollarSign/>, label: "Tendencia anual", query: "¿Cuál es la tendencia de gastos en el último año?" },
-    { icon: <BanknoteArrowDown/>, label: "Top gastos", query: "¿Cuáles son mis mayores gastos?" },
+    { icon: <ChartCandlestick />, label: "Balance actual", query: "¿Cuál es mi balance actual?" },
+    { icon: <ChartNoAxesCombined />, label: "Gastos del mes", query: "¿Cuánto gasté este mes?" },
+    { icon: <CircleDollarSign />, label: "Tendencia anual", query: "¿Cuál es la tendencia de gastos en el último año?" },
+    { icon: <BanknoteArrowDown />, label: "Top gastos", query: "¿Cuáles son mis mayores gastos?" },
   ];
 
   const handleSendMessage = async (message = null) => {
@@ -69,7 +72,7 @@ const FinancialChatbotV2 = () => {
 
     setShowSuggestions(false);
     setInputMessage("");
-    
+
     // Add user message to conversation
     const userMessage = {
       id: Date.now(),
@@ -77,7 +80,7 @@ const FinancialChatbotV2 = () => {
       content: messageToSend,
       timestamp: new Date(),
     };
-    
+
     setConversationHistory((prev) => [...prev, userMessage]);
     setIsLoading(true);
 
@@ -127,7 +130,7 @@ const FinancialChatbotV2 = () => {
       const response = await fetch("/api/ai/chatbot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: messageToSend }),
+        body: JSON.stringify({ question: messageToSend, tenantId }),
       });
 
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -155,7 +158,7 @@ const FinancialChatbotV2 = () => {
       clearInterval(progressInterval);
       clearInterval(stageInterval);
       console.error("Error en chatbot:", err);
-      
+
       const errorMessage = {
         id: Date.now() + 1,
         type: "error",
@@ -244,12 +247,12 @@ const FinancialChatbotV2 = () => {
               Array.isArray(data.metrics)
                 ? data.metrics
                 : Object.entries(data.metrics)
-                    .filter(([key]) => !["totalIngresos", "totalGastos", "balance", "numeroTransacciones"].includes(key))
-                    .map(([key, value]) => ({
-                      label: key.charAt(0).toUpperCase() + key.slice(1),
-                      value: value,
-                      type: typeof value === "number" && value > 1000 ? "currency" : "number",
-                    }))
+                  .filter(([key]) => !["totalIngresos", "totalGastos", "balance", "numeroTransacciones"].includes(key))
+                  .map(([key, value]) => ({
+                    label: key.charAt(0).toUpperCase() + key.slice(1),
+                    value: value,
+                    type: typeof value === "number" && value > 1000 ? "currency" : "number",
+                  }))
             }
             layout="grid"
           />
@@ -310,9 +313,8 @@ const FinancialChatbotV2 = () => {
           <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
             <div className="flex items-center text-xs text-gray-600">
               <div
-                className={`w-2 h-2 rounded-full mr-2 ${
-                  data.analysisScope.coverage === "completo" ? "bg-green-500" : "bg-yellow-500"
-                }`}
+                className={`w-2 h-2 rounded-full mr-2 ${data.analysisScope.coverage === "completo" ? "bg-green-500" : "bg-yellow-500"
+                  }`}
               />
               <span>
                 {data.analysisScope.transactionsAnalyzed} transacciones analizadas
@@ -482,29 +484,26 @@ const FinancialChatbotV2 = () => {
           {conversationHistory.map((message) => (
             <div
               key={message.id}
-              className={`flex items-start space-x-3 mb-6 ${
-                message.type === "user" ? "justify-end" : ""
-              }`}
+              className={`flex items-start space-x-3 mb-6 ${message.type === "user" ? "justify-end" : ""
+                }`}
             >
               {message.type !== "user" && (
                 <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
                   <Bot className="w-4 h-4 text-white" />
                 </div>
               )}
-              
+
               <div
-                className={`flex-1 max-w-3xl ${
-                  message.type === "user" ? "flex justify-end" : ""
-                }`}
+                className={`flex-1 max-w-3xl ${message.type === "user" ? "flex justify-end" : ""
+                  }`}
               >
                 <div
-                  className={`rounded-2xl px-4 py-3 ${
-                    message.type === "user"
+                  className={`rounded-2xl px-4 py-3 ${message.type === "user"
                       ? "bg-gray-900 text-white ml-auto"
                       : message.type === "error"
-                      ? "bg-red-50 border border-red-200 text-red-800"
-                      : "bg-white"
-                  }`}
+                        ? "bg-red-50 border border-red-200 text-red-800"
+                        : "bg-white"
+                    }`}
                   style={message.type === "user" ? { maxWidth: "80%" } : {}}
                 >
                   {message.type === "user" ? (

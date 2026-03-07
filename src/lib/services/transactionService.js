@@ -267,7 +267,7 @@ export const transactionService = {
   },
 
   // Update transaction status and balance based on payments
-  async updatePaymentStatus(id, totalPaid, totalAmount) {
+  async updatePaymentStatus(id, totalPaid, totalAmount, tenantId = null) {
     try {
       const balance = totalAmount - totalPaid;
       let status = "pendiente";
@@ -282,7 +282,7 @@ export const transactionService = {
         totalPaid,
         balance,
         status,
-      });
+      }, null, tenantId);
 
       return { totalPaid, balance, status };
     } catch (error) {
