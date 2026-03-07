@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import TransactionForm from "../../../components/forms/TransactionForm";
+import TransactionCsvImportModal from "../../../components/forms/TransactionCsvImportModal";
 import ProtectedRoute from "../../../components/auth/ProtectedRoute";
 import AdvancedDateSelector from "../../../components/dashboard/AdvancedDateSelector";
 import { useAuth } from "../../../context/AuthContextMultiTenant";
@@ -16,7 +17,9 @@ import {
   PlusIcon,
   ArrowTrendingUpIcon,
   PencilIcon,
-  EyeIcon
+  EyeIcon,
+  ArrowDownTrayIcon,
+  ArrowUpTrayIcon
 } from '@heroicons/react/24/outline';
 
 const Ingresos = () => {
@@ -33,6 +36,7 @@ const Ingresos = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentMonthName, setCurrentMonthName] = useState("");
+  const [showImportModal, setShowImportModal] = useState(false);
   const toast = useToast();
 
   // Check permissions based on user role in tenant
@@ -318,6 +322,226 @@ const Ingresos = () => {
     router.push(`/admin/transacciones/detalle/${transactionId}`);
   };
 
+  const exportToCSV = async () => {
+    try {
+      if (!tenantId) {
+        toast.error('Error: No se ha identificado el tenant');
+        return;
+      }
+
+      // Obtener todas las transacciones del mes sin límite
+      const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
+
+      const transactionQuery = {
+        type: "entrada",
+        startDate: startOfMonth,
+        endDate: endOfMonth
+      };
+
+      const allTransactions = await transactionService.getAll(transactionQuery, tenantId);
+
+      // Crear headers del CSV
+      const headers = [
+        'Fecha',
+        'General', 
+        'Concepto',
+        'Subconcepto',
+        'Descripción',
+        'Monto',
+        'Estado'
+      ];
+
+      // Convertir transacciones a formato CSV
+      const csvData = allTransactions.map(transaction => [
+        formatDate(transaction.date),
+        getGeneralName(transaction.generalId),
+        getConceptName(transaction.conceptId), 
+        getSubconceptName(transaction.subconceptId) || '',
+        transaction.description || '',
+        transaction.amount || 0,
+        transaction.status || 'pendiente'
+      ]);
+
+      // Combinar headers con datos
+      const fullCsvData = [headers, ...csvData];
+
+      // Convertir a string CSV
+      const csvContent = fullCsvData.map(row => 
+        row.map(cell => `"${cell.toString().replace(/"/g, '""')}"`).join(',')
+      ).join('\n');
+
+      // Descargar archivo
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      
+      const monthYear = currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+      const tenantName = tenantInfo?.name ? `_${tenantInfo.name.replace(/\s+/g, '_')}` : '';
+      link.setAttribute('download', `entradas_${monthYear.replace(' ', '_')}${tenantName}.csv`);
+      
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success('Archivo CSV exportado exitosamente');
+    } catch (error) {
+      console.error('Error exporting to CSV:', error);
+      toast.error('Error al exportar el archivo CSV');
+    }
+  };
+
+  const handleImportCSV = (file, importTenantId) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const csvText = e.target.result;
+          const lines = csvText.trim().split('\n');
+          
+          if (lines.length <= 1) {
+            throw new Error('El archivo CSV está vacío o solo contiene headers');
+          }
+
+          // Saltar la primera línea (headers)
+          const dataLines = lines.slice(1);
+          const importResults = {
+            total: dataLines.length,
+            successful: 0,
+            errors: []
+          };
+
+          for (let i = 0; i < dataLines.length; i++) {
+            const line = dataLines[i];
+            const lineNumber = i + 2; // +2 porque saltamos header y empezamos en 1
+            
+            try {
+              // Parsear CSV considerando comillas
+              const values = [];
+              let current = '';
+              let inQuotes = false;
+              let j = 0;
+
+              while (j < line.length) {
+                const char = line[j];
+                const nextChar = line[j + 1];
+
+                if (char === '"' && inQuotes && nextChar === '"') {
+                  current += '"';
+                  j += 2;
+                } else if (char === '"') {
+                  inQuotes = !inQuotes;
+                  j++;
+                } else if (char === ',' && !inQuotes) {
+                  values.push(current);
+                  current = '';
+                  j++;
+                } else {
+                  current += char;
+                  j++;
+                }
+              }
+              values.push(current); // Agregar el último valor
+
+              if (values.length < 7) {
+                throw new Error(`Línea ${lineNumber}: Se esperaban al menos 7 columnas, encontradas ${values.length}`);
+              }
+
+              // Buscar IDs correspondientes
+              const generalName = values[1]?.trim();
+              const conceptName = values[2]?.trim();
+              const subconceptName = values[3]?.trim();
+
+              const general = generals.find(g => g.name === generalName);
+              if (!general) {
+                throw new Error(`Línea ${lineNumber}: General "${generalName}" no encontrado`);
+              }
+
+              const concept = concepts.find(c => c.name === conceptName);
+              if (!concept) {
+                throw new Error(`Línea ${lineNumber}: Concepto "${conceptName}" no encontrado`);
+              }
+
+              let subconceptId = null;
+              if (subconceptName) {
+                const subconcept = subconcepts.find(s => s.name === subconceptName);
+                if (!subconcept) {
+                  throw new Error(`Línea ${lineNumber}: Subconcepto "${subconceptName}" no encontrado`);
+                }
+                subconceptId = subconcept.id;
+              }
+
+              // Parsear fecha correctamente  
+              const dateString = values[0]?.trim();
+              if (!dateString) {
+                throw new Error(`Línea ${lineNumber}: La fecha es requerida`);
+              }
+              
+              let transactionDate;
+              
+              // Intentar diferentes formatos de fecha
+              if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                // Formato YYYY-MM-DD
+                transactionDate = new Date(dateString + 'T00:00:00');
+              } else if (dateString.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+                // Formato DD/MM/YYYY
+                const [day, month, year] = dateString.split('/');
+                transactionDate = new Date(year, month - 1, day);
+              } else if (dateString.match(/^\d{2}-\d{2}-\d{4}$/)) {
+                // Formato DD-MM-YYYY  
+                const [day, month, year] = dateString.split('-');
+                transactionDate = new Date(year, month - 1, day);
+              } else {
+                // Último intento con Date constructor
+                transactionDate = new Date(dateString);
+              }
+              
+              // Validar que la fecha sea válida
+              if (isNaN(transactionDate.getTime())) {
+                throw new Error(`Línea ${lineNumber}: Fecha inválida "${dateString}". Use formato YYYY-MM-DD, DD/MM/YYYY o DD-MM-YYYY`);
+              }
+
+              // Crear objeto de transacción
+              const transactionData = {
+                type: 'entrada',
+                generalId: general.id,
+                conceptId: concept.id,
+                subconceptId: subconceptId,
+                description: values[4]?.trim() || '',
+                amount: parseFloat(values[5]) || 0,
+                status: values[6]?.trim()?.toLowerCase() || 'pendiente',
+                date: transactionDate
+              };
+
+              // Validar campos requeridos
+              if (transactionData.amount <= 0) {
+                throw new Error(`Línea ${lineNumber}: El monto debe ser mayor a 0`);
+              }
+
+              if (!['pendiente', 'parcial', 'pagado'].includes(transactionData.status)) {
+                throw new Error(`Línea ${lineNumber}: Estado inválido "${transactionData.status}". Use: pendiente, parcial, pagado`);
+              }
+
+              // Crear transacción en el tenant específico
+              await transactionService.create(transactionData, { uid: 'import-user' }, importTenantId);
+              importResults.successful++;
+
+            } catch (error) {
+              importResults.errors.push(`Línea ${lineNumber}: ${error.message}`);
+            }
+          }
+
+          resolve(importResults);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      reader.readAsText(file);
+    });
+  };
+
   const filteredTransactions = transactions.filter((transaction) => {
     // Si hay un término de búsqueda, filtrar por él
     if (searchTerm) {
@@ -381,12 +605,29 @@ const Ingresos = () => {
                 </div>
               </div>
               {!showForm && canManageTransactions && (
-                <button
-                  onClick={handleNewTransaction}
-                  className="px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 focus:ring-4 focus:ring-green-500/20 focus:ring-offset-2 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl font-medium"
-                ><PlusIcon className="h-4 w-4 mr-1.5" />
-                  Nueva Entrada
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={exportToCSV}
+                    className="px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 focus:ring-4 focus:ring-blue-500/20 focus:ring-offset-2 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl font-medium"
+                  >
+                    <ArrowDownTrayIcon className="h-4 w-4 mr-1.5" />
+                    Exportar CSV
+                  </button>
+                  <button
+                    onClick={() => setShowImportModal(true)}
+                    className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 focus:ring-4 focus:ring-purple-500/20 focus:ring-offset-2 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl font-medium"
+                  >
+                    <ArrowUpTrayIcon className="h-4 w-4 mr-1.5" />
+                    Importar CSV
+                  </button>
+                  <button
+                    onClick={handleNewTransaction}
+                    className="px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 focus:ring-4 focus:ring-green-500/20 focus:ring-offset-2 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl font-medium"
+                  >
+                    <PlusIcon className="h-4 w-4 mr-1.5" />
+                    Nueva Entrada
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -702,6 +943,18 @@ const Ingresos = () => {
             </div>
           )}
         </div>
+
+        <TransactionCsvImportModal
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          onSuccess={(message) => {
+            toast.success(message);
+            loadTransactions();
+          }}
+          onImport={handleImportCSV}
+          type="entrada"
+          tenantId={tenantId}
+        />
       </AdminLayout>
     </ProtectedRoute>
   );

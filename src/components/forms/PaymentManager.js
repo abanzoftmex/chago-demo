@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { paymentService } from "../../lib/services/paymentService";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/AuthContextMultiTenant";
 import FileUpload from "../ui/FileUpload";
 import Toast from "../ui/Toast";
 import { sendEmailWithRateLimit } from "../../lib/utils";
@@ -12,7 +12,7 @@ const PaymentManager = ({
   provider,
   transaction,
 }) => {
-  const { checkPermission, userRole } = useAuth();
+  const { checkPermission, userRole, tenantInfo } = useAuth();
   const canDeletePayments = checkPermission("canDeletePayments");
   const canRegisterPayments = !['director', 'director_general'].includes(userRole);
   
@@ -55,7 +55,7 @@ const PaymentManager = ({
   const loadPaymentData = useCallback(async () => {
     try {
       setLoading(true);
-      const summary = await paymentService.getPaymentSummary(transactionId);
+      const summary = await paymentService.getPaymentSummary(transactionId, tenantInfo?.id);
       setPaymentSummary(summary);
       setPayments(summary.payments);
     } catch (error) {
@@ -67,7 +67,7 @@ const PaymentManager = ({
     } finally {
       setLoading(false);
     }
-  }, [transactionId]);
+  }, [transactionId, tenantInfo?.id]);
   // Load payment data on mount
   useEffect(() => {
     if (transactionId) {
@@ -266,7 +266,7 @@ const PaymentManager = ({
       // Extract original File objects from wrappers
       const originalFiles = formFiles.map(fileWrapper => fileWrapper.file);
 
-      const created = await paymentService.create(paymentData, originalFiles);
+      const created = await paymentService.create(paymentData, originalFiles, tenantInfo?.id);
 
       // Reset form
       setFormData({
@@ -330,7 +330,7 @@ const PaymentManager = ({
     }
 
     try {
-      await paymentService.delete(paymentId);
+      await paymentService.delete(paymentId, tenantInfo?.id);
       await loadPaymentData();
 
       if (onPaymentUpdate) {

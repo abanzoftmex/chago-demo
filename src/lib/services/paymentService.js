@@ -38,7 +38,7 @@ const STORAGE_PATH = "payment-attachments";
 
 export const paymentService = {
   // Create a new payment
-  async create(paymentData, files = []) {
+  async create(paymentData, files = [], tenantId = null) {
     try {
       // Upload files first if any
       const attachments = [];
@@ -54,7 +54,8 @@ export const paymentService = {
       }
 
       // Create payment document
-      const docRef = await addDoc(collection(db, COLLECTION_NAME), {
+      const collectionPath = getPaymentsCollection(tenantId);
+      const docRef = await addDoc(collection(db, collectionPath), {
         ...paymentData,
         attachments,
         createdAt: serverTimestamp(),
@@ -246,9 +247,9 @@ export const paymentService = {
   },
 
   // Delete payment
-  async delete(id) {
+  async delete(id, tenantId = null) {
     try {
-      const payment = await this.getById(id);
+      const payment = await this.getById(id, tenantId);
 
       // Delete attached files from storage
       if (payment.attachments && payment.attachments.length > 0) {
@@ -451,10 +452,10 @@ export const paymentService = {
   },
 
   // Get payment summary for transaction
-  async getPaymentSummary(transactionId) {
+  async getPaymentSummary(transactionId, tenantId = null) {
     try {
-      const payments = await this.getByTransaction(transactionId);
-      const transaction = await transactionService.getById(transactionId);
+      const payments = await this.getByTransaction(transactionId, tenantId);
+      const transaction = await transactionService.getById(transactionId, tenantId);
 
       const totalPaid = payments.reduce(
         (sum, payment) => sum + payment.amount,

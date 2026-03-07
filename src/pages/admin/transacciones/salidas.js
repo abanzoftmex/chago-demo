@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/router";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import TransactionForm from "../../../components/forms/TransactionForm";
+import TransactionCsvImportModal from "../../../components/forms/TransactionCsvImportModal";
 import ProtectedRoute from "../../../components/auth/ProtectedRoute";
 import AdvancedDateSelector from "../../../components/dashboard/AdvancedDateSelector";
 import { useAuth } from "../../../context/AuthContextMultiTenant";
@@ -21,6 +22,8 @@ import {
   EyeIcon,
   ArrowPathIcon,
   TrashIcon,
+  ArrowDownTrayIcon,
+  ArrowUpTrayIcon,
 } from '@heroicons/react/24/outline';
 
 const SolicitudesPago = () => {
@@ -40,6 +43,7 @@ const SolicitudesPago = () => {
   const [currentMonthName, setCurrentMonthName] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
+  const [showImportModal, setShowImportModal] = useState(false);
   const toast = useToast();
 
   // Check permissions based on user role in tenant
@@ -425,6 +429,266 @@ const SolicitudesPago = () => {
     setCurrentPage(1); // Reset to first page when searching
   };
 
+  // CSV Export function
+  const exportToCSV = () => {
+    try {
+      // Validate tenant ID
+      if (!tenantId) {
+        toast.error("Error: No hay información de tenant disponible");
+        return;
+      }
+
+      // Create CSV headers specific to Salidas (include provider field)
+      const headers = [
+        'Fecha',
+        'Descripcion',
+        'Monto',
+        'General',
+        'Concepto', 
+        'Subconcepto',
+        'Proveedor',
+        'Estado',
+        'Notas'
+      ];
+
+      // Convert transactions to CSV rows
+      const rows = filteredTransactions.map(transaction => [
+        formatDate(transaction.date),
+        transaction.description || '',
+        transaction.amount || 0,
+        getGeneralName(transaction.generalId, transaction),
+        getConceptName(transaction.conceptId, transaction),
+        getSubconceptName(transaction.subconceptId, transaction) || '',
+        getProviderName(transaction.providerId, transaction),
+        transaction.status || 'pendiente',
+        transaction.notes || ''
+      ]);
+
+      // Combine headers and rows
+      const csvContent = [headers, ...rows]
+        .map(row => row.map(cell => `"${cell}"`).join(','))
+        .join('\n');
+
+      // Create and download file with tenant-aware naming
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      
+      // Create tenant-aware filename
+      const monthYear = currentDate.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
+      const fileName = `salidas_${tenantInfo?.name || 'tenant'}_${monthYear}.csv`;
+      
+      link.href = URL.createObjectURL(blob);
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success(`Archivo CSV exportado: ${fileName}`);
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      toast.error('Error al exportar CSV: ' + error.message);
+    }
+  };
+
+  // CSV Import handler
+  const handleImportCSV = () => {
+    // Validate tenant ID before opening modal
+    if (!tenantId) {
+      toast.error("Error: No hay información de tenant disponible para importar");
+      return;
+    }
+    
+    setShowImportModal(true);
+  };
+
+  // Handle successful CSV import
+  const handleImportSuccess = () => {
+    setShowImportModal(false);
+    loadTransactions(); // Refresh the transactions list
+    toast.success('Salidas importadas exitosamente');
+  };
+
+  // Handle CSV import processing
+  const handleProcessImportCSV = (file, importTenantId) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const csvText = e.target.result;
+          const lines = csvText.trim().split('\n');
+          
+          if (lines.length <= 1) {
+            throw new Error('El archivo CSV está vacío o solo contiene headers');
+          }
+
+          // Saltar la primera línea (headers)
+          const dataLines = lines.slice(1);
+          const importResults = {
+            total: dataLines.length,
+            successful: 0,
+            errors: []
+          };
+
+          for (let i = 0; i < dataLines.length; i++) {
+            const line = dataLines[i];
+            const lineNumber = i + 2; // +2 porque saltamos header y empezamos en 1
+            
+            try {
+              // Parsear CSV considerando comillas
+              const values = [];
+              let current = '';
+              let inQuotes = false;
+              let j = 0;
+
+              while (j < line.length) {
+                const char = line[j];
+                const nextChar = line[j + 1];
+
+                if (char === '"' && inQuotes && nextChar === '"') {
+                  current += '"';
+                  j += 2;
+                } else if (char === '"') {
+                  inQuotes = !inQuotes;
+                  j++;
+                } else if (char === ',' && !inQuotes) {
+                  values.push(current);
+                  current = '';
+                  j++;
+                } else {
+                  current += char;
+                  j++;
+                }
+              }
+              values.push(current); // Agregar el último valor
+
+              if (values.length < 7) {
+                throw new Error(`Línea ${lineNumber}: Se esperaban al menos 7 columnas (para salidas sin proveedor) u 8 (con proveedor), encontradas ${values.length}`);
+              }
+
+              // Parsear fecha correctamente
+              const dateString = values[0]?.trim();
+              if (!dateString) {
+                throw new Error(`Línea ${lineNumber}: La fecha es requerida`);
+              }
+              
+              let transactionDate;
+              
+              // Intentar diferentes formatos de fecha
+              if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                // Formato YYYY-MM-DD
+                transactionDate = new Date(dateString + 'T00:00:00');
+              } else if (dateString.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+                // Formato DD/MM/YYYY
+                const [day, month, year] = dateString.split('/');
+                transactionDate = new Date(year, month - 1, day);
+              } else if (dateString.match(/^\d{2}-\d{2}-\d{4}$/)) {
+                // Formato DD-MM-YYYY  
+                const [day, month, year] = dateString.split('-');
+                transactionDate = new Date(year, month - 1, day);
+              } else {
+                // Último intento con Date constructor
+                transactionDate = new Date(dateString);
+              }
+              
+              // Validar que la fecha sea válida
+              if (isNaN(transactionDate.getTime())) {
+                throw new Error(`Línea ${lineNumber}: Fecha inválida "${dateString}". Use formato YYYY-MM-DD, DD/MM/YYYY o DD-MM-YYYY`);
+              }
+
+              // Determinar si es formato con 8 columnas (con proveedor) o 7 (sin proveedor)
+              const hasProvider = values.length >= 8;
+              
+              let generalName, conceptName, subconceptName, providerName, description, amount, status;
+              
+              if (hasProvider) {
+                // Formato: Fecha,General,Concepto,Subconcepto,Proveedor,Descripción,Monto,Estado
+                generalName = values[1]?.trim();
+                conceptName = values[2]?.trim();
+                subconceptName = values[3]?.trim();
+                providerName = values[4]?.trim();
+                description = values[5]?.trim();
+                amount = values[6];
+                status = values[7];
+              } else {
+                // Formato: Fecha,General,Concepto,Subconcepto,Descripción,Monto,Estado
+                generalName = values[1]?.trim();
+                conceptName = values[2]?.trim();
+                subconceptName = values[3]?.trim();
+                description = values[4]?.trim();
+                amount = values[5];
+                status = values[6];
+              }
+
+              // Buscar IDs correspondientes
+              const general = generals.find(g => g.name === generalName);
+              if (!general) {
+                throw new Error(`Línea ${lineNumber}: General "${generalName}" no encontrado`);
+              }
+
+              const concept = concepts.find(c => c.name === conceptName);
+              if (!concept) {
+                throw new Error(`Línea ${lineNumber}: Concepto "${conceptName}" no encontrado`);
+              }
+
+              let subconceptId = null;
+              if (subconceptName) {
+                const subconcept = subconcepts.find(s => s.name === subconceptName);
+                if (!subconcept) {
+                  throw new Error(`Línea ${lineNumber}: Subconcepto "${subconceptName}" no encontrado`);
+                }
+                subconceptId = subconcept.id;
+              }
+
+              let providerId = null;
+              if (hasProvider && providerName) {
+                const provider = providers.find(p => p.name === providerName);
+                if (!provider) {
+                  throw new Error(`Línea ${lineNumber}: Proveedor "${providerName}" no encontrado`);
+                }
+                providerId = provider.id;
+              }
+
+              // Crear objeto de transacción
+              const transactionData = {
+                type: 'salida',
+                generalId: general.id,
+                conceptId: concept.id,
+                subconceptId: subconceptId,
+                providerId: providerId,
+                description: description || '',
+                amount: parseFloat(amount) || 0,
+                status: status?.trim()?.toLowerCase() || 'pendiente',
+                date: transactionDate
+              };
+
+              // Validar campos requeridos
+              if (transactionData.amount <= 0) {
+                throw new Error(`Línea ${lineNumber}: El monto debe ser mayor a 0`);
+              }
+
+              if (!['pendiente', 'parcial', 'pagado'].includes(transactionData.status)) {
+                throw new Error(`Línea ${lineNumber}: Estado inválido "${transactionData.status}". Use: pendiente, parcial, pagado`);
+              }
+
+              // Crear transacción en el tenant específico
+              await transactionService.create(transactionData, { uid: 'import-user' }, importTenantId);
+              importResults.successful++;
+
+            } catch (error) {
+              importResults.errors.push(error.message);
+            }
+          }
+
+          resolve(importResults);
+        } catch (error) {
+          reject(error);
+        }
+      };
+
+      reader.readAsText(file);
+    });
+  };
+
   return (
     <ProtectedRoute>
       <AdminLayout
@@ -465,7 +729,28 @@ const SolicitudesPago = () => {
                 </div>
               </div>
               {!showForm && canManageTransactions && (
-                <div className="flex flex-col sm:flex-row gap-3">                  
+                <div className="flex flex-col sm:flex-row gap-3">
+                  {/* Botones CSV */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={exportToCSV}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:ring-4 focus:ring-green-500/20 flex items-center transition-all duration-200 font-medium"
+                      title="Exportar a CSV"
+                    >
+                      <ArrowDownTrayIcon className="h-4 w-4 mr-1.5" />
+                      <span className="hidden sm:inline">Exportar</span>
+                    </button>
+                    
+                    <button
+                      onClick={handleImportCSV}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-500/20 flex items-center transition-all duration-200 font-medium"
+                      title="Importar desde CSV"
+                    >
+                      <ArrowUpTrayIcon className="h-4 w-4 mr-1.5" />
+                      <span className="hidden sm:inline">Importar</span>
+                    </button>
+                  </div>
+                  
                   {/* Botón Nueva Salida */}
                   <button
                     onClick={handleNewTransaction}
@@ -994,6 +1279,18 @@ const SolicitudesPago = () => {
           )}
         </div>
       </AdminLayout>
+
+      {/* CSV Import Modal */}
+      {showImportModal && (
+        <TransactionCsvImportModal
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          onSuccess={handleImportSuccess}
+          onImport={handleProcessImportCSV}
+          transactionType="salida"
+          tenantId={tenantId}
+        />
+      )}
     </ProtectedRoute>
   );
 };
