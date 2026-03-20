@@ -93,7 +93,7 @@ const Ingresos = () => {
       const paymentsData = {};
       for (const transaction of transactionsData) {
         try {
-          const payments = await paymentService.getByTransaction(transaction.id);
+          const payments = await paymentService.getByTransaction(transaction.id, tenantId);
           paymentsData[transaction.id] = payments || [];
         } catch (err) {
           console.error(`Error loading payments for transaction ${transaction.id}:`, err);
@@ -196,17 +196,25 @@ const Ingresos = () => {
   };
 
   const getRemainingAmount = (transaction) => {
+    // Usar el campo 'balance' guardado en la transacción (actualizado por updateTransactionPaymentStatus)
+    if (transaction.balance !== undefined && transaction.balance !== null) {
+      return Math.max(0, transaction.balance);
+    }
+    // Fallback: calcular desde paymentsMap
     const totalAmount = transaction.amount || 0;
     const payments = paymentsMap[transaction.id] || [];
     const paidAmount = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
-    const remainingAmount = Math.max(0, totalAmount - paidAmount);
-    return remainingAmount;
+    return Math.max(0, totalAmount - paidAmount);
   };
 
   const getPaidAmount = (transaction) => {
+    // Usar el campo 'totalPaid' guardado en la transacción
+    if (transaction.totalPaid !== undefined && transaction.totalPaid !== null) {
+      return transaction.totalPaid;
+    }
+    // Fallback: calcular desde paymentsMap
     const payments = paymentsMap[transaction.id] || [];
-    const paidAmount = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
-    return paidAmount;
+    return payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
   };
 
 

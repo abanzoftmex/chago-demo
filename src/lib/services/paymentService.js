@@ -458,7 +458,7 @@ export const paymentService = {
   // Get payment summary for transaction
   async getPaymentSummary(transactionId, tenantId = null) {
     try {
-      const payments = await this.getByTransaction(transactionId);
+      const payments = await this.getByTransaction(transactionId, tenantId);
       const transaction = await transactionService.getById(transactionId, tenantId);
 
       const totalPaid = payments.reduce(

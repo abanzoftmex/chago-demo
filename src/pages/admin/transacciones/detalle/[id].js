@@ -35,6 +35,7 @@ import {
   X,
   Copy,
   Banknote,
+  Clock,
 } from "lucide-react";
 
 // Modal component for displaying provider details
@@ -267,8 +268,18 @@ const TransactionDetail = () => {
     }
   };
 
-  const handlePaymentUpdate = (updatedPayments) => {
-    setPayments(Array.isArray(updatedPayments) ? updatedPayments : []);
+  const handlePaymentUpdate = async () => {
+    if (!id || !tenantId) return;
+    try {
+      const [updatedPayments, updatedTransaction] = await Promise.all([
+        paymentService.getByTransaction(id, tenantId),
+        transactionService.getById(id, tenantId),
+      ]);
+      setPayments(Array.isArray(updatedPayments) ? updatedPayments : []);
+      setTransaction(updatedTransaction);
+    } catch (err) {
+      console.error("Error refreshing payment data:", err);
+    }
   };
 
   const handleDeleteReasonChange = (value) => {
@@ -310,30 +321,30 @@ const TransactionDetail = () => {
   };
 
   const getStatusBadge = (status) => {
-    switch (status) {
-      case "pagado":
-        return (
-          <div className="flex items-center space-x-1 text-green-600">
-            <CheckCircle className="w-4 h-4" />
-            <span className="text-xs font-medium">Pagado</span>
-          </div>
-        );
-      case "parcial":
-        return (
-          <div className="flex items-center space-x-1 text-amber-600">
-            <AlertCircle className="w-4 h-4" />
-            <span className="text-xs font-medium">Parcial</span>
-          </div>
-        );
-      case "pendiente":
-      default:
-        return (
-          <div className="flex items-center space-x-1 text-red-600">
-            <AlertCircle className="w-4 h-4" />
-            <span className="text-xs font-medium">Pendiente</span>
-          </div>
-        );
-    }
+    const config = {
+      pagado: {
+        className: "bg-green-100 text-green-800",
+        icon: <CheckCircle className="w-3.5 h-3.5" />,
+        label: "Pagado",
+      },
+      parcial: {
+        className: "bg-amber-100 text-amber-800",
+        icon: <Clock className="w-3.5 h-3.5" />,
+        label: "Parcial",
+      },
+      pendiente: {
+        className: "bg-red-100 text-red-800",
+        icon: <AlertCircle className="w-3.5 h-3.5" />,
+        label: "Pendiente",
+      },
+    };
+    const { className, icon, label } = config[status] ?? config.pendiente;
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${className}`}>
+        {icon}
+        {label}
+      </span>
+    );
   };
 
   const getPaymentMetrics = () => {
@@ -738,12 +749,8 @@ const TransactionDetail = () => {
                 <BarChart3 className="w-4 h-4 text-primary mt-0.5" />
                 <div>
                   <div className="text-xs text-muted-foreground">Estado</div>
-                  <div className="text-sm font-medium">
-                    {transaction.status === "pagado"
-                      ? "Pagado"
-                      : transaction.status === "parcial"
-                        ? "Parcial"
-                        : "Pendiente"}
+                  <div className="mt-0.5">
+                    {getStatusBadge(transaction.status)}
                   </div>
                 </div>
               </div>
@@ -773,110 +780,11 @@ const TransactionDetail = () => {
           <div className="border border-border rounded-lg p-4 bg-background">
             <PaymentManager
               transactionId={id}
-              transactionAmount={transaction.amount}
-              transactionType={transactionType}
               onPaymentUpdate={handlePaymentUpdate}
               provider={provider}
               transaction={transaction}
             />
           </div>
-        </div>
-
-        {/* Payment History */}
-        <div>
-          {payments && Array.isArray(payments) && payments.length > 0 && (
-            <div className="space-y-4">
-              {payments.map((payment, index) => (
-                <div
-                  key={payment.id}
-                  className="border border-border rounded-lg p-4 hover:bg-muted/30 transition-colors bg-background"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                        <DollarSign className="w-4 h-4 text-primary" />
-                      </div>
-                      <div>
-                        <div className="font-semibold text-foreground">
-                          {formatCurrency(payment.amount)}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          Pago #{index + 1} • {formatDate(payment.date)}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xs text-muted-foreground">
-                        Registrado
-                      </div>
-                      <div className="text-sm font-medium">
-                        {formatDateTime(payment.createdAt)}
-                      </div>
-                    </div>
-                  </div>
-
-                  {payment.notes && (
-                    <div className="mb-3 pl-11">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <StickyNote className="w-4 h-4 text-blue-600" />
-                        <span className="text-sm font-medium">Notas</span>
-                      </div>
-                      <div className="bg-muted/50 rounded p-3 text-sm">
-                        {payment.notes}
-                      </div>
-                    </div>
-                  )}
-
-                  {payment.attachments && Array.isArray(payment.attachments) && payment.attachments.length > 0 && (
-                    <div className="pl-11">
-                      <div className="flex items-center space-x-2 mb-3">
-                        <Paperclip className="w-4 h-4 text-purple-600" />
-                        <span className="text-sm font-medium">
-                          Documentos ({payment.attachments.length})
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {payment.attachments.map((attachment, attachIndex) => (
-                          <div
-                            key={attachIndex}
-                            className="border border-border rounded p-3 bg-background"
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center space-x-2">
-                                <FileText className="w-4 h-4 text-primary" />
-                                <span className="text-xs font-medium text-primary uppercase">
-                                  {attachment.fileType}
-                                </span>
-                              </div>
-                            </div>
-                            <div
-                              className="text-sm font-medium mb-2 truncate"
-                              title={attachment.fileName}
-                            >
-                              {attachment.fileName}
-                            </div>
-                            <div className="flex space-x-2">
-                              <button
-                                onClick={() =>
-                                  handleViewFile(attachment.fileUrl)
-                                }
-                                className="py-1 px-3 text-xs bg-primary/10 text-primary hover:bg-primary/20 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary flex items-center rounded-sm"
-                                title="Ver archivo"
-                              >
-                                <Eye className="w-3 h-3 mr-1" />
-                                Ver
-                              </button>
-
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Actions */}
