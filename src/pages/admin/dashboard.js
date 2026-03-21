@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { useToast } from "../../components/ui/Toast";
 import { useAuth } from "../../context/AuthContextMultiTenant";
@@ -17,7 +17,7 @@ import TreeComparisonSection from "../../components/reports/TreeComparisonSectio
 import WeeklyBreakdownCombined from "../../components/reports/WeeklyBreakdownCombined";
 import WeeklyBreakdownEntradas from "../../components/reports/WeeklyBreakdownEntradas";
 import WeeklyBreakdownSalidas from "../../components/reports/WeeklyBreakdownSalidas";
-import { formatCurrency, formatCurrencyWithBadge, calculateTreeComparison, getTreeBalanceByName, isAmboTree } from "../../lib/utils/reportUtils";
+import { formatCurrency, formatCurrencyWithBadge, calculateTreeComparison } from "../../lib/utils/reportUtils";
 
 const Dashboard = () => {
   const { error, success } = useToast();
@@ -131,75 +131,6 @@ const Dashboard = () => {
     return dailyData;
   };
 
-  // Función para agrupar transacciones por categoría general
-  const groupTransactionsByGeneral = async (transactions, concepts) => {
-    try {
-      const tenantId = tenantInfo?.id;
-      if (!tenantId) {
-        return {};
-      }
-      
-      // Obtener todas las categorías generales de tipo 'salida' (gastos)
-      const generals = await generalService.getByType('salida', tenantId);
-      
-      // Crear un mapa de conceptos a categorías generales
-      const conceptToGeneralMap = {};
-      concepts.forEach(concept => {
-        // En la base de datos, el campo que relaciona un concepto con su categoría general es generalId
-        conceptToGeneralMap[concept.id] = concept.generalId || 'sin-categoria';
-      });
-      
-      // Crear un mapa de IDs de categorías generales a nombres
-      const generalNamesMap = {};
-      generals.forEach(general => {
-        generalNamesMap[general.id] = general.name;
-      });
-      
-      // Inicializar datos para todas las categorías generales, incluso las que no tienen transacciones
-      const generalData = {};
-      generals.forEach(general => {
-        generalData[general.name] = {
-          amount: 0,
-          count: 0
-        };
-      });
-      
-      // Añadir categoría para conceptos sin categoría general asignada
-      generalData['Sin Categoría'] = {
-        amount: 0,
-        count: 0
-      };
-      
-      // Imprimir para depuración
-      console.log('Conceptos:', concepts);
-      console.log('Mapa de conceptos a generales:', conceptToGeneralMap);
-      console.log('Mapa de nombres de generales:', generalNamesMap);
-      
-      // Agrupar transacciones por categoría general
-      transactions.forEach(transaction => {
-        if (transaction.type === 'salida') {
-          const conceptId = transaction.conceptId;
-          const generalId = conceptToGeneralMap[conceptId] || 'sin-categoria';
-          const generalName = generalNamesMap[generalId] || 'Sin Categoría';
-          console.log(`Transacción: ${transaction.id}, Concepto: ${conceptId}, General ID: ${generalId}, Nombre General: ${generalName}`);
-          
-          generalData[generalName].amount += transaction.amount;
-          generalData[generalName].count++;
-        }
-      });
-      
-      // Filtrar categorías sin transacciones si se desea
-      // const filteredGeneralData = Object.fromEntries(
-      //   Object.entries(generalData).filter(([_, data]) => data.count > 0)
-      // );
-      
-      return generalData;
-    } catch (error) {
-      console.error('Error agrupando transacciones por categoría general:', error);
-      return {};
-    }
-  };
-
   const loadDashboardData = async () => {
     try {
       setLoading(true);
@@ -230,24 +161,7 @@ const Dashboard = () => {
         throw new Error('No tenant ID available');
       }
 
-      // Load all dashboard data in parallel for the selected month
-      const [
-        summaryData,
-        trendsData, 
-        allTransactions, 
-        allConcepts,
-        generalsData,
-        subconceptsData
-      ] = await Promise.all([
-        dashboardService.getMonthSummary(startOfMonth, endOfMonth, tenantId),
-        dashboardService.getMonthlyTrends(tenantId),
-        transactionService.getByDateRange(startOfMonth, endOfMonth, {}, tenantId),
-        conceptService.getAll(tenantId),
-        generalService.getAll(tenantId),
-        subconceptService.getAll(tenantId)
-      ]);
-
-      // Generate report stats for report components
+      // Build filter data before parallel block so it can be used inside it
       const filterData = {
         startDate: startOfMonth,
         endDate: endOfMonth,
@@ -258,7 +172,28 @@ const Dashboard = () => {
         division: null
       };
 
-      const transactionsForReport = await reportService.getFilteredTransactions(filterData, tenantId);
+      // Load all dashboard data in parallel for the selected month
+      const [
+        summaryData,
+        trendsData,
+        allTransactions,
+        allConcepts,
+        generalsData,
+        subconceptsData,
+        transactionsForReport,
+        allTransactionsComplete
+      ] = await Promise.all([
+        dashboardService.getMonthSummary(startOfMonth, endOfMonth, tenantId),
+        dashboardService.getMonthlyTrends(tenantId),
+        transactionService.getByDateRange(startOfMonth, endOfMonth, {}, tenantId),
+        conceptService.getAll(tenantId),
+        generalService.getAll(tenantId),
+        subconceptService.getAll(tenantId),
+        reportService.getFilteredTransactions(filterData, tenantId),
+        transactionService.getAll({}, tenantId)
+      ]);
+
+      // generateReportStats depends on transactionsForReport — must be sequential
       const statsData = await reportService.generateReportStats(transactionsForReport, filterData, tenantId);
 
       // Store data for report components
@@ -267,9 +202,6 @@ const Dashboard = () => {
       setSubconcepts(subconceptsData);
       setStats(statsData);
       setTransactionsReport(transactionsForReport);
-      
-      // Get all transactions without date filter for tree comparison
-      const allTransactionsComplete = await transactionService.getAll({}, tenantId);
       setAllTransactionsReport(allTransactionsComplete);
 
       // Agrupar transacciones por día

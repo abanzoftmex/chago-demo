@@ -1,5 +1,17 @@
-import { useState } from "react";
-import { EyeIcon, XMarkIcon, ArrowUpIcon, ArrowDownIcon, ClockIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
+import { useState, useMemo } from "react";
+import { EyeIcon, XMarkIcon, ClockIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
+import { useWeekDayBreakdown } from "../../lib/hooks/useWeekDayBreakdown";
+import { usePersistedDisabledRows } from "../../lib/hooks/usePersistedDisabledRows";
+import WeekDayBreakdownModal from "./WeekDayBreakdownModal";
+import { parseWeekDate } from "../../lib/utils/reportUtils";
+import { useAuth } from "../../context/AuthContextMultiTenant";
+
+const PAYMENT_STATUS_CONFIG = {
+  pendiente: { color: "bg-red-100 text-red-800", text: "Pendiente", icon: <ClockIcon className="h-3 w-3 mr-1" /> },
+  parcial: { color: "bg-yellow-100 text-yellow-800", text: "Parcial", icon: <ClockIcon className="h-3 w-3 mr-1" /> },
+  pagado: { color: "bg-green-100 text-green-800", text: "Pagado", icon: <CheckCircleIcon className="h-3 w-3 mr-1" /> },
+};
+const getPaymentStatusBadge = (status) => PAYMENT_STATUS_CONFIG[status] || PAYMENT_STATUS_CONFIG.pendiente;
 
 const WeeklyBreakdownSalidas = ({
   stats,
@@ -12,20 +24,37 @@ const WeeklyBreakdownSalidas = ({
   currentDate,
   formatCurrency
 }) => {
+  const { user } = useAuth();
   const [selectedWeekDetail, setSelectedWeekDetail] = useState(null);
-  const [disabledRows, setDisabledRows] = useState(new Set());
+  const { disabledRows, toggleRow } = usePersistedDisabledRows(user?.uid, "salidas");
+  const { selectedWeekOverview, handleWeekOverviewClick, clearWeekOverview } = useWeekDayBreakdown({
+    transactions, generals, concepts, subconcepts, filters, currentDate, type: "salida",
+  });
 
-  const toggleRow = (key) => {
-    setDisabledRows(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
-  };
+  const generalMap = useMemo(() => Object.fromEntries(generals.map((g) => [g.id, g.name])), [generals]);
+  const conceptMap = useMemo(() => Object.fromEntries(concepts.map((c) => [c.id, c.name])), [concepts]);
+  const subconceptMap = useMemo(() => Object.fromEntries(subconcepts.map((s) => [s.id, s.name])), [subconcepts]);
 
   if (!stats || !stats.weeklyBreakdown || !stats.weeklyBreakdown.weeks) {
     return null;
   }
+
+  const handleRowClick = (week, index, subconcept, amount) => {
+    const weekTransactions = transactions.filter((t) => {
+      const tDate = t.date?.toDate ? t.date.toDate() : new Date(t.date);
+      const tTime = tDate.getTime();
+      const fullName = `${generalMap[t.generalId] || "N/A"} > ${conceptMap[t.conceptId] || "N/A"} > ${subconceptMap[t.subconceptId] || "N/A"}`;
+      return t.type === "salida" && tTime >= week.startTimestamp && tTime <= week.endTimestamp && fullName === subconcept;
+    });
+    setSelectedWeekDetail({
+      weekNumber: week.weekNumber || index + 1,
+      weekRange: `${week.startDate} - ${week.endDate}`,
+      subconcept,
+      type: "salida",
+      amount,
+      transactions: weekTransactions,
+    });
+  };
 
   return (
     <div className="bg-background rounded-lg border border-border p-6">
@@ -35,65 +64,41 @@ const WeeklyBreakdownSalidas = ({
         </h3>
       </div>
 
-      {stats.weeklyBreakdown && stats.weeklyBreakdown.weeks ? (
-        <div className="overflow-x-auto">
+      <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-border">
             <thead className="bg-red-100">
               <tr>
-                <th rowSpan={2} className="px-6 py-3 text-center text-sm font-bold text-red-800 tracking-wider border-r-2 border-red-200">
+                <th rowSpan={2} className="px-4 py-2 text-center text-xs font-bold text-red-800 tracking-wider border-r-2 border-red-200">
                   Concepto
                 </th>
-                <th colSpan={stats.weeklyBreakdown.weeks.length} className="px-6 py-3 text-center text-sm font-bold text-red-800 tracking-wider border-r-2 border-red-200">
+                <th colSpan={stats.weeklyBreakdown.weeks.length} className="px-4 py-2 text-center text-xs font-bold text-red-800 tracking-wider border-r-2 border-red-200">
                   Semanas
                 </th>
-                <th rowSpan={2} className="px-6 py-3 text-center text-sm font-bold tracking-wider bg-red-200 text-red-800">
+                <th rowSpan={2} className="px-4 py-2 text-center text-xs font-bold tracking-wider bg-red-200 text-red-800">
                   Totales
                 </th>
               </tr>
               <tr>
                 {stats.weeklyBreakdown.weeks.map((week, index) => {
                   return (
-                  <th key={index} className="px-6 py-3 text-center text-xs font-medium text-red-800 uppercase tracking-wider bg-red-50">
-                    <div>{week.weekNumber || (index + 1)}</div>
+                  <th key={index} className="px-4 py-3 text-center text-xs font-medium text-red-800 tracking-wider bg-red-50">
+                    <button
+                      onClick={() => handleWeekOverviewClick(week, index)}
+                      title={`Ver desglose diario — Semana ${week.weekNumber || index + 1}`}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700 hover:text-blue-900 font-bold border border-blue-300 transition-colors cursor-pointer"
+                    >
+                      <EyeIcon className="h-3 w-3" />
+                      {week.weekNumber || index + 1}
+                    </button>
                     {(() => {
-                      try {
-                        if (!week.startDate || !week.endDate) {
-                          return null;
-                        }
-                        
-                        // Parse dates - handle both Firestore Timestamp and "dd/MM" string format
-                        let startDate, endDate;
-                        
-                        if (typeof week.startDate === 'string' && week.startDate.includes('/')) {
-                          // Format "dd/MM" - need to add year
-                          const currentYear = new Date(filters.startDate || currentDate).getFullYear();
-                          const [dayStart, monthStart] = week.startDate.split('/');
-                          startDate = new Date(currentYear, parseInt(monthStart) - 1, parseInt(dayStart));
-                        } else {
-                          startDate = week.startDate?.toDate ? week.startDate.toDate() : new Date(week.startDate);
-                        }
-                        
-                        if (typeof week.endDate === 'string' && week.endDate.includes('/')) {
-                          // Format "dd/MM" - need to add year
-                          const currentYear = new Date(filters.startDate || currentDate).getFullYear();
-                          const [dayEnd, monthEnd] = week.endDate.split('/');
-                          endDate = new Date(currentYear, parseInt(monthEnd) - 1, parseInt(dayEnd));
-                        } else {
-                          endDate = week.endDate?.toDate ? week.endDate.toDate() : new Date(week.endDate);
-                        }
-                        
-                        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-                          return null;
-                        }
-                        
-                        return (
-                          <div className="text-xs font-normal text-red-700 mt-1">
-                            {startDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })} - {endDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}
-                          </div>
-                        );
-                      } catch (error) {
-                        return null;
-                      }
+                      const startDate = parseWeekDate(week.startDate, filters, currentDate);
+                      const endDate = parseWeekDate(week.endDate, filters, currentDate);
+                      if (!startDate || !endDate || isNaN(startDate) || isNaN(endDate)) return null;
+                      return (
+                        <div className="text-xs font-normal text-red-700 mt-1">
+                          {startDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })} - {endDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}
+                        </div>
+                      );
                     })()}
                   </th>
                   );
@@ -106,7 +111,7 @@ const WeeklyBreakdownSalidas = ({
                 const isActive = !disabledRows.has(subconcept);
                 return (
                 <tr key={subconcept} className={`hover:bg-muted/50 transition-opacity ${!isActive ? 'opacity-40' : ''}`}>
-                  <td className="px-6 py-4 text-sm text-foreground min-w-[200px] max-w-[230px]">
+                  <td className="px-4 py-3 text-xs text-foreground min-w-[200px] max-w-[230px]">
                     <div className="flex items-start gap-2">
                       <button
                         onClick={() => toggleRow(subconcept)}
@@ -130,38 +135,13 @@ const WeeklyBreakdownSalidas = ({
                   {stats.weeklyBreakdown.weeks.map((week, index) => {
                     const amount = weekData[`week${index + 1}`];
                     return (
-                    <td key={index} className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                    <td key={index} className="px-4 py-3 whitespace-nowrap text-xs text-right">
                       {amount ? (
                         <button
-                          onClick={() => {
-                            // Filtrar transacciones de esta semana y subconcepto
-                            const weekTransactions = transactions.filter(t => {
-                              const tDate = t.date?.toDate ? t.date.toDate() : new Date(t.date);
-                              const tTime = tDate.getTime();
-                              
-                              // Construir el nombre completo del árbol desde los IDs
-                              const general = generals.find(g => g.id === t.generalId);
-                              const concept = concepts.find(c => c.id === t.conceptId);
-                              const subconceptItem = subconcepts.find(s => s.id === t.subconceptId);
-                              const fullName = `${general?.name || 'N/A'} > ${concept?.name || 'N/A'} > ${subconceptItem?.name || 'N/A'}`;
-                              
-                              return t.type === 'salida' &&
-                                     tTime >= week.startTimestamp &&
-                                     tTime <= week.endTimestamp &&
-                                     fullName === subconcept;
-                            });
-                            setSelectedWeekDetail({
-                              weekNumber: week.weekNumber || (index + 1),
-                              weekRange: `${week.startDate} - ${week.endDate}`,
-                              subconcept,
-                              type: 'salida',
-                              amount,
-                              transactions: weekTransactions
-                            });
-                          }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-100 hover:bg-red-200 text-red-700 hover:text-red-800 font-medium transition-colors cursor-pointer border border-red-300"
+                          onClick={() => handleRowClick(week, index, subconcept, amount)}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-100 hover:bg-red-200 text-red-700 hover:text-red-800 font-medium transition-colors cursor-pointer border border-red-300"
                         >
-                          <EyeIcon className="h-4 w-4" />
+                          <EyeIcon className="h-3 w-3" />
                           {formatCurrency(amount)}
                         </button>
                       ) : (
@@ -170,14 +150,14 @@ const WeeklyBreakdownSalidas = ({
                     </td>
                     );
                   })}
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-red-700 bg-red-100">
+                  <td className="px-4 py-3 whitespace-nowrap text-xs text-right font-bold text-red-700 bg-red-100">
                     {formatCurrency(weekData.total || 0)}
                   </td>
                 </tr>
                 );
               })}
               <tr className="bg-gray-200 font-bold border-t-2 border-gray-400">
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                <td className="px-4 py-3 whitespace-nowrap text-xs text-foreground">
                   {/* Vacío para totales */}
                 </td>
                 {stats.weeklyBreakdown.weeks.map((week, index) => {
@@ -186,12 +166,12 @@ const WeeklyBreakdownSalidas = ({
                     0
                   );
                   return (
-                    <td key={index} className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-700">
+                    <td key={index} className="px-4 py-3 whitespace-nowrap text-xs text-right text-red-700">
                       {formatCurrency(weekTotal)}
                     </td>
                   );
                 })}
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-red-800 bg-red-200">
+                <td className="px-4 py-3 whitespace-nowrap text-xs text-right font-bold text-red-800 bg-red-200">
                   {formatCurrency(Object.entries(stats.weeklyBreakdown.salidas || {}).reduce(
                     (sum, [key, data]) => disabledRows.has(key) ? sum : sum + (data.total || 0),
                     0
@@ -201,12 +181,6 @@ const WeeklyBreakdownSalidas = ({
             </tbody>
           </table>
         </div>
-      ) : (
-        <div className="text-center py-8 text-muted-foreground">
-          <p>No hay datos de desglose semanal disponibles.</p>
-          <p className="text-sm mt-2">El backend necesita proporcionar la estructura <code>weeklyBreakdown</code> con semanas y subconceptos.</p>
-        </div>
-      )}
 
       {/* Modal de Detalle de Semana */}
       {selectedWeekDetail && (
@@ -281,27 +255,6 @@ const WeeklyBreakdownSalidas = ({
                           .map((transaction, index) => {
                             const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
                             
-                            const getPaymentStatusBadge = (status) => {
-                              const statusConfig = {
-                                pendiente: { 
-                                  color: "bg-red-100 text-red-800", 
-                                  text: "Pendiente",
-                                  icon: <ClockIcon className="h-3 w-3 mr-1" />
-                                },
-                                parcial: { 
-                                  color: "bg-yellow-100 text-yellow-800", 
-                                  text: "Parcial",
-                                  icon: <ClockIcon className="h-3 w-3 mr-1" />
-                                },
-                                pagado: { 
-                                  color: "bg-green-100 text-green-800", 
-                                  text: "Pagado",
-                                  icon: <CheckCircleIcon className="h-3 w-3 mr-1" />
-                                },
-                              };
-                              return statusConfig[status] || statusConfig.pendiente;
-                            };
-
                             const paymentBadge = getPaymentStatusBadge(transaction.status);
                             
                             return (
@@ -350,6 +303,11 @@ const WeeklyBreakdownSalidas = ({
           </div>
         </div>
       )}
+      <WeekDayBreakdownModal
+        data={selectedWeekOverview}
+        onClose={clearWeekOverview}
+        formatCurrency={formatCurrency}
+      />
     </div>
   );
 };

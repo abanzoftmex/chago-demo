@@ -225,3 +225,17 @@ export const isAmboTree = (treeString, generals) => {
   
   return general?.type === 'ambos';
 };
+
+// Shared helpers for week day breakdown feature
+export const getDayKey = (date) =>
+  `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+
+export const parseWeekDate = (dateValue, filters, currentDate) => {
+  if (!dateValue) return null;
+  if (typeof dateValue === "string" && dateValue.includes("/")) {
+    const currentYear = new Date(filters?.startDate || currentDate).getFullYear();
+    const [day, month] = dateValue.split("/");
+    return new Date(currentYear, parseInt(month) - 1, parseInt(day));
+  }
+  return dateValue?.toDate ? dateValue.toDate() : new Date(dateValue);
+};

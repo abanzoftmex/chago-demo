@@ -89,7 +89,7 @@ const TreeComparisonSection = ({
                       <tr key={index} className="hover:bg-muted/50 transition-colors">
                         <td className="px-3 py-2 whitespace-nowrap text-center">
                           <div className="inline-flex flex-col items-center">
-                            <span className="text-base font-bold text-foreground">
+                            <span className="text-sm font-bold text-foreground">
                               {stats?.weeklyBreakdown?.weeks?.[tree.weekInfo?.weekIndex]?.weekNumber ?? tree.weekNumber}
                             </span>
                             {tree.weekInfo && (
@@ -99,14 +99,14 @@ const TreeComparisonSection = ({
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-2 text-sm text-foreground">
+                        <td className="px-3 py-2 text-xs text-foreground">
                           <div className="space-y-1">
                             <div className="font-semibold">{tree.conceptName}</div>
                             <div className="font-medium text-xs">{tree.generalName}</div>
                           </div>
                         </td>
                         {showBalanceColumns && (
-                          <td className={`px-4 py-2 whitespace-nowrap text-sm text-right font-medium ${
+                          <td className={`px-3 py-2 whitespace-nowrap text-xs text-right font-medium ${
                             tree.carryover >= 0 ? 'text-purple-600' : 'text-purple-700'
                           }`}>
                             <div className="flex items-center justify-end">
@@ -129,21 +129,21 @@ const TreeComparisonSection = ({
                             </div>
                           </td>
                         )}
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-right font-medium">
+                        <td className="px-3 py-2 whitespace-nowrap text-xs text-right font-medium">
                           {tree.entradas > 0 ? (
                             <span className="text-green-600">{formatCurrency(tree.entradas)}</span>
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}
                         </td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-right font-medium">
+                        <td className="px-3 py-2 whitespace-nowrap text-xs text-right font-medium">
                           {tree.salidas > 0 ? (
                             <span className="text-red-600">{formatCurrency(tree.salidas)}</span>
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}
                         </td>
-                        <td className={`px-4 py-2 whitespace-nowrap text-sm text-right font-bold ${
+                        <td className={`px-3 py-2 whitespace-nowrap text-xs text-right font-bold ${
                           tree.balance >= 0 ? 'text-blue-600' : 'text-blue-700'
                         }`}>
                           <div className="flex items-center justify-end">
@@ -160,7 +160,7 @@ const TreeComparisonSection = ({
                           </div>
                         </td>
                         {showBalanceColumns && (
-                          <td className={`px-4 py-2 whitespace-nowrap text-sm text-right font-bold ${
+                          <td className={`px-3 py-2 whitespace-nowrap text-xs text-right font-bold ${
                             tree.todayBalance >= 0 ? 'text-orange-600' : 'text-orange-700'
                           }`}>
                             <div className="flex items-center justify-end">
@@ -177,12 +177,12 @@ const TreeComparisonSection = ({
                             </div>
                           </td>
                         )}
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-right">
+                        <td className="px-3 py-2 whitespace-nowrap text-xs text-right">
                           <button
                             onClick={() => setSelectedTreeTransactions(tree)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700 hover:text-blue-800 font-medium transition-colors cursor-pointer border border-blue-300"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700 hover:text-blue-800 font-medium transition-colors cursor-pointer border border-blue-300"
                           >
-                            <EyeIcon className="h-4 w-4" />
+                            <EyeIcon className="h-3 w-3" />
                             <span>{tree.transactionCount}</span>
                           </button>
                         </td>

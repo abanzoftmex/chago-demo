@@ -1,5 +1,17 @@
-import { useState } from "react";
-import { EyeIcon, XMarkIcon, ClockIcon, CheckCircleIcon, ArrowUpIcon, ArrowDownIcon } from "@heroicons/react/24/outline";
+import { useState, useMemo } from "react";
+import { EyeIcon, XMarkIcon, ClockIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
+import { useWeekDayBreakdown } from "../../lib/hooks/useWeekDayBreakdown";
+import { usePersistedDisabledRows } from "../../lib/hooks/usePersistedDisabledRows";
+import WeekDayBreakdownModal from "./WeekDayBreakdownModal";
+import { parseWeekDate } from "../../lib/utils/reportUtils";
+import { useAuth } from "../../context/AuthContextMultiTenant";
+
+const PAYMENT_STATUS_CONFIG = {
+  pendiente: { color: "bg-red-100 text-red-800", text: "Pendiente", icon: <ClockIcon className="h-3 w-3 mr-1" /> },
+  parcial: { color: "bg-yellow-100 text-yellow-800", text: "Parcial", icon: <ClockIcon className="h-3 w-3 mr-1" /> },
+  pagado: { color: "bg-green-100 text-green-800", text: "Pagado", icon: <CheckCircleIcon className="h-3 w-3 mr-1" /> },
+};
+const getPaymentStatusBadge = (status) => PAYMENT_STATUS_CONFIG[status] || PAYMENT_STATUS_CONFIG.pendiente;
 
 const WeeklyBreakdownCombined = ({
   stats,
@@ -12,16 +24,12 @@ const WeeklyBreakdownCombined = ({
   currentDate,
   formatCurrency
 }) => {
+  const { user } = useAuth();
   const [selectedWeekDetail, setSelectedWeekDetail] = useState(null);
-  const [disabledRows, setDisabledRows] = useState(new Set());
-
-  const toggleRow = (key) => {
-    setDisabledRows(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
-  };
+  const { disabledRows, toggleRow } = usePersistedDisabledRows(user?.uid, "combined");
+  const { selectedWeekOverview, handleWeekOverviewClick, clearWeekOverview } = useWeekDayBreakdown({
+    transactions, generals, concepts, subconcepts, filters, currentDate, type: null,
+  });
 
   if (!stats || !stats.weeklyBreakdown || !stats.weeklyBreakdown.weeks) {
     return null;
@@ -29,39 +37,28 @@ const WeeklyBreakdownCombined = ({
 
   const weeks = stats.weeklyBreakdown.weeks;
 
-  // Combine entradas and salidas into a single ordered list
-  const entradasRows = Object.entries(stats.weeklyBreakdown.entradas || {}).map(
-    ([subconcept, weekData]) => ({ subconcept, weekData, type: "entrada" })
-  );
-  const salidasRows = Object.entries(stats.weeklyBreakdown.salidas || {}).map(
-    ([subconcept, weekData]) => ({ subconcept, weekData, type: "salida" })
-  );
-  const allRows = [...entradasRows, ...salidasRows];
+  // O(1) lookup maps — built once per render, shared by handleRowClick
+  const generalMap = useMemo(() => Object.fromEntries(generals.map((g) => [g.id, g.name])), [generals]);
+  const conceptMap = useMemo(() => Object.fromEntries(concepts.map((c) => [c.id, c.name])), [concepts]);
+  const subconceptMap = useMemo(() => Object.fromEntries(subconcepts.map((s) => [s.id, s.name])), [subconcepts]);
 
-  const parseWeekDate = (dateValue) => {
-    if (!dateValue) return null;
-    if (typeof dateValue === "string" && dateValue.includes("/")) {
-      const currentYear = new Date(filters.startDate || currentDate).getFullYear();
-      const [day, month] = dateValue.split("/");
-      return new Date(currentYear, parseInt(month) - 1, parseInt(day));
-    }
-    return dateValue?.toDate ? dateValue.toDate() : new Date(dateValue);
-  };
+  // Combine entradas and salidas into a single ordered list
+  const entradasRows = useMemo(
+    () => Object.entries(stats.weeklyBreakdown.entradas || {}).map(([subconcept, weekData]) => ({ subconcept, weekData, type: "entrada" })),
+    [stats.weeklyBreakdown.entradas]
+  );
+  const salidasRows = useMemo(
+    () => Object.entries(stats.weeklyBreakdown.salidas || {}).map(([subconcept, weekData]) => ({ subconcept, weekData, type: "salida" })),
+    [stats.weeklyBreakdown.salidas]
+  );
+  const allRows = useMemo(() => [...entradasRows, ...salidasRows], [entradasRows, salidasRows]);
 
   const handleRowClick = (week, index, subconcept, type, amount) => {
     const weekTransactions = transactions.filter((t) => {
       const tDate = t.date?.toDate ? t.date.toDate() : new Date(t.date);
       const tTime = tDate.getTime();
-      const general = generals.find((g) => g.id === t.generalId);
-      const concept = concepts.find((c) => c.id === t.conceptId);
-      const subconceptItem = subconcepts.find((s) => s.id === t.subconceptId);
-      const fullName = `${general?.name || "N/A"} > ${concept?.name || "N/A"} > ${subconceptItem?.name || "N/A"}`;
-      return (
-        t.type === type &&
-        tTime >= week.startTimestamp &&
-        tTime <= week.endTimestamp &&
-        fullName === subconcept
-      );
+      const fullName = `${generalMap[t.generalId] || "N/A"} > ${conceptMap[t.conceptId] || "N/A"} > ${subconceptMap[t.subconceptId] || "N/A"}`;
+      return t.type === type && tTime >= week.startTimestamp && tTime <= week.endTimestamp && fullName === subconcept;
     });
     setSelectedWeekDetail({
       weekNumber: week.weekNumber || index + 1,
@@ -87,39 +84,40 @@ const WeeklyBreakdownCombined = ({
             <tr>
               <th
                 rowSpan={2}
-                className="px-6 py-3 text-center text-sm font-bold text-gray-700 bg-gray-200 tracking-wider border-r-2 border-gray-200"
+                className="px-4 py-2 text-center text-xs font-bold text-gray-700 bg-gray-200 tracking-wider border-r-2 border-gray-200"
               >
                 Concepto
               </th>
               <th
-                rowSpan={2}
-                className="px-6 py-3 text-center text-sm font-bold text-gray-700 bg-gray-200 tracking-wider border-r-2 border-gray-200"
-              >
-                Tipo
-              </th>
-              <th
                 colSpan={weeks.length}
-                className="px-6 py-3 text-center text-sm font-bold bg-gray-200 text-gray-700 tracking-wider border-r-2 border-gray-200"
+                className="px-4 py-2 text-center text-xs font-bold bg-gray-200 text-gray-700 tracking-wider border-r-2 border-gray-200"
               >
                 Semanas
               </th>
               <th
                 rowSpan={2}
-                className="px-6 py-3 text-center text-sm font-bold tracking-wider text-gray-700 bg-gray-200"
+                className="px-4 py-2 text-center text-xs font-bold tracking-wider text-gray-700 bg-gray-200"
               >
                 Total
               </th>
             </tr>
             <tr>
               {weeks.map((week, index) => {
-                const startDate = parseWeekDate(week.startDate);
-                const endDate = parseWeekDate(week.endDate);
+                const startDate = parseWeekDate(week.startDate, filters, currentDate);
+                const endDate = parseWeekDate(week.endDate, filters, currentDate);
                 return (
                   <th
                     key={index}
                     className="px-6 py-3 text-center text-xs font-medium text-gray-700 tracking-wider bg-gray-50"
                   >
-                    <div>{week.weekNumber || index + 1}</div>
+                    <button
+                      onClick={() => handleWeekOverviewClick(week, index)}
+                      title={`Ver desglose diario — Semana ${week.weekNumber || index + 1}`}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700 hover:text-blue-900 font-bold border border-blue-300 transition-colors cursor-pointer"
+                    >
+                      <EyeIcon className="h-3 w-3" />
+                      {week.weekNumber || index + 1}
+                    </button>
                     {startDate && endDate && !isNaN(startDate) && !isNaN(endDate) && (
                       <div className="text-xs font-normal text-gray-500 mt-1">
                         {startDate.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" })}
@@ -141,7 +139,7 @@ const WeeklyBreakdownCombined = ({
               return (
                 <tr key={rowKey} className={`hover:bg-muted/50 transition-opacity ${!isActive ? 'opacity-40' : ''}`}>
                   {/* Concepto cell */}
-                  <td className="px-6 py-4 text-sm text-foreground min-w-[200px] max-w-[230px]">
+                  <td className="px-4 py-3 text-xs text-foreground min-w-[200px] max-w-[230px]">
                     <div className="flex items-start gap-2">
                       <button
                         onClick={() => toggleRow(rowKey)}
@@ -164,35 +162,21 @@ const WeeklyBreakdownCombined = ({
                       </div>
                     </div>
                   </td>
-                  {/* Tipo badge */}
-                  <td className="px-4 py-4 whitespace-nowrap text-center">
-                    {isEntrada ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-lime-100 text-lime-700 border border-lime-300">
-                        <ArrowDownIcon className="h-3 w-3" />
-                        Entrada
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 border border-red-300">
-                        <ArrowUpIcon className="h-3 w-3" />
-                        Salida
-                      </span>
-                    )}
-                  </td>
                   {/* Week amount cells */}
                   {weeks.map((week, index) => {
                     const amount = weekData[`week${index + 1}`];
                     return (
-                      <td key={index} className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                      <td key={index} className="px-4 py-3 whitespace-nowrap text-xs text-right">
                         {amount ? (
                           <button
                             onClick={() => handleRowClick(week, index, subconcept, type, amount)}
                             className={
                               isEntrada
-                                ? "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-lime-100 hover:bg-lime-200 text-lime-700 hover:text-lime-800 font-medium transition-colors cursor-pointer border border-lime-300"
-                                : "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-100 hover:bg-red-200 text-red-700 hover:text-red-800 font-medium transition-colors cursor-pointer border border-red-300"
+                                ? "inline-flex items-center gap-1 px-2 py-1 rounded-full bg-lime-100 hover:bg-lime-200 text-lime-700 hover:text-lime-800 font-medium transition-colors cursor-pointer border border-lime-300"
+                                : "inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-100 hover:bg-red-200 text-red-700 hover:text-red-800 font-medium transition-colors cursor-pointer border border-red-300"
                             }
                           >
-                            <EyeIcon className="h-4 w-4" />
+                            <EyeIcon className="h-3 w-3" />
                             {formatCurrency(amount)}
                           </button>
                         ) : (
@@ -205,8 +189,8 @@ const WeeklyBreakdownCombined = ({
                   <td
                     className={
                       isEntrada
-                        ? "px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-lime-800 bg-lime-100"
-                        : "px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-red-800 bg-red-100"
+                        ? "px-4 py-3 whitespace-nowrap text-xs text-right font-bold text-lime-800 bg-lime-100"
+                        : "px-4 py-3 whitespace-nowrap text-xs text-right font-bold text-red-800 bg-red-100"
                     }
                   >
                     {formatCurrency(weekData.total || 0)}
@@ -217,21 +201,20 @@ const WeeklyBreakdownCombined = ({
 
             {/* Total Entradas row */}
             <tr className="bg-lime-50 font-bold border-t-2 border-gray-300">
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-lime-800 font-bold">
+              <td className="px-4 py-3 whitespace-nowrap text-xs text-lime-800 font-bold">
                 Total Entradas
               </td>
-              <td />
               {weeks.map((week, index) => {
                 const weekTotal = Object.entries(
                   stats.weeklyBreakdown.entradas || {}
                 ).reduce((sum, [key, data]) => disabledRows.has(`entrada-${key}`) ? sum : sum + (data[`week${index + 1}`] || 0), 0);
                 return (
-                  <td key={index} className="px-6 py-4 whitespace-nowrap text-sm text-right text-lime-700">
+                  <td key={index} className="px-4 py-3 whitespace-nowrap text-xs text-right text-lime-700">
                     {formatCurrency(weekTotal)}
                   </td>
                 );
               })}
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-lime-800 bg-lime-200">
+              <td className="px-4 py-3 whitespace-nowrap text-xs text-right font-bold text-lime-800 bg-lime-200">
                 {formatCurrency(Object.entries(stats.weeklyBreakdown.entradas || {}).reduce(
                   (sum, [key, data]) => disabledRows.has(`entrada-${key}`) ? sum : sum + (data.total || 0), 0
                 ))}
@@ -240,21 +223,20 @@ const WeeklyBreakdownCombined = ({
 
             {/* Total Salidas row */}
             <tr className="bg-red-50 font-bold border-t border-gray-200">
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-red-800 font-bold">
+              <td className="px-4 py-3 whitespace-nowrap text-xs text-red-800 font-bold">
                 Total Salidas
               </td>
-              <td />
               {weeks.map((week, index) => {
                 const weekTotal = Object.entries(
                   stats.weeklyBreakdown.salidas || {}
                 ).reduce((sum, [key, data]) => disabledRows.has(`salida-${key}`) ? sum : sum + (data[`week${index + 1}`] || 0), 0);
                 return (
-                  <td key={index} className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-700">
+                  <td key={index} className="px-4 py-3 whitespace-nowrap text-xs text-right text-red-700">
                     {formatCurrency(weekTotal)}
                   </td>
                 );
               })}
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-red-800 bg-red-200">
+              <td className="px-4 py-3 whitespace-nowrap text-xs text-right font-bold text-red-800 bg-red-200">
                 {formatCurrency(Object.entries(stats.weeklyBreakdown.salidas || {}).reduce(
                   (sum, [key, data]) => disabledRows.has(`salida-${key}`) ? sum : sum + (data.total || 0), 0
                 ))}
@@ -273,10 +255,9 @@ const WeeklyBreakdownCombined = ({
               const isPositive = balance >= 0;
               return (
                 <tr className="bg-gray-200 font-bold border-t-2 border-gray-400">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800 font-bold">
+                  <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-800 font-bold">
                     Balance
                   </td>
-                  <td />
                   {weeks.map((week, index) => {
                     const entradasWeek = Object.entries(
                       stats.weeklyBreakdown.entradas || {}
@@ -288,7 +269,7 @@ const WeeklyBreakdownCombined = ({
                     return (
                       <td
                         key={index}
-                        className={`px-6 py-4 whitespace-nowrap text-sm text-right font-semibold ${
+                        className={`px-4 py-3 whitespace-nowrap text-xs text-right font-semibold ${
                           weekBalance >= 0 ? "text-lime-700" : "text-red-700"
                         }`}
                       >
@@ -297,7 +278,7 @@ const WeeklyBreakdownCombined = ({
                     );
                   })}
                   <td
-                    className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${
+                    className={`px-4 py-3 whitespace-nowrap text-xs text-right font-bold ${
                       isPositive ? "text-lime-800 bg-lime-100" : "text-red-800 bg-red-100"
                     }`}
                   >
@@ -309,6 +290,12 @@ const WeeklyBreakdownCombined = ({
           </tbody>
         </table>
       </div>
+
+      <WeekDayBreakdownModal
+        data={selectedWeekOverview}
+        onClose={clearWeekOverview}
+        formatCurrency={formatCurrency}
+      />
 
       {/* Modal de Detalle de Semana */}
       {selectedWeekDetail && (
@@ -409,33 +396,12 @@ const WeeklyBreakdownCombined = ({
                               ? transaction.date.toDate()
                               : new Date(transaction.date);
 
-                            const getPaymentStatusBadge = (status) => {
-                              const statusConfig = {
-                                pendiente: {
-                                  color: "bg-red-100 text-red-800",
-                                  text: "Pendiente",
-                                  icon: <ClockIcon className="h-3 w-3 mr-1" />,
-                                },
-                                parcial: {
-                                  color: "bg-yellow-100 text-yellow-800",
-                                  text: "Parcial",
-                                  icon: <ClockIcon className="h-3 w-3 mr-1" />,
-                                },
-                                pagado: {
-                                  color: "bg-green-100 text-green-800",
-                                  text: "Pagado",
-                                  icon: <CheckCircleIcon className="h-3 w-3 mr-1" />,
-                                },
-                              };
-                              return statusConfig[status] || statusConfig.pendiente;
-                            };
-
                             const paymentBadge = getPaymentStatusBadge(transaction.status);
                             const isEntradaModal = selectedWeekDetail.type === "entrada";
 
                             return (
                               <tr key={transaction.id || index} className="hover:bg-gray-50">
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
                                   {transactionDate.toLocaleDateString("es-MX", {
                                     day: "2-digit",
                                     month: "short",
@@ -443,22 +409,22 @@ const WeeklyBreakdownCombined = ({
                                   })}
                                 </td>
                                 <td
-                                  className={`px-4 py-3 whitespace-nowrap text-sm text-right font-semibold ${
+                                  className={`px-3 py-2 whitespace-nowrap text-xs text-right font-semibold ${
                                     isEntradaModal ? "text-green-600" : "text-red-600"
                                   }`}
                                 >
                                   {formatCurrency(transaction.amount || 0)}
                                 </td>
                                 <td
-                                  className="px-4 py-3 text-sm text-gray-900 max-w-xs truncate"
+                                  className="px-3 py-2 text-xs text-gray-900 max-w-xs truncate"
                                   title={transaction.description || "Sin descripción"}
                                 >
                                   {transaction.description || "Sin descripción"}
                                 </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-600">
                                   {transaction.providerName || "Sin proveedor"}
                                 </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm">
+                                <td className="px-3 py-2 whitespace-nowrap text-xs">
                                   <span
                                     className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${paymentBadge.color}`}
                                   >
