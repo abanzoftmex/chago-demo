@@ -4,50 +4,45 @@ import AdminLayout from "../../../components/layout/AdminLayout";
 import AdvancedDateSelector from "../../../components/dashboard/AdvancedDateSelector";
 import { transactionService } from "../../../lib/services/transactionService";
 import { conceptService } from "../../../lib/services/conceptService";
-import { descriptionService } from "../../../lib/services/descriptionService";
 import { providerService } from "../../../lib/services/providerService";
 import { generalService } from "../../../lib/services/generalService";
 import { subconceptService } from "../../../lib/services/subconceptService";
-import { DIVISIONS, formatDivision } from "../../../lib/constants/divisions";
-import { 
-  Search, 
-  TrendingUp, 
-  TrendingDown, 
-  Filter, 
-  Users, 
-  Tag, 
-  Building, 
-  CheckCircle, 
-  Clock, 
-  AlertCircle, 
+import { formatDivision } from "../../../lib/constants/divisions";
+import {
+  Search,
+  TrendingUp,
+  Filter,
+  Users,
+  Tag,
+  Building,
+  CheckCircle,
   RefreshCw,
   ClockIcon,
   EyeIcon,
-  X,
   Layers
 } from "lucide-react";
 import Select from "react-select";
 import { useAuth } from "../../../context/AuthContextMultiTenant";
 
-const Historial = () => {
-  const router = useRouter();
-  const { tenantInfo } = useAuth();
-  
-  // Memoize tenantId to prevent unnecessary re-renders
-  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
-  
-  const [transactions, setTransactions] = useState([]);
-  const [transactionStats, setTransactionStats] = useState({ pendiente: 0, parcial: 0, pagado: 0, total: 0 });
-  const [concepts, setConcepts] = useState([]);
-  const [subconcepts, setSubconcepts] = useState([]);
-  const [descriptions, setDescriptions] = useState([]);
-  const [providers, setProviders] = useState([]);
-  const [generals, setGenerals] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+const ITEMS_PER_PAGE = 20;
 
-  // Custom styles for React Select
-  const selectStyles = {
+const formatDateForInput = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const currentMonthRange = () => {
+  const now = new Date();
+  return {
+    startDate: formatDateForInput(new Date(now.getFullYear(), now.getMonth(), 1)),
+    endDate: formatDateForInput(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+  };
+};
+
+// Defined outside component to avoid re-creation on each render
+const selectStyles = {
     control: (provided, state) => ({
       ...provided,
       minHeight: '44px',
@@ -86,12 +81,27 @@ const Historial = () => {
       zIndex: 10,
       fontSize: '14px'
     }),
-    option: (provided, state) => ({
+    option: (provided) => ({
       ...provided,
-      fontSize: '14px',
-      padding: '10px 14px'
-    })
+      fontSize: "14px",
+      padding: "10px 14px",
+    }),
   };
+
+const Historial = () => {
+  const router = useRouter();
+  const { tenantInfo } = useAuth();
+
+  const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
+
+  const [transactions, setTransactions] = useState([]);
+  const [transactionStats, setTransactionStats] = useState({ pendiente: 0, parcial: 0, pagado: 0, total: 0 });
+  const [concepts, setConcepts] = useState([]);
+  const [subconcepts, setSubconcepts] = useState([]);
+  const [providers, setProviders] = useState([]);
+  const [generals, setGenerals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   // Options for React Select
   const typeOptions = [
@@ -108,42 +118,21 @@ const Historial = () => {
     { value: "pagado", label: "Pagado" }
   ];
 
-  const generalOptions = [
+  const generalOptions = useMemo(() => [
     { value: "", label: "Todas las categorías" },
-    ...generals.map(general => ({
-      value: general.id,
-      label: general.name
-    }))
-  ];
+    ...generals.map(general => ({ value: general.id, label: general.name }))
+  ], [generals]);
 
-  const conceptOptions = [
-    { value: "", label: "Todos los conceptos" },
-    ...concepts.map(concept => ({
-      value: concept.id,
-      label: concept.name
-    }))
-  ];
-
-  const providerOptions = [
+  const providerOptions = useMemo(() => [
     { value: "", label: "Todos los proveedores" },
-    ...providers.map(provider => ({
-      value: provider.id,
-      label: provider.name
-    }))
-  ];
-
-  const divisionOptions = [
-    { value: "", label: "Todas las divisiones" },
-    ...DIVISIONS.map(division => ({
-      value: division.value,
-      label: division.label
-    }))
-  ];
+    ...providers.map(provider => ({ value: provider.id, label: provider.name }))
+  ], [providers]);
 
   // Filters
   const [filters, setFilters] = useState({
     type: "",
     conceptId: "",
+    subconceptId: "",
     providerId: "",
     generalId: "",
     status: "",
@@ -158,66 +147,39 @@ const Historial = () => {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
 
   // Track if initial data has been loaded
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
-  const loadInitialData = async () => {
-    try {
-      if (!tenantId) {
-        console.error("No tenant ID available");
-        return;
-      }
-
-      const [conceptsData, subconceptsData, providersData, generalsData] = await Promise.all([
-        conceptService.getAll(tenantId),
-        subconceptService.getAll(tenantId),
-        providerService.getAll(tenantId),
-        generalService.getAll(tenantId),
-      ]);
-
-      setConcepts(conceptsData);
-      setSubconcepts(subconceptsData);
-      setProviders(providersData);
-      setGenerals(generalsData);
-      setInitialDataLoaded(true);
-    } catch (err) {
-      console.error("Error loading initial data:", err);
-      setError("Error al cargar los datos iniciales");
-      setInitialDataLoaded(true); // Set to true even on error to prevent infinite loading
-    }
-  };
-
   // Load initial data and set default date range to current month
   useEffect(() => {
-    // Only load if we have tenant info
-    if (tenantId) {
-      loadInitialData();
-    }
-    
-    // Set default date to current month for AdvancedDateSelector
-    const now = new Date();
-    setSelectedDate(now);
-    
-    // Set default date range to current month
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    
-    // Format dates as YYYY-MM-DD for input type="date"
-    const formatDateForInput = (date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
+    if (!tenantId) return;
+
+    const load = async () => {
+      try {
+        const [conceptsData, subconceptsData, providersData, generalsData] = await Promise.all([
+          conceptService.getAll(tenantId),
+          subconceptService.getAll(tenantId),
+          providerService.getAll(tenantId),
+          generalService.getAll(tenantId),
+        ]);
+        setConcepts(conceptsData);
+        setSubconcepts(subconceptsData);
+        setProviders(providersData);
+        setGenerals(generalsData);
+      } catch (err) {
+        console.error("Error loading initial data:", err);
+        setError("Error al cargar los datos iniciales");
+      } finally {
+        setInitialDataLoaded(true);
+      }
     };
-    
-    setFilters(prev => ({
-      ...prev,
-      startDate: formatDateForInput(firstDay),
-      endDate: formatDateForInput(lastDay)
-    }));
+
+    const { startDate, endDate } = currentMonthRange();
+    setSelectedDate(new Date());
+    setFilters(prev => ({ ...prev, startDate, endDate }));
+    load();
   }, [tenantId]);
 
   // Load statistics separately for efficiency
@@ -233,6 +195,7 @@ const Historial = () => {
       const statsFilters = {
         type: filters.type || undefined,
         conceptId: filters.conceptId || undefined,
+        subconceptId: filters.subconceptId || undefined,
         providerId: filters.providerId || undefined,
         generalId: filters.generalId || undefined,
         division: filters.division || undefined,
@@ -242,7 +205,8 @@ const Historial = () => {
       const stats = await transactionService.getStatsByDateRange(
         startDate,
         endDate,
-        statsFilters
+        statsFilters,
+        tenantId
       );
 
       setTransactionStats(stats);
@@ -267,25 +231,25 @@ const Historial = () => {
 
         let transactionsData;
 
+        if (!tenantId) {
+          throw new Error("No tenant ID available");
+        }
+
         // Build filter object
         const appliedFilters = {
           type: filters.type || undefined,
           conceptId: filters.conceptId || undefined,
+          subconceptId: filters.subconceptId || undefined,
           providerId: filters.providerId || undefined,
           generalId: filters.generalId || undefined,
           status: filters.status || undefined,
           division: filters.division || undefined,
         };
 
-        if (!tenantId) {
-          throw new Error("No tenant ID available");
-        }
-
-        // If date range is specified, use date range query
         if (filters.startDate && filters.endDate) {
           const startDate = new Date(filters.startDate);
           const endDate = new Date(filters.endDate);
-          endDate.setHours(23, 59, 59, 999); // End of day
+          endDate.setHours(23, 59, 59, 999);
 
           transactionsData = await transactionService.getByDateRange(
             startDate,
@@ -294,10 +258,9 @@ const Historial = () => {
             tenantId
           );
         } else {
-          // Use regular getAll with filters
           transactionsData = await transactionService.getAll({
             ...appliedFilters,
-            limit: itemsPerPage * 2, // Load more for client-side filtering
+            limit: ITEMS_PER_PAGE * 10,
           }, tenantId);
         }
 
@@ -320,18 +283,9 @@ const Historial = () => {
           });
         }
 
-        // Pagination
         setTotalItems(transactionsData.length);
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        const paginatedData = transactionsData.slice(
-          startIndex,
-          startIndex + itemsPerPage
-        );
-
-        setTransactions(paginatedData);
-
-        // Load statistics separately for badges
-        await loadStatistics();
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        setTransactions(transactionsData.slice(startIndex, startIndex + ITEMS_PER_PAGE));
       } catch (err) {
         console.error("Error loading transactions:", err);
         setError("Error al cargar las transacciones");
@@ -341,72 +295,71 @@ const Historial = () => {
     };
 
     loadTransactions();
-  }, [filters, currentPage, concepts, providers, generals, itemsPerPage, initialDataLoaded]);
+  }, [filters, currentPage, concepts, providers, generals, initialDataLoaded, tenantId]);
 
   // Load statistics when date or non-status filters change
   useEffect(() => {
     if (initialDataLoaded && filters.startDate && filters.endDate) {
       loadStatistics();
     }
-  }, [filters.startDate, filters.endDate, filters.type, filters.conceptId, filters.providerId, filters.generalId, filters.division, initialDataLoaded]);
+  }, [filters.startDate, filters.endDate, filters.type, filters.conceptId, filters.subconceptId, filters.providerId, filters.generalId, filters.division, initialDataLoaded]);
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => {
       const newFilters = { ...prev, [key]: value };
+      // Cascade resets
+      if (key === "generalId") {
+        newFilters.conceptId = "";
+        newFilters.subconceptId = "";
+      }
+      if (key === "conceptId") {
+        newFilters.subconceptId = "";
+      }
       return newFilters;
     });
-    setCurrentPage(1); // Reset to first page when filtering
+    setCurrentPage(1);
   };
 
   const handleDateChange = (date) => {
     setSelectedDate(date);
-    
-    // Calculate start and end of month
-    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-    const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-    
-    // Format dates as YYYY-MM-DD
-    const formatDateForInput = (dateObj) => {
-      const year = dateObj.getFullYear();
-      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-      const day = String(dateObj.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-    
     setFilters(prev => ({
       ...prev,
-      startDate: formatDateForInput(startOfMonth),
-      endDate: formatDateForInput(endOfMonth)
+      startDate: formatDateForInput(new Date(date.getFullYear(), date.getMonth(), 1)),
+      endDate: formatDateForInput(new Date(date.getFullYear(), date.getMonth() + 1, 0)),
     }));
   };
 
   const clearFilters = () => {
-    const now = new Date();
-    setSelectedDate(now);
-    
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    
-    const formatDateForInput = (date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-    
+    const { startDate, endDate } = currentMonthRange();
+    setSelectedDate(new Date());
     setFilters({
       type: "",
       conceptId: "",
+      subconceptId: "",
       providerId: "",
       generalId: "",
       status: "",
       division: "",
       search: "",
-      startDate: formatDateForInput(firstDay),
-      endDate: formatDateForInput(lastDay),
+      startDate,
+      endDate,
     });
     setCurrentPage(1);
   };
+
+  const filteredConceptOptions = useMemo(() => [
+    { value: "", label: "Todos los conceptos" },
+    ...concepts
+      .filter(c => !filters.generalId || c.generalId === filters.generalId)
+      .map(c => ({ value: c.id, label: c.name }))
+  ], [concepts, filters.generalId]);
+
+  const filteredSubconceptOptions = useMemo(() => [
+    { value: "", label: "Todos los subconceptos" },
+    ...subconcepts
+      .filter(s => !filters.conceptId || s.conceptId === filters.conceptId)
+      .map(s => ({ value: s.id, label: s.name }))
+  ], [subconcepts, filters.conceptId]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("es-MX", {
@@ -558,6 +511,15 @@ const Historial = () => {
         icon: Tag
       });
     }
+
+    if (filters.subconceptId) {
+      const subconcept = subconcepts.find(s => s.id === filters.subconceptId);
+      activeFilters.push({
+        label: 'Subconcepto',
+        value: subconcept ? subconcept.name : 'Desconocido',
+        icon: Layers
+      });
+    }
     
     if (filters.providerId) {
       const provider = providers.find(p => p.id === filters.providerId);
@@ -587,7 +549,25 @@ const Historial = () => {
     return activeFilters;
   };
 
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) setCurrentPage(page);
+  };
+
+  const getRemainingAmount = (transaction) => {
+    if (transaction.balance !== undefined && transaction.balance !== null) {
+      return Math.max(0, transaction.balance);
+    }
+    return Math.max(0, (transaction.amount || 0));
+  };
+
+  const getPaidAmount = (transaction) => {
+    if (transaction.totalPaid !== undefined && transaction.totalPaid !== null) {
+      return transaction.totalPaid;
+    }
+    return 0;
+  };
 
   const handleViewDetails = (transactionId) => {
     router.push(`/admin/transacciones/detalle/${transactionId}`);
@@ -625,18 +605,20 @@ const Historial = () => {
                 onDateChange={handleDateChange}
                 onSuccess={() => {}}
                 onError={() => {}}
+                accentColor="gray"
               />
             </div>
           </div>
         </div>
-        {/* Filters Only */}
+        {/* Filters */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-          <div className="p-4">
-            {/* Filters Grid - Full width distribution */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 mb-4">
-              {/* Search */}
+          <div className="p-4 space-y-3">
+
+            {/* Fila 1: Búsqueda + Tipo + Estado */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {/* Búsqueda */}
               <div className="flex flex-col">
-                <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                <label className="flex items-center text-sm font-medium text-gray-700 mb-1.5">
                   <Search className="w-4 h-4 mr-1.5" />
                   Búsqueda
                 </label>
@@ -644,133 +626,135 @@ const Historial = () => {
                   type="text"
                   value={filters.search}
                   onChange={(e) => handleFilterChange("search", e.target.value)}
-                  placeholder="Buscar..."
-                  className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ease-in-out h-[44px]"
+                  placeholder="Buscar por concepto, proveedor, monto..."
+                  className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent transition-all h-[44px] bg-white"
                 />
               </div>
 
-              {/* Type Filter */}
+              {/* Tipo */}
               <div className="flex flex-col">
-                <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                <label className="flex items-center text-sm font-medium text-gray-700 mb-1.5">
                   <TrendingUp className="w-4 h-4 mr-1.5" />
                   Tipo
                 </label>
                 <Select
-                  value={typeOptions.find(option => option.value === filters.type)}
+                  value={typeOptions.find(option => option.value === filters.type) || null}
                   onChange={(selectedOption) => handleFilterChange("type", selectedOption?.value || "")}
                   options={typeOptions}
                   styles={selectStyles}
-                  placeholder="Seleccionar..."
+                  placeholder="Todos los tipos"
                   isClearable
                   isSearchable={false}
                 />
               </div>
 
-              {/* Status Filter */}
+              {/* Estado */}
               <div className="flex flex-col">
-                <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                <label className="flex items-center text-sm font-medium text-gray-700 mb-1.5">
                   <CheckCircle className="w-4 h-4 mr-1.5" />
                   Estado
                 </label>
                 <Select
-                  value={statusOptions.find(option => option.value === filters.status)}
+                  value={statusOptions.find(option => option.value === filters.status) || null}
                   onChange={(selectedOption) => handleFilterChange("status", selectedOption?.value || "")}
                   options={statusOptions}
                   styles={selectStyles}
-                  placeholder="Seleccionar..."
+                  placeholder="Todos los estados"
                   isClearable
                   isSearchable={false}
                 />
               </div>
+            </div>
 
-              {/* General Filter */}
+            {/* Fila 2: General → Concepto (cascada) → Subconcepto (cascada) + Proveedor */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* General */}
               <div className="flex flex-col">
-                <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                <label className="flex items-center text-sm font-medium text-gray-700 mb-1.5">
                   <Building className="w-4 h-4 mr-1.5" />
                   General
                 </label>
                 <Select
-                  value={generalOptions.find(option => option.value === filters.generalId)}
+                  value={generalOptions.find(option => option.value === filters.generalId) || null}
                   onChange={(selectedOption) => handleFilterChange("generalId", selectedOption?.value || "")}
                   options={generalOptions}
                   styles={selectStyles}
-                  placeholder="Seleccionar..."
+                  placeholder="Todos los generales"
                   isClearable
                   isSearchable
                 />
               </div>
 
-              {/* Concept Filter */}
+              {/* Concepto — se activa al seleccionar un General */}
               <div className="flex flex-col">
-                <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                <label className={`flex items-center text-sm font-medium mb-1.5 ${filters.generalId ? "text-gray-700" : "text-gray-400"}`}>
                   <Tag className="w-4 h-4 mr-1.5" />
                   Concepto
+                  {!filters.generalId && <span className="ml-1.5 text-xs">(selecciona General)</span>}
                 </label>
                 <Select
-                  value={conceptOptions.find(option => option.value === filters.conceptId)}
+                  value={filteredConceptOptions.find(option => option.value === filters.conceptId) || null}
                   onChange={(selectedOption) => handleFilterChange("conceptId", selectedOption?.value || "")}
-                  options={conceptOptions}
+                  options={filteredConceptOptions}
                   styles={selectStyles}
-                  placeholder="Seleccionar..."
+                  placeholder={filters.generalId ? "Todos los conceptos" : "Primero un General"}
                   isClearable
                   isSearchable
+                  isDisabled={!filters.generalId}
                 />
               </div>
 
-              {/* Provider Filter */}
+              {/* Subconcepto — se activa al seleccionar un Concepto */}
               <div className="flex flex-col">
-                <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                <label className={`flex items-center text-sm font-medium mb-1.5 ${filters.conceptId ? "text-gray-700" : "text-gray-400"}`}>
+                  <Layers className="w-4 h-4 mr-1.5" />
+                  Subconcepto
+                  {!filters.conceptId && <span className="ml-1.5 text-xs">(selecciona Concepto)</span>}
+                </label>
+                <Select
+                  value={filteredSubconceptOptions.find(option => option.value === filters.subconceptId) || null}
+                  onChange={(selectedOption) => handleFilterChange("subconceptId", selectedOption?.value || "")}
+                  options={filteredSubconceptOptions}
+                  styles={selectStyles}
+                  placeholder={filters.conceptId ? "Todos los subconceptos" : "Primero un Concepto"}
+                  isClearable
+                  isSearchable
+                  isDisabled={!filters.conceptId}
+                />
+              </div>
+
+              {/* Proveedor — independiente */}
+              <div className="flex flex-col">
+                <label className="flex items-center text-sm font-medium text-gray-700 mb-1.5">
                   <Users className="w-4 h-4 mr-1.5" />
                   Proveedor
                 </label>
                 <Select
-                  value={providerOptions.find(option => option.value === filters.providerId)}
+                  value={providerOptions.find(option => option.value === filters.providerId) || null}
                   onChange={(selectedOption) => handleFilterChange("providerId", selectedOption?.value || "")}
                   options={providerOptions}
                   styles={selectStyles}
-                  placeholder="Seleccionar..."
+                  placeholder="Todos los proveedores"
                   isClearable
                   isSearchable
                 />
               </div>
-
-              {/* Division Filter - Oculto temporalmente */}
-              {/* <div className="flex flex-col">
-                <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                  <Layers className="w-4 h-4 mr-1.5" />
-                  División
-                </label>
-                <Select
-                  value={divisionOptions.find(option => option.value === filters.division)}
-                  onChange={(selectedOption) => handleFilterChange("division", selectedOption?.value || "")}
-                  options={divisionOptions}
-                  styles={selectStyles}
-                  placeholder="Seleccionar..."
-                  isClearable
-                  isSearchable={false}
-                />
-              </div> */}
-
-              {/* Clear Filters */}
-              {getActiveFilters().length > 0 && (
-                <div className="flex flex-col">
-                  <label className="text-sm font-medium text-transparent mb-2">
-                    Acciones
-                  </label>
-                  <button
-                    onClick={clearFilters}
-                    className="inline-flex items-center justify-center px-3 py-2.5 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors h-[44px] w-full"
-                  >
-                    <RefreshCw className="w-4 h-4 mr-1.5" />
-                    Limpiar
-                  </button>
-                </div>
-              )}
             </div>
 
-            {/* Results Counter */}
-            <div className="text-sm text-gray-600">
-              {totalItems} transacciones encontradas
+            {/* Contador de resultados + Limpiar */}
+            <div className="flex items-center justify-between pt-1">
+              <p className="text-sm text-gray-600">
+                {totalItems} transacciones encontradas
+              </p>
+              {getActiveFilters().length > 0 && (
+                <button
+                  onClick={clearFilters}
+                  className="inline-flex items-center px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                  Limpiar filtros
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -845,11 +829,21 @@ const Historial = () => {
           )}
 
           {loading ? (
-            <div className="p-8 text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-              <p className="text-muted-foreground mt-2">
-                Cargando transacciones...
-              </p>
+            <div className="p-12 text-center">
+              <div className="max-w-sm mx-auto">
+                <div className="relative">
+                  <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200 border-t-slate-600 mx-auto"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-8 h-8 bg-slate-600 rounded-full opacity-20"></div>
+                  </div>
+                </div>
+                <p className="text-gray-600 mt-4 font-medium">
+                  Cargando transacciones...
+                </p>
+                <p className="text-gray-500 text-sm mt-1">
+                  Por favor espera un momento
+                </p>
+              </div>
             </div>
           ) : transactions.length === 0 ? (
             <div className="p-8 text-center">
@@ -922,8 +916,20 @@ const Historial = () => {
                         {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                           {transaction.type === 'salida' ? formatDivision(transaction.division) : '-'}
                         </td> */}
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
-                          {formatCurrency(transaction.amount)}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-semibold text-gray-900">{formatCurrency(transaction.amount)}</span>
+                            {(transaction.status === "parcial" || transaction.status === "pagado") && getPaidAmount(transaction) > 0 && (
+                              <span className="text-xs text-green-700 bg-green-50 border border-green-200 rounded px-1.5 py-0.5">
+                                Pagado: {formatCurrency(getPaidAmount(transaction))}
+                              </span>
+                            )}
+                            {(transaction.status === "pendiente" || transaction.status === "parcial") && getRemainingAmount(transaction) > 0 && (
+                              <span className="text-xs text-gray-600 bg-gray-100 border border-gray-300 rounded px-1.5 py-0.5">
+                                Saldo: {formatCurrency(getRemainingAmount(transaction))}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {getStatusBadge(transaction.status)}
@@ -931,9 +937,8 @@ const Historial = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <button
                             onClick={() => handleViewDetails(transaction.id)}
-                            className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors"
+                            className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors cursor-pointer"
                             title="Ver detalles"
-                            cursor="pointer"
                           >
                             <EyeIcon className="h-4 w-4" /> 
                           </button>
@@ -1003,67 +1008,95 @@ const Historial = () => {
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <div className="px-6 py-4 border-t border-border">
+                <div className="px-6 py-4 border-t border-gray-200">
                   <div className="flex items-center justify-between">
-                    <div className="text-sm text-muted-foreground">
-                      Mostrando {(currentPage - 1) * itemsPerPage + 1} a{" "}
-                      {Math.min(currentPage * itemsPerPage, totalItems)} de{" "}
-                      {totalItems} resultados
-                    </div>
-                    <div className="flex items-center space-x-2">
+                    {/* Mobile */}
+                    <div className="flex-1 flex justify-between sm:hidden">
                       <button
-                        onClick={() =>
-                          setCurrentPage((prev) => Math.max(prev - 1, 1))
-                        }
+                        onClick={() => handlePageChange(currentPage - 1)}
                         disabled={currentPage === 1}
-                        className="px-3 py-1 text-sm border border-border rounded-md hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Anterior
                       </button>
-
-                      <div className="flex items-center space-x-1">
-                        {Array.from(
-                          { length: Math.min(5, totalPages) },
-                          (_, i) => {
-                            let pageNum;
-                            if (totalPages <= 5) {
-                              pageNum = i + 1;
-                            } else if (currentPage <= 3) {
-                              pageNum = i + 1;
-                            } else if (currentPage >= totalPages - 2) {
-                              pageNum = totalPages - 4 + i;
-                            } else {
-                              pageNum = currentPage - 2 + i;
-                            }
-
-                            return (
-                              <button
-                                key={pageNum}
-                                onClick={() => setCurrentPage(pageNum)}
-                                className={`px-3 py-1 text-sm border rounded-md transition-colors ${
-                                  currentPage === pageNum
-                                    ? "bg-primary text-primary-foreground border-primary"
-                                    : "border-border hover:bg-muted"
-                                }`}
-                              >
-                                {pageNum}
-                              </button>
-                            );
-                          }
-                        )}
-                      </div>
-
                       <button
-                        onClick={() =>
-                          setCurrentPage((prev) =>
-                            Math.min(prev + 1, totalPages)
-                          )
-                        }
+                        onClick={() => handlePageChange(currentPage + 1)}
                         disabled={currentPage === totalPages}
-                        className="px-3 py-1 text-sm border border-border rounded-md hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Siguiente
                       </button>
+                    </div>
+                    {/* Desktop */}
+                    <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm text-gray-700">
+                          Mostrando{" "}
+                          <span className="font-medium">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> a{" "}
+                          <span className="font-medium">{Math.min(currentPage * ITEMS_PER_PAGE, totalItems)}</span>{" "}
+                          de{" "}
+                          <span className="font-medium">{totalItems}</span>{" "}
+                          resultados
+                        </p>
+                      </div>
+                      <div>
+                        <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                          <button
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 1}
+                            className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <span className="sr-only">Anterior</span>
+                            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                            if (
+                              page === 1 ||
+                              page === totalPages ||
+                              Math.abs(page - currentPage) <= 1
+                            ) {
+                              return (
+                                <button
+                                  key={page}
+                                  onClick={() => handlePageChange(page)}
+                                  className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                                    page === currentPage
+                                      ? "z-10 bg-slate-100 border-slate-500 text-slate-700"
+                                      : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
+                                  }`}
+                                >
+                                  {page}
+                                </button>
+                              );
+                            } else if (
+                              page === currentPage - 2 ||
+                              page === currentPage + 2
+                            ) {
+                              return (
+                                <span
+                                  key={page}
+                                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700"
+                                >
+                                  ...
+                                </span>
+                              );
+                            }
+                            return null;
+                          })}
+                          <button
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages}
+                            className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <span className="sr-only">Siguiente</span>
+                            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                        </nav>
+                      </div>
                     </div>
                   </div>
                 </div>

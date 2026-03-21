@@ -100,7 +100,7 @@ const Sidebar = ({
             <button
               onClick={() => handleNavigation("/admin/dashboard")}
               className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/dashboard"
-                ? "bg-blue-50 text-primary"
+                ? "bg-[#5a5e68] text-[#ededed]"
                 : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                 }`}
             >
@@ -139,7 +139,7 @@ const Sidebar = ({
                             handleNavigation("/admin/transacciones/entradas")
                           }
                           className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/entradas"
-                            ? "bg-red-50 text-primary"
+                            ? "bg-[#5a5e68] text-[#ededed]"
                             : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                             }`}
                         >
@@ -155,7 +155,7 @@ const Sidebar = ({
                             handleNavigation("/admin/transacciones/salidas")
                           }
                           className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/salidas"
-                            ? "bg-blue-50 text-primary"
+                            ? "bg-[#5a5e68] text-[#ededed]"
                             : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                             }`}
                         >
@@ -171,7 +171,7 @@ const Sidebar = ({
                             handleNavigation("/admin/transacciones/historial")
                           }
                           className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/historial"
-                            ? "bg-blue-50 text-primary"
+                            ? "bg-[#5a5e68] text-[#ededed]"
                             : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                             }`}
                         >
@@ -192,7 +192,7 @@ const Sidebar = ({
                 <button
                   onClick={() => handleNavigation("/admin/transacciones/recurrentes")}
                   className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/recurrentes"
-                    ? "bg-rose-50 text-rose-600 border border-rose-200"
+                    ? "bg-[#5a5e68] text-[#ededed]"
                     : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                     }`}
                 >
@@ -235,7 +235,7 @@ const Sidebar = ({
                             handleNavigation("/admin/catalogos/proveedores")
                           }
                           className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/catalogos/proveedores"
-                            ? "bg-blue-50 text-primary"
+                            ? "bg-[#5a5e68] text-[#ededed]"
                             : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                             }`}
                         >
@@ -251,7 +251,7 @@ const Sidebar = ({
                             handleNavigation("/admin/catalogos/generales")
                           }
                           className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/catalogos/generales"
-                            ? "bg-blue-50 text-primary"
+                            ? "bg-[#5a5e68] text-[#ededed]"
                             : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                             }`}
                         >
@@ -267,7 +267,7 @@ const Sidebar = ({
                             handleNavigation("/admin/catalogos/conceptos")
                           }
                           className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/catalogos/conceptos"
-                            ? "bg-blue-50 text-primary"
+                            ? "bg-[#5a5e68] text-[#ededed]"
                             : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                             }`}
                         >
@@ -283,7 +283,7 @@ const Sidebar = ({
                             handleNavigation("/admin/catalogos/subconceptos")
                           }
                           className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/catalogos/subconceptos"
-                            ? "bg-blue-50 text-primary"
+                            ? "bg-[#5a5e68] text-[#ededed]"
                             : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                             }`}
                         >
@@ -301,7 +301,7 @@ const Sidebar = ({
               <button
                 onClick={() => handleNavigation("/admin/reportes")}
                 className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/reportes"
-                  ? "bg-blue-50 text-primary"
+                  ? "bg-[#5a5e68] text-[#ededed]"
                   : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                   }`}
               >
@@ -315,7 +315,7 @@ const Sidebar = ({
               <button
                 onClick={() => handleNavigation("/admin/analisis-ia")}
                 className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/analisis-ia"
-                  ? "bg-purple-50 text-purple-600"
+                  ? "bg-[#5a5e68] text-[#ededed]"
                   : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                   }`}
               >
@@ -351,7 +351,7 @@ const Sidebar = ({
                           handleNavigation("/admin/configuracion/logo")
                         }
                         className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/configuracion/logo"
-                          ? "bg-blue-50 text-primary"
+                          ? "bg-[#5a5e68] text-[#ededed]"
                           : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                           }`}
                       >
@@ -365,7 +365,7 @@ const Sidebar = ({
                         }
                         className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname ===
                           "/admin/configuracion/correos-notificacion"
-                          ? "bg-blue-50 text-primary"
+                          ? "bg-[#5a5e68] text-[#ededed]"
                           : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                           }`}
                       >
@@ -379,7 +379,7 @@ const Sidebar = ({
                         }
                         className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname ===
                           "/admin/configuracion/logs"
-                          ? "bg-blue-50 text-primary"
+                          ? "bg-[#5a5e68] text-[#ededed]"
                           : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                           }`}
                       >
@@ -393,7 +393,7 @@ const Sidebar = ({
                         }
                         className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname ===
                           "/admin/configuracion/catalogos"
-                          ? "bg-blue-50 text-primary"
+                          ? "bg-[#5a5e68] text-[#ededed]"
                           : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                           }`}
                       >
@@ -409,7 +409,7 @@ const Sidebar = ({
                           }
                           className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname ===
                             "/admin/configuracion/dev-tools"
-                            ? "bg-blue-50 text-primary"
+                            ? "bg-[#5a5e68] text-[#ededed]"
                             : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                             }`}
                         >
@@ -423,7 +423,7 @@ const Sidebar = ({
                 <button
                   onClick={() => handleNavigation("/admin/configuracion")}
                   className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/configuracion"
-                    ? "bg-blue-50 text-primary"
+                    ? "bg-[#5a5e68] text-[#ededed]"
                     : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                     }`}
                 >
@@ -437,7 +437,7 @@ const Sidebar = ({
               <button
                 onClick={() => handleNavigation("/admin/usuarios")}
                 className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/usuarios"
-                  ? "bg-blue-50 text-primary"
+                  ? "bg-[#5a5e68] text-[#ededed]"
                   : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                   }`}
               >
@@ -478,7 +478,7 @@ const Sidebar = ({
             <button
               onClick={() => handleNavigation("/admin/dashboard")}
               className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/dashboard"
-                ? "bg-blue-50 text-primary"
+                ? "bg-[#5a5e68] text-[#ededed]"
                 : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                 }`}
             >
@@ -514,7 +514,7 @@ const Sidebar = ({
                             handleNavigation("/admin/transacciones/entradas")
                           }
                           className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/entradas"
-                            ? "bg-blue-50 text-primary"
+                            ? "bg-[#5a5e68] text-[#ededed]"
                             : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                             }`}
                         >
@@ -529,7 +529,7 @@ const Sidebar = ({
                             handleNavigation("/admin/transacciones/salidas")
                           }
                           className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/salidas"
-                            ? "bg-blue-50 text-primary"
+                            ? "bg-[#5a5e68] text-[#ededed]"
                             : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                             }`}
                         >
@@ -544,7 +544,7 @@ const Sidebar = ({
                             handleNavigation("/admin/transacciones/historial")
                           }
                           className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/historial"
-                            ? "bg-blue-50 text-primary"
+                            ? "bg-[#5a5e68] text-[#ededed]"
                             : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                             }`}
                         >
@@ -559,7 +559,7 @@ const Sidebar = ({
                             handleNavigation("/admin/transacciones/historial")
                           }
                           className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/historial"
-                            ? "bg-blue-50 text-primary"
+                            ? "bg-[#5a5e68] text-[#ededed]"
                             : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                             }`}
                         >
@@ -578,7 +578,7 @@ const Sidebar = ({
                 <button
                   onClick={() => handleNavigation("/admin/transacciones/recurrentes")}
                   className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/recurrentes"
-                    ? "bg-rose-50 text-rose-600 border border-rose-200"
+                    ? "bg-[#5a5e68] text-[#ededed]"
                     : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                     }`}
                 >
@@ -618,7 +618,7 @@ const Sidebar = ({
                             handleNavigation("/admin/catalogos/proveedores")
                           }
                           className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/catalogos/proveedores"
-                            ? "bg-blue-50 text-primary"
+                            ? "bg-[#5a5e68] text-[#ededed]"
                             : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                             }`}
                         >
@@ -633,7 +633,7 @@ const Sidebar = ({
                             handleNavigation("/admin/catalogos/generales")
                           }
                           className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/catalogos/generales"
-                            ? "bg-blue-50 text-primary"
+                            ? "bg-[#5a5e68] text-[#ededed]"
                             : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                             }`}
                         >
@@ -648,7 +648,7 @@ const Sidebar = ({
                             handleNavigation("/admin/catalogos/conceptos")
                           }
                           className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/catalogos/conceptos"
-                            ? "bg-blue-50 text-primary"
+                            ? "bg-[#5a5e68] text-[#ededed]"
                             : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                             }`}
                         >
@@ -663,7 +663,7 @@ const Sidebar = ({
                             handleNavigation("/admin/catalogos/subconceptos")
                           }
                           className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/catalogos/subconceptos"
-                            ? "bg-blue-50 text-primary"
+                            ? "bg-[#5a5e68] text-[#ededed]"
                             : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                             }`}
                         >
@@ -680,7 +680,7 @@ const Sidebar = ({
               <button
                 onClick={() => handleNavigation("/admin/reportes")}
                 className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/reportes"
-                  ? "bg-blue-50 text-primary"
+                  ? "bg-[#5a5e68] text-[#ededed]"
                   : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                   }`}
               >
@@ -694,7 +694,7 @@ const Sidebar = ({
               <button
                 onClick={() => handleNavigation("/admin/analisis-ia")}
                 className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/analisis-ia"
-                  ? "bg-purple-50 text-purple-600"
+                  ? "bg-[#5a5e68] text-[#ededed]"
                   : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                   }`}
               >
@@ -729,7 +729,7 @@ const Sidebar = ({
                         handleNavigation("/admin/configuracion/logo")
                       }
                       className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/configuracion/logo"
-                        ? "bg-blue-50 text-primary"
+                        ? "bg-[#5a5e68] text-[#ededed]"
                         : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                         }`}
                     >
@@ -743,7 +743,7 @@ const Sidebar = ({
                       }
                       className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname ===
                         "/admin/configuracion/correos-notificacion"
-                        ? "bg-blue-50 text-primary"
+                        ? "bg-[#5a5e68] text-[#ededed]"
                         : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                         }`}
                     >
@@ -757,7 +757,7 @@ const Sidebar = ({
                       }
                       className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname ===
                         "/admin/configuracion/logs"
-                        ? "bg-blue-50 text-primary"
+                        ? "bg-[#5a5e68] text-[#ededed]"
                         : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                         }`}
                     >
@@ -773,7 +773,7 @@ const Sidebar = ({
                         }
                         className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname ===
                           "/admin/configuracion/dev-tools"
-                          ? "bg-blue-50 text-primary"
+                          ? "bg-[#5a5e68] text-[#ededed]"
                           : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                           }`}
                       >
@@ -790,7 +790,7 @@ const Sidebar = ({
               <button
                 onClick={() => handleNavigation("/admin/usuarios")}
                 className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/usuarios"
-                  ? "bg-blue-50 text-primary"
+                  ? "bg-[#5a5e68] text-[#ededed]"
                   : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                   }`}
               >

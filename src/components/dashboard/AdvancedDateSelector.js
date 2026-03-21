@@ -3,9 +3,27 @@ import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, CalendarIcon } from
 import { dashboardService } from "../../lib/services/dashboardService";
 import { useAuth } from "../../context/AuthContextMultiTenant";
 
-const AdvancedDateSelector = ({ currentDate, onDateChange, onSuccess, onError }) => {
+const AdvancedDateSelector = ({ currentDate, onDateChange, onSuccess, onError, accentColor = "primary" }) => {
   const { tenantInfo } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
+
+  const colors = accentColor === "green"
+    ? {
+        button: "bg-green-100 hover:bg-green-200 text-green-700",
+        selected: "bg-green-100 text-green-700 font-medium",
+        link: "text-green-600 hover:text-green-700",
+      }
+    : accentColor === "gray"
+    ? {
+        button: "bg-slate-100 hover:bg-slate-200 text-slate-700",
+        selected: "bg-slate-100 text-slate-700 font-medium",
+        link: "text-slate-600 hover:text-slate-700",
+      }
+    : {
+        button: "bg-primary/10 hover:bg-primary/20 text-primary",
+        selected: "bg-primary/10 text-primary",
+        link: "text-primary hover:text-primary/80",
+      };
   const [showYearSelector, setShowYearSelector] = useState(false);
   const [availableData, setAvailableData] = useState({ months: [], years: [] });
   const [availableMonthsForSelectedYear, setAvailableMonthsForSelectedYear] = useState([]);
@@ -224,7 +242,7 @@ const AdvancedDateSelector = ({ currentDate, onDateChange, onSuccess, onError })
         disabled={!canNavigatePrevious()}
         className={`p-2 rounded-full transition-colors ${
           canNavigatePrevious()
-            ? 'bg-primary/10 hover:bg-primary/20 text-primary'
+            ? colors.button
             : 'bg-muted text-muted-foreground cursor-not-allowed'
         }`}
         aria-label="Mes anterior"
@@ -237,7 +255,7 @@ const AdvancedDateSelector = ({ currentDate, onDateChange, onSuccess, onError })
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setShowDropdown(!showDropdown)}
-            className="px-4 py-2 rounded-md bg-primary/10 hover:bg-primary/20 text-primary text-sm font-medium transition-colors flex items-center space-x-2"
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-2 ${colors.button}`}
           >
             <CalendarIcon className="h-4 w-4" />
             <span>{getCurrentDisplayName()}</span>
@@ -271,7 +289,7 @@ const AdvancedDateSelector = ({ currentDate, onDateChange, onSuccess, onError })
                   <div className="relative" ref={yearDropdownRef}>
                     <button
                       onClick={() => setShowYearSelector(!showYearSelector)}
-                      className="text-sm font-medium text-primary hover:text-primary/80 flex items-center space-x-1"
+                      className={`text-sm font-medium flex items-center space-x-1 ${colors.link}`}
                     >
                       <span>{selectedYear}</span>
                       <ChevronDownIcon className="h-3 w-3" />
@@ -285,7 +303,7 @@ const AdvancedDateSelector = ({ currentDate, onDateChange, onSuccess, onError })
                             onClick={() => selectYear(year)}
                             className={`block w-full text-left px-3 py-1 text-sm ${
                               selectedYear === year
-                                ? 'bg-primary/10 text-primary'
+                                ? colors.selected
                                 : 'text-gray-700 hover:bg-gray-100'
                             }`}
                           >
@@ -306,7 +324,7 @@ const AdvancedDateSelector = ({ currentDate, onDateChange, onSuccess, onError })
                         onClick={() => selectMonth(monthData.month, monthData.year)}
                         className={`block w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
                           currentDate.getMonth() === monthData.month && currentDate.getFullYear() === monthData.year
-                            ? 'bg-primary/10 text-primary font-medium'
+                            ? colors.selected
                             : 'text-gray-700 hover:bg-gray-100'
                         }`}
                       >
@@ -330,7 +348,7 @@ const AdvancedDateSelector = ({ currentDate, onDateChange, onSuccess, onError })
         disabled={!canNavigateNext()}
         className={`p-2 rounded-full transition-colors ${
           canNavigateNext()
-            ? 'bg-primary/10 hover:bg-primary/20 text-primary'
+            ? colors.button
             : 'bg-muted text-muted-foreground cursor-not-allowed'
         }`}
         aria-label="Mes siguiente"

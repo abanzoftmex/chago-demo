@@ -135,34 +135,34 @@ export const subconceptService = {
     }
   },
 
-  // Soft delete subconcept (set isActive to false)
+  // Delete subconcept — blocked if it has associated transactions
   async delete(id, tenantId, user = null) {
+    if (!tenantId) {
+      throw new Error('Tenant ID es requerido');
+    }
+
+    // Permission check
+    const userRole = user?.role || user?.userRole;
+    if (user && ['contador', 'director_general'].includes(userRole)) {
+      throw new Error("No tienes permisos para eliminar subconceptos");
+    }
+
+    // Block deletion if there are transactions referencing this subconcept
+    const hasTransactions = await this.hasAssociatedTransactions(id, tenantId);
+    if (hasTransactions) {
+      throw new Error(
+        'No es posible eliminar este Subconcepto porque tiene transacciones asociadas. ' +
+        'Para eliminarlo, primero elimina o reasigna las transacciones que lo utilizan.'
+      );
+    }
+
     try {
-      if (!tenantId) {
-        throw new Error('Tenant ID es requerido');
-      }
-      
-      // Check if user has permission to delete (contador and director_general roles cannot delete)
-      const userRole = user?.role || user?.userRole;
-      if (user && ['contador', 'director_general'].includes(userRole)) {
-        throw new Error("No tienes permisos para eliminar subconceptos");
-      }
-      // Check if subconcept has associated transactions
-      const hasTransactions = await this.hasAssociatedTransactions(id, tenantId);
-      
-      if (hasTransactions) {
-        // Soft delete - just deactivate
-        await this.update(id, { isActive: false }, tenantId);
-      } else {
-        // Hard delete if no transactions
-        const docRef = doc(db, getSubconceptsCollection(tenantId), id);
-        await deleteDoc(docRef);
-      }
-      
+      const docRef = doc(db, getSubconceptsCollection(tenantId), id);
+      await deleteDoc(docRef);
       return true;
     } catch (error) {
       console.error('Error deleting subconcept:', error);
-      throw new Error('Error al eliminar el subconcepto');
+      throw new Error(error.message || 'Error al eliminar el subconcepto');
     }
   },
 

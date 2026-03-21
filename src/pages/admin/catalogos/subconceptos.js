@@ -6,6 +6,7 @@ import { subconceptService } from "../../../lib/services/subconceptService";
 import { conceptService } from "../../../lib/services/conceptService";
 import { generalService } from "../../../lib/services/generalService";
 import { useAuth } from "../..//..//context/AuthContextMultiTenant";
+import ConfirmDialog from '../../../components/ui/ConfirmDialog';
 import { 
   PencilIcon,
   TrashIcon,
@@ -30,6 +31,11 @@ export default function SubconceptosPage() {
   const [editingSubconcept, setEditingSubconcept] = useState(null);
   const [filterConcept, setFilterConcept] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, item: null });
+  const [errorDialog, setErrorDialog] = useState({ open: false, message: '' });
+
+  const ITEMS_PER_PAGE = 20;
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -96,24 +102,19 @@ export default function SubconceptosPage() {
     setIsModalOpen(true);
   };
 
-  const handleDeleteSubconcept = async (subconcept) => {
-    if (
-      !confirm(
-        `¿Estás seguro de que deseas eliminar el subconcepto "${subconcept.name}"?`
-      )
-    ) {
-      return;
-    }
+  const handleDeleteSubconcept = (subconcept) => {
+    setDeleteDialog({ open: true, item: subconcept });
+  };
 
+  const confirmDeleteSubconcept = async () => {
+    const subconcept = deleteDialog.item;
+    setDeleteDialog({ open: false, item: null });
     try {
-      if (!tenantId) {
-        throw new Error('No tenant ID available');
-      }
-      
+      if (!tenantId) throw new Error('No tenant ID available');
       await subconceptService.delete(subconcept.id, tenantId, { role: userRole });
-      await loadData(); // Reload the list
+      await loadData();
     } catch (error) {
-      alert(`Error al eliminar el subconcepto: ${error.message}`);
+      setErrorDialog({ open: true, message: error.message });
     }
   };
 
@@ -126,6 +127,15 @@ export default function SubconceptosPage() {
     const matchesSearch = subconcept.name.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesConceptFilter && matchesSearch;
   });
+
+  const totalPages = Math.ceil(filteredSubconcepts.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedSubconcepts = filteredSubconcepts.slice(startIndex, endIndex);
+
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) setCurrentPage(page);
+  };
 
   const breadcrumbs = [
     { label: "Dashboard", href: "/admin/dashboard" },
@@ -181,7 +191,7 @@ export default function SubconceptosPage() {
                 <select
                   id="filterConcept"
                   value={filterConcept}
-                  onChange={(e) => setFilterConcept(e.target.value)}
+                  onChange={(e) => { setFilterConcept(e.target.value); setCurrentPage(1); }}
                   className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500"
                 >
                   <option value="all">Todos los conceptos</option>
@@ -205,7 +215,7 @@ export default function SubconceptosPage() {
                 type="text"
                 id="search"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                 placeholder="Buscar subconceptos..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500"
               />
@@ -306,7 +316,7 @@ export default function SubconceptosPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredSubconcepts.map((subconcept) => {
+                    paginatedSubconcepts.map((subconcept) => {
                       const concept = concepts.find(c => c.id === subconcept.conceptId);
                       const general = concept ? generals.find(g => g.id === concept.generalId) : null;
                       
@@ -393,6 +403,29 @@ export default function SubconceptosPage() {
                 </tbody>
               </table>
             </div>
+            <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between">
+              <p className="text-sm text-gray-700">
+                Mostrando <span className="font-medium">{filteredSubconcepts.length === 0 ? 0 : startIndex + 1}</span> a <span className="font-medium">{Math.min(endIndex, filteredSubconcepts.length)}</span> de <span className="font-medium">{filteredSubconcepts.length}</span> resultados
+              </p>
+              {totalPages > 1 && (
+                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                  <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                    if (page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1) {
+                      return (<button key={page} onClick={() => handlePageChange(page)} className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${page === currentPage ? 'z-10 bg-orange-50 border-orange-500 text-orange-700' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'}`}>{page}</button>);
+                    } else if (page === currentPage - 2 || page === currentPage + 2) {
+                      return (<span key={page} className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">...</span>);
+                    }
+                    return null;
+                  })}
+                  <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
+                  </button>
+                </nav>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -405,10 +438,24 @@ export default function SubconceptosPage() {
         initialData={editingSubconcept}
         concepts={concepts}
       />
-      
 
-      
+      <ConfirmDialog
+        isOpen={deleteDialog.open}
+        type="confirm"
+        title="Eliminar Subconcepto"
+        message={`¿Estás seguro de que deseas eliminar el subconcepto "${deleteDialog.item?.name}"? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        onConfirm={confirmDeleteSubconcept}
+        onClose={() => setDeleteDialog({ open: false, item: null })}
+      />
 
+      <ConfirmDialog
+        isOpen={errorDialog.open}
+        type="error"
+        title="No se puede eliminar"
+        message={errorDialog.message}
+        onClose={() => setErrorDialog({ open: false, message: '' })}
+      />
     </AdminLayout>
   );
 }

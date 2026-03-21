@@ -11,7 +11,8 @@ export default function GeneralModal({ isOpen, onClose, onSuccess, type = 'entra
   const [formData, setFormData] = useState({
     name: '',
     type: 'entrada',
-    description: ''
+    description: '',
+    hasPreviousBalance: false,
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -23,14 +24,16 @@ export default function GeneralModal({ isOpen, onClose, onSuccess, type = 'entra
         setFormData({
           name: initialData.name || '',
           type: initialData.type || 'entrada',
-          description: initialData.description || ''
+          description: initialData.description || '',
+          hasPreviousBalance: initialData.hasPreviousBalance ?? false,
         });
       } else {
         // Creating new general
         setFormData({
           name: '',
           type: type || 'entrada', // Use the passed type or default to 'entrada'
-          description: ''
+          description: '',
+          hasPreviousBalance: false,
         });
       }
       setErrors({});
@@ -190,6 +193,32 @@ export default function GeneralModal({ isOpen, onClose, onSuccess, type = 'entra
               placeholder="Descripción opcional de la categoría general"
               disabled={isSubmitting}
             />
+          </div>
+
+          {/* Saldo anterior */}
+          <div className="flex items-start justify-between rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="flex-1 pr-4">
+              <p className="text-sm font-medium text-gray-700">¿Maneja saldo anterior y actual?</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Activa esta opción si esta categoría requiere mostrar comparativa de saldo anterior vs. actual en el dashboard.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={formData.hasPreviousBalance}
+              onClick={() => setFormData(prev => ({ ...prev, hasPreviousBalance: !prev.hasPreviousBalance }))}
+              disabled={isSubmitting}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 ${
+                formData.hasPreviousBalance ? 'bg-orange-500' : 'bg-gray-200'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  formData.hasPreviousBalance ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">

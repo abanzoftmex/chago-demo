@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/router";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import TransactionForm from "../../../components/forms/TransactionForm";
@@ -13,8 +13,7 @@ import { providerService } from "../../../lib/services/providerService";
 import { generalService } from "../../../lib/services/generalService";
 import { subconceptService } from "../../../lib/services/subconceptService";
 import { paymentService } from "../../../lib/services/paymentService";
-import Link from "next/link";
-import { 
+import {
   PlusIcon,
   ArrowTrendingDownIcon,
   PencilIcon,
@@ -25,6 +24,8 @@ import {
   ArrowDownTrayIcon,
   ArrowUpTrayIcon,
 } from '@heroicons/react/24/outline';
+
+const ITEMS_PER_PAGE = 20;
 
 const SolicitudesPago = () => {
   const router = useRouter();
@@ -40,9 +41,7 @@ const SolicitudesPago = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [currentMonthName, setCurrentMonthName] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(20);
   const [showImportModal, setShowImportModal] = useState(false);
   const toast = useToast();
 
@@ -53,13 +52,17 @@ const SolicitudesPago = () => {
   // Memoize tenantId to prevent unnecessary re-renders
   const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
 
+  const currentMonthName = useMemo(() => {
+    const monthName = currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    return monthName.charAt(0).toUpperCase() + monthName.slice(1);
+  }, [currentDate]);
+
   const loadTransactions = useCallback(async () => {
     try {
       setLoading(true);
 
       // Check if we have tenant ID
       if (!tenantId) {
-        console.error("No tenant ID available");
         setLoading(false);
         return;
       }
@@ -85,29 +88,22 @@ const SolicitudesPago = () => {
         ]
       );
       
-      console.log('Transacciones cargadas:', {
-        query: transactionQuery,
-        resultCount: transactionsData.length,
-        transactions: transactionsData
-      });
-      
       setTransactions(transactionsData);
       setConcepts(conceptsData);
       setProviders(providersData);
       setGenerals(generalsData);
       setSubconcepts(subconceptsData);
 
-      // Cargar pagos para todas las transacciones
+      // Cargar pagos de todas las transacciones en paralelo
+      const paymentsResults = await Promise.all(
+        transactionsData.map(t =>
+          paymentService.getByTransaction(t.id, tenantId).catch(() => [])
+        )
+      );
       const paymentsData = {};
-      for (const transaction of transactionsData) {
-        try {
-          const payments = await paymentService.getByTransaction(transaction.id);
-          paymentsData[transaction.id] = payments || [];
-        } catch (err) {
-          console.error(`Error loading payments for transaction ${transaction.id}:`, err);
-          paymentsData[transaction.id] = [];
-        }
-      }
+      transactionsData.forEach((t, i) => {
+        paymentsData[t.id] = paymentsResults[i] || [];
+      });
       setPaymentsMap(paymentsData);
     } catch (error) {
       console.error("Error loading transactions:", error);
@@ -117,18 +113,11 @@ const SolicitudesPago = () => {
     }
   }, [toast, currentDate, tenantId]);
 
-  const updateMonthName = useCallback(() => {
-    const monthName = currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-    setCurrentMonthName(monthName.charAt(0).toUpperCase() + monthName.slice(1));
-  }, [currentDate]);
-
   useEffect(() => {
-    // Only load transactions if we have tenant info
     if (tenantId) {
       loadTransactions();
-      updateMonthName();
     }
-  }, [loadTransactions, updateMonthName, tenantId]);
+  }, [loadTransactions, tenantId]);
 
   const handleDateChange = (newDate) => {
     setCurrentDate(newDate);
@@ -230,17 +219,25 @@ const SolicitudesPago = () => {
   };
 
   const getRemainingAmount = (transaction) => {
+    // Usar el campo 'balance' guardado en la transacción (actualizado por updateTransactionPaymentStatus)
+    if (transaction.balance !== undefined && transaction.balance !== null) {
+      return Math.max(0, transaction.balance);
+    }
+    // Fallback: calcular desde paymentsMap
     const totalAmount = transaction.amount || 0;
     const payments = paymentsMap[transaction.id] || [];
     const paidAmount = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
-    const remainingAmount = Math.max(0, totalAmount - paidAmount);
-    return remainingAmount;
+    return Math.max(0, totalAmount - paidAmount);
   };
 
   const getPaidAmount = (transaction) => {
+    // Usar el campo 'totalPaid' guardado en la transacción
+    if (transaction.totalPaid !== undefined && transaction.totalPaid !== null) {
+      return transaction.totalPaid;
+    }
+    // Fallback: calcular desde paymentsMap
     const payments = paymentsMap[transaction.id] || [];
-    const paidAmount = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
-    return paidAmount;
+    return payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
   };
 
   const getProviderName = (providerId, transaction = null) => {
@@ -379,22 +376,16 @@ const SolicitudesPago = () => {
     router.push(`/admin/transacciones/detalle/${transactionId}`);
   };
 
-  const filteredTransactions = transactions.filter((transaction) => {
-    // Si hay un término de búsqueda, filtrar por él
+  const filteredTransactions = useMemo(() => transactions.filter((transaction) => {
     if (searchTerm) {
       const query = searchTerm.toLowerCase();
-      
-      // Buscar en el árbol jerárquico completo
       const generalName = getGeneralName(transaction.generalId, transaction).toLowerCase();
       const conceptName = getConceptName(transaction.conceptId, transaction).toLowerCase();
       const subconceptName = (getSubconceptName(transaction.subconceptId, transaction) || "").toLowerCase();
-      
-      // Otros campos
       const providerName = getProviderName(transaction.providerId, transaction).toLowerCase();
       const description = (transaction.description || "").toLowerCase();
       const amountStr = (transaction.amount ?? "").toString();
       const statusStr = (transaction.status ?? "").toString().toLowerCase();
-      
       return (
         generalName.includes(query) ||
         conceptName.includes(query) ||
@@ -406,18 +397,19 @@ const SolicitudesPago = () => {
       );
     }
     return true;
-  });
+  }), [transactions, searchTerm, generals, concepts, subconcepts, providers]);
 
-  // Sort transactions by status priority
-  const sortedTransactions = filteredTransactions.sort((a, b) => {
-    const statusOrder = { pendiente: 1, parcial: 2, pagado: 3 };
-    return statusOrder[a.status] - statusOrder[b.status];
-  });
+  const sortedTransactions = useMemo(() =>
+    [...filteredTransactions].sort((a, b) => {
+      const statusOrder = { pendiente: 1, parcial: 2, pagado: 3 };
+      return statusOrder[a.status] - statusOrder[b.status];
+    }),
+  [filteredTransactions]);
 
   // Calculate pagination
-  const totalPages = Math.ceil(sortedTransactions.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
+  const totalPages = Math.ceil(sortedTransactions.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
   const currentTransactions = sortedTransactions.slice(startIndex, endIndex);
 
   const handlePageChange = (page) => {
@@ -482,6 +474,7 @@ const SolicitudesPago = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
       
       toast.success(`Archivo CSV exportado: ${fileName}`);
     } catch (error) {
@@ -515,7 +508,7 @@ const SolicitudesPago = () => {
       reader.onload = async (e) => {
         try {
           const csvText = e.target.result;
-          const lines = csvText.trim().split('\n');
+          const lines = csvText.trim().split(/\r?\n/);
           
           if (lines.length <= 1) {
             throw new Error('El archivo CSV está vacío o solo contiene headers');
@@ -700,6 +693,26 @@ const SolicitudesPago = () => {
         ]}
       >
         <div className="space-y-6">
+          {/* Top-right utility buttons */}
+          {canManageTransactions && (
+            <div className="flex justify-end gap-1.5">
+              <button
+                onClick={exportToCSV}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
+              >
+                <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                Exportar CSV
+              </button>
+              <button
+                onClick={handleImportCSV}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-md hover:bg-purple-100 transition-colors"
+              >
+                <ArrowUpTrayIcon className="h-3.5 w-3.5" />
+                Importar CSV
+              </button>
+            </div>
+          )}
+
           {/* Header with action button */}
           <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-xl p-6 border border-red-200">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
@@ -729,36 +742,13 @@ const SolicitudesPago = () => {
                 </div>
               </div>
               {!showForm && canManageTransactions && (
-                <div className="flex flex-col sm:flex-row gap-3">
-                  {/* Botones CSV */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={exportToCSV}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:ring-4 focus:ring-green-500/20 flex items-center transition-all duration-200 font-medium"
-                      title="Exportar a CSV"
-                    >
-                      <ArrowDownTrayIcon className="h-4 w-4 mr-1.5" />
-                      <span className="hidden sm:inline">Exportar</span>
-                    </button>
-                    
-                    <button
-                      onClick={handleImportCSV}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-500/20 flex items-center transition-all duration-200 font-medium"
-                      title="Importar desde CSV"
-                    >
-                      <ArrowUpTrayIcon className="h-4 w-4 mr-1.5" />
-                      <span className="hidden sm:inline">Importar</span>
-                    </button>
-                  </div>
-                  
-                  {/* Botón Nueva Salida */}
-                  <button
-                    onClick={handleNewTransaction}
-                    className="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 focus:ring-4 focus:ring-red-500/20 focus:ring-offset-2 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl font-medium"
-                  ><PlusIcon className="h-4 w-4 mr-1.5" />
-                    Nueva Salida
-                  </button>
-                </div>
+                <button
+                  onClick={handleNewTransaction}
+                  className="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 focus:ring-4 focus:ring-red-500/20 focus:ring-offset-2 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl font-medium"
+                >
+                  <PlusIcon className="h-4 w-4 mr-1.5" />
+                  Nueva Salida
+                </button>
               )}
             </div>
           </div>
@@ -879,7 +869,7 @@ const SolicitudesPago = () => {
                           value={searchTerm}
                           onChange={handleSearchChange}
                           placeholder="Buscar por general, concepto, subconcepto, proveedor, descripción, monto o estado..."
-                          className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+                          className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent text-sm bg-white"
                         />
                         <svg
                           className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
@@ -981,7 +971,7 @@ const SolicitudesPago = () => {
                           <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                             Proveedor
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-red-900 uppercase tracking-wider bg-red-200">
                             Monto
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -1023,7 +1013,7 @@ const SolicitudesPago = () => {
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                                 {getProviderName(transaction.providerId, transaction)}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-800 bg-red-50">
                                 {formatCurrency(transaction.amount)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
@@ -1047,31 +1037,30 @@ const SolicitudesPago = () => {
                                   {canManageTransactions && (
                                     <button
                                       onClick={() => handleEditTransaction(transaction)}
-                                      className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center"
+                                      className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center cursor-pointer"
                                       title="Editar gasto"
-                                      cursor="pointer"
                                     >
                                       <PencilIcon className="h-4 w-4" /> 
                                     </button>
                                   )}
                                   <button
                                     onClick={() => handleViewDetails(transaction.id)}
-                                    className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors"
+                                    className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors cursor-pointer"
                                     title="Ver detalles"
-                                    cursor="pointer"
                                   >
                                     <EyeIcon className="h-4 w-4" />
                                   </button>
-                                  {canDeleteTransactions && (
-                                    <button
-                                      onClick={() => handleDeleteTransaction(transaction)}
-                                      className="bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center"
-                                      title="Eliminar gasto"
-                                      cursor="pointer"
-                                    >
-                                      <TrashIcon className="h-4 w-4" />
-                                    </button>
-                                  )}
+                                  <div className="hidden">
+                                    {canDeleteTransactions && (
+                                      <button
+                                        onClick={() => handleDeleteTransaction(transaction)}
+                                        className="bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center"
+                                        title="Eliminar gasto"
+                                      >
+                                        <TrashIcon className="h-4 w-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -1150,16 +1139,18 @@ const SolicitudesPago = () => {
                             >
                               Ver Detalles
                             </button>
-                            {canDeleteTransactions && (
-                              <button
-                                onClick={() => handleDeleteTransaction(transaction)}
-                                className="text-sm text-red-600 hover:text-red-800 transition-colors flex items-center"
-                                title="Eliminar gasto"
-                              >
-                                <TrashIcon className="w-4 h-4 mr-1" />
-                                Eliminar
-                              </button>
-                            )}
+                            <div className="hidden">
+                              {canDeleteTransactions && (
+                                <button
+                                  onClick={() => handleDeleteTransaction(transaction)}
+                                  className="text-sm text-red-600 hover:text-red-800 transition-colors flex items-center"
+                                  title="Eliminar gasto"
+                                >
+                                  <TrashIcon className="w-4 h-4 mr-1" />
+                                  Eliminar
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>

@@ -7,167 +7,194 @@ const TreeComparisonSection = ({
   calculateTreeComparison,
   formatCurrency,
   formatCurrencyWithBadge,
-  subconcepts
+  subconcepts,
+  generals,
 }) => {
   const [selectedTreeTransactions, setSelectedTreeTransactions] = useState(null);
 
-  if (!stats || !calculateTreeComparison().length) {
+  const treeData = calculateTreeComparison();
+
+  if (!stats || !treeData.length) {
     return null;
   }
 
+  // Group trees by generalId — one purple card per General
+  const generalGroupMap = {};
+  treeData.forEach(tree => {
+    if (!generalGroupMap[tree.generalId]) {
+      generalGroupMap[tree.generalId] = {
+        generalId: tree.generalId,
+        generalName: tree.generalName,
+        trees: [],
+      };
+    }
+    generalGroupMap[tree.generalId].trees.push(tree);
+  });
+  const generalGroups = Object.values(generalGroupMap);
+
   return (
-    <div className="bg-purple-100 rounded-lg border border-border p-6">
-      <div className="flex justify-between items-center mb-4">
-        <div>
-          <h3 className="text-lg font-semibold text-foreground">
-            Saldo de cuentas (Entrada vs Salida)
-          </h3>
-          <p className="text-xs text-foreground mt-1">
-            Saldo por semana - Período: {currentMonthName}
-          </p>
-        </div>
-      </div>
+    <>
+      <div className="space-y-6">
+        {generalGroups.map(group => {
+          const generalInfo = generals?.find(g => g.id === group.generalId);
+          const showBalanceColumns = generalInfo?.hasPreviousBalance === true;
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-border">
-          <thead className="bg-muted">
-            <tr>
-              <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Semana
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Árbol (General / Concepto)
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-purple-600 uppercase tracking-wider">
-                Saldo<br/><span className="text-[10px] font-normal normal-case">(Semana anterior)</span>
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-green-600 uppercase tracking-wider">
-                Entradas<br/><span className="text-[10px] font-normal normal-case">(Semana)</span>
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-red-600 uppercase tracking-wider">
-                Salidas<br/><span className="text-[10px] font-normal normal-case">(Semana)</span>
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-blue-600 uppercase tracking-wider">
-                Saldo<br/><span className="text-[10px] font-normal normal-case">(Semana)</span>
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-orange-600 uppercase tracking-wider">
-                Saldo total
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Transacciones
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-background divide-y divide-border">
-            {calculateTreeComparison().map((tree, index) => (
-              <tr key={index} className="hover:bg-muted/50 transition-colors">
-                <td className="px-4 py-4 whitespace-nowrap text-center">
-                  <div className="inline-flex flex-col items-center">
-                    <span className="text-lg font-bold text-foreground">
-                      {tree.weekNumber}
-                    </span>
-                    {tree.weekInfo && (
-                      <span className="text-[10px] text-muted-foreground mt-0.5">
-                        {tree.weekInfo.startDate} - {tree.weekInfo.endDate}
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-sm text-foreground">
-                  <div className="space-y-1">
-                    <div className="font-semibold">{tree.conceptName}</div>
-                    <div className="font-medium text-xs">{tree.generalName}</div>
-                  </div>
-                </td>
-                <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-medium ${
-                  tree.carryover >= 0 ? 'text-purple-600' : 'text-purple-700'
-                }`}>
-                  <div className="flex items-center justify-end">
-                    {tree.carryover !== 0 ? (
-                      <>
-                        {tree.carryover >= 0 ? (
-                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                          </svg>
-                        ) : (
-                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                          </svg>
+          return (
+            <div key={group.generalId} className="bg-purple-100 rounded-lg border border-border p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-foreground">
+                  Saldo de cuentas — {group.generalName}
+                </h3>
+                <p className="text-xs text-foreground">
+                  Saldo por semana · Período: {currentMonthName}
+                </p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-border">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="px-3 py-2 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Semana
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Árbol (General / Concepto)
+                      </th>
+                      {showBalanceColumns && (
+                        <th className="px-4 py-2 text-right text-xs font-medium text-purple-600 uppercase tracking-wider">
+                          Saldo<br /><span className="text-[10px] font-normal normal-case">(Semana anterior)</span>
+                        </th>
+                      )}
+                      <th className="px-4 py-2 text-right text-xs font-medium text-green-600 uppercase tracking-wider">
+                        Entradas<br /><span className="text-[10px] font-normal normal-case">(Semana)</span>
+                      </th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-red-600 uppercase tracking-wider">
+                        Salidas<br /><span className="text-[10px] font-normal normal-case">(Semana)</span>
+                      </th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-blue-600 uppercase tracking-wider">
+                        Saldo<br /><span className="text-[10px] font-normal normal-case">(Semana)</span>
+                      </th>
+                      {showBalanceColumns && (
+                        <th className="px-4 py-2 text-right text-xs font-medium text-orange-600 uppercase tracking-wider">
+                          Saldo total
+                        </th>
+                      )}
+                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Transacciones
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-background divide-y divide-border">
+                    {group.trees.map((tree, index) => (
+                      <tr key={index} className="hover:bg-muted/50 transition-colors">
+                        <td className="px-3 py-2 whitespace-nowrap text-center">
+                          <div className="inline-flex flex-col items-center">
+                            <span className="text-base font-bold text-foreground">
+                              {stats?.weeklyBreakdown?.weeks?.[tree.weekInfo?.weekIndex]?.weekNumber ?? tree.weekNumber}
+                            </span>
+                            {tree.weekInfo && (
+                              <span className="text-[10px] text-muted-foreground mt-0.5">
+                                {tree.weekInfo.startDate} - {tree.weekInfo.endDate}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 text-sm text-foreground">
+                          <div className="space-y-1">
+                            <div className="font-semibold">{tree.conceptName}</div>
+                            <div className="font-medium text-xs">{tree.generalName}</div>
+                          </div>
+                        </td>
+                        {showBalanceColumns && (
+                          <td className={`px-4 py-2 whitespace-nowrap text-sm text-right font-medium ${
+                            tree.carryover >= 0 ? 'text-purple-600' : 'text-purple-700'
+                          }`}>
+                            <div className="flex items-center justify-end">
+                              {tree.carryover !== 0 ? (
+                                <>
+                                  {tree.carryover >= 0 ? (
+                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                                    </svg>
+                                  ) : (
+                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                                    </svg>
+                                  )}
+                                  {formatCurrencyWithBadge(tree.carryover)}
+                                </>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </div>
+                          </td>
                         )}
-                        {formatCurrencyWithBadge(tree.carryover)}
-                      </>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
-                  {tree.entradas > 0 ? (
-                    <span className="text-green-600">{formatCurrency(tree.entradas)}</span>
-                  ) : (
-                    <span className="text-muted-foreground">-</span>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
-                  {tree.salidas > 0 ? (
-                    <span className="text-red-600">{formatCurrency(tree.salidas)}</span>
-                  ) : (
-                    <span className="text-muted-foreground">-</span>
-                  )}
-                </td>
-                <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${
-                  tree.balance >= 0 ? 'text-blue-600' : 'text-blue-700'
-                }`}>
-                  <div className="flex items-center justify-end">
-                    {tree.balance >= 0 ? (
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                      </svg>
-                    ) : (
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                      </svg>
-                    )}
-                    {formatCurrencyWithBadge(tree.balance)}
-                  </div>
-                </td>
-                <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${
-                  tree.todayBalance >= 0 ? 'text-orange-600' : 'text-orange-700'
-                }`}>
-                  <div className="flex items-center justify-end">
-                    {tree.todayBalance >= 0 ? (
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                      </svg>
-                    ) : (
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                      </svg>
-                    )}
-                    {formatCurrencyWithBadge(tree.todayBalance)}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                  <button
-                    onClick={() => setSelectedTreeTransactions(tree)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700 hover:text-blue-800 font-medium transition-colors cursor-pointer border border-blue-300"
-                  >
-                    <EyeIcon className="h-4 w-4" />
-                    <span>{tree.transactionCount}</span>
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-right font-medium">
+                          {tree.entradas > 0 ? (
+                            <span className="text-green-600">{formatCurrency(tree.entradas)}</span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-right font-medium">
+                          {tree.salidas > 0 ? (
+                            <span className="text-red-600">{formatCurrency(tree.salidas)}</span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </td>
+                        <td className={`px-4 py-2 whitespace-nowrap text-sm text-right font-bold ${
+                          tree.balance >= 0 ? 'text-blue-600' : 'text-blue-700'
+                        }`}>
+                          <div className="flex items-center justify-end">
+                            {tree.balance >= 0 ? (
+                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                              </svg>
+                            )}
+                            {formatCurrencyWithBadge(tree.balance)}
+                          </div>
+                        </td>
+                        {showBalanceColumns && (
+                          <td className={`px-4 py-2 whitespace-nowrap text-sm text-right font-bold ${
+                            tree.todayBalance >= 0 ? 'text-orange-600' : 'text-orange-700'
+                          }`}>
+                            <div className="flex items-center justify-end">
+                              {tree.todayBalance >= 0 ? (
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                                </svg>
+                              ) : (
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                                </svg>
+                              )}
+                              {formatCurrencyWithBadge(tree.todayBalance)}
+                            </div>
+                          </td>
+                        )}
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-right">
+                          <button
+                            onClick={() => setSelectedTreeTransactions(tree)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700 hover:text-blue-800 font-medium transition-colors cursor-pointer border border-blue-300"
+                          >
+                            <EyeIcon className="h-4 w-4" />
+                            <span>{tree.transactionCount}</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })}
       </div>
-
-      {calculateTreeComparison().length === 0 && (
-        <div className="text-center py-8 text-muted-foreground">
-          <p className="text-sm">No hay árboles con transacciones mixtas en el período seleccionado</p>
-          <p className="text-xs mt-2">Los árboles tipo 'ambos' aparecerán aquí agrupados por semana cuando tengan transacciones</p>
-        </div>
-      )}
 
       {/* Modal de Transacciones de Árbol Mixto */}
       {selectedTreeTransactions && (() => {
@@ -379,7 +406,7 @@ const TreeComparisonSection = ({
           </div>
         );
       })()}
-    </div>
+    </>
   );
 };
 

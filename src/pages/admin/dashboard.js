@@ -14,6 +14,7 @@ import { subconceptService } from "../../lib/services/subconceptService";
 import { recurringExpenseService } from "../../lib/services/recurringExpenseService";
 import { reportService } from "../../lib/services/reportService";
 import TreeComparisonSection from "../../components/reports/TreeComparisonSection";
+import WeeklyBreakdownCombined from "../../components/reports/WeeklyBreakdownCombined";
 import WeeklyBreakdownEntradas from "../../components/reports/WeeklyBreakdownEntradas";
 import WeeklyBreakdownSalidas from "../../components/reports/WeeklyBreakdownSalidas";
 import { formatCurrency, formatCurrencyWithBadge, calculateTreeComparison, getTreeBalanceByName, isAmboTree } from "../../lib/utils/reportUtils";
@@ -370,6 +371,20 @@ const Dashboard = () => {
               formatCurrency={formatCurrency}
               formatCurrencyWithBadge={formatCurrencyWithBadge}
               subconcepts={subconcepts}
+              generals={generals}
+            />
+
+            {/* Weekly Breakdown Combined (Entradas + Salidas) */}
+            <WeeklyBreakdownCombined
+              stats={stats}
+              currentMonthName={currentMonthName}
+              transactions={transactionsReport}
+              generals={generals}
+              concepts={concepts}
+              subconcepts={subconcepts}
+              filters={filters}
+              currentDate={currentDate}
+              formatCurrency={formatCurrency}
             />
 
             {/* Weekly Breakdown for Entradas */}

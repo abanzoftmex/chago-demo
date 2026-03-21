@@ -149,21 +149,31 @@ export const generalService = {
     }
   },
 
-  // Soft delete general (set isActive to false)
+  // Delete general — blocked if it has associated transactions
   async delete(id, tenantId, user = null) {
+    if (!tenantId) {
+      throw new Error('Tenant ID es requerido');
+    }
+
+    // Permission check
+    const userRole = user?.role || user?.userRole;
+    if (user && ['contador', 'director_general'].includes(userRole)) {
+      throw new Error("No tienes permisos para eliminar categorías generales");
+    }
+
+    // Block deletion if there are transactions referencing this general
+    const hasTransactions = await this.hasAssociatedTransactions(id, tenantId);
+    if (hasTransactions) {
+      throw new Error(
+        'No es posible eliminar este General porque tiene transacciones asociadas. ' +
+        'Para eliminarlo, primero elimina o reasigna las transacciones que lo utilizan.'
+      );
+    }
+
     try {
-      if (!tenantId) {
-        throw new Error('Tenant ID es requerido');
-      }
-      
-      // Check if user has permission to delete (contador and director_general roles cannot delete)
-      const userRole = user?.role || user?.userRole;
-      if (user && ['contador', 'director_general'].includes(userRole)) {
-        throw new Error("No tienes permisos para eliminar categorías generales");
-      }
       // Check if general has associated concepts
       const hasConcepts = await this.hasAssociatedConcepts(id, tenantId);
-      
+
       if (hasConcepts) {
         // Soft delete - just deactivate
         await this.update(id, { isActive: false }, tenantId);
@@ -172,11 +182,11 @@ export const generalService = {
         const docRef = doc(db, getGeneralsCollection(tenantId), id);
         await deleteDoc(docRef);
       }
-      
+
       return true;
     } catch (error) {
       console.error('Error deleting general:', error);
-      throw new Error('Error al eliminar la categoría general');
+      throw new Error(error.message || 'Error al eliminar la categoría general');
     }
   },
 

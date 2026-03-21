@@ -13,6 +13,15 @@ const WeeklyBreakdownSalidas = ({
   formatCurrency
 }) => {
   const [selectedWeekDetail, setSelectedWeekDetail] = useState(null);
+  const [disabledRows, setDisabledRows] = useState(new Set());
+
+  const toggleRow = (key) => {
+    setDisabledRows(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
 
   if (!stats || !stats.weeklyBreakdown || !stats.weeklyBreakdown.weeks) {
     return null;
@@ -94,18 +103,28 @@ const WeeklyBreakdownSalidas = ({
             <tbody className="bg-background divide-y divide-border">
               {Object.entries(stats.weeklyBreakdown.salidas || {}).map(([subconcept, weekData]) => {
                 const parts = subconcept.split(' > ');
+                const isActive = !disabledRows.has(subconcept);
                 return (
-                <tr key={subconcept} className="hover:bg-muted/50">
+                <tr key={subconcept} className={`hover:bg-muted/50 transition-opacity ${!isActive ? 'opacity-40' : ''}`}>
                   <td className="px-6 py-4 text-sm text-foreground min-w-[200px] max-w-[230px]">
-                    <div className="break-words">
-                      {parts.length === 3 ? (
-                        <>
-                          <div className="font-bold text-foreground">{parts[2]}</div>
-                          <div className="font-normal text-xs text-muted-foreground mt-0.5">{parts[0]} / {parts[1]}</div>
-                        </>
-                      ) : (
-                        <span className="font-semibold">{subconcept}</span>
-                      )}
+                    <div className="flex items-start gap-2">
+                      <button
+                        onClick={() => toggleRow(subconcept)}
+                        title={isActive ? 'Desactivar fila' : 'Activar fila'}
+                        className={`mt-0.5 relative inline-flex h-4 w-7 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isActive ? 'bg-red-500' : 'bg-gray-300'}`}
+                      >
+                        <span className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isActive ? 'translate-x-3' : 'translate-x-0'}`} />
+                      </button>
+                      <div className="break-words">
+                        {parts.length === 3 ? (
+                          <>
+                            <div className="font-bold text-foreground">{parts[2]}</div>
+                            <div className="font-normal text-xs text-muted-foreground mt-0.5">{parts[0]} / {parts[1]}</div>
+                          </>
+                        ) : (
+                          <span className="font-semibold">{subconcept}</span>
+                        )}
+                      </div>
                     </div>
                   </td>
                   {stats.weeklyBreakdown.weeks.map((week, index) => {
@@ -162,8 +181,8 @@ const WeeklyBreakdownSalidas = ({
                   {/* Vacío para totales */}
                 </td>
                 {stats.weeklyBreakdown.weeks.map((week, index) => {
-                  const weekTotal = Object.values(stats.weeklyBreakdown.salidas || {}).reduce(
-                    (sum, data) => sum + (data[`week${index + 1}`] || 0),
+                  const weekTotal = Object.entries(stats.weeklyBreakdown.salidas || {}).reduce(
+                    (sum, [key, data]) => disabledRows.has(key) ? sum : sum + (data[`week${index + 1}`] || 0),
                     0
                   );
                   return (
@@ -173,7 +192,10 @@ const WeeklyBreakdownSalidas = ({
                   );
                 })}
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-red-800 bg-red-200">
-                  {formatCurrency(stats.totalSalidas || 0)}
+                  {formatCurrency(Object.entries(stats.weeklyBreakdown.salidas || {}).reduce(
+                    (sum, [key, data]) => disabledRows.has(key) ? sum : sum + (data.total || 0),
+                    0
+                  ))}
                 </td>
               </tr>
             </tbody>

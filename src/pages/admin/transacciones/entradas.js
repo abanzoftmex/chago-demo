@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/router";
-import Link from "next/link";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import TransactionForm from "../../../components/forms/TransactionForm";
 import TransactionCsvImportModal from "../../../components/forms/TransactionCsvImportModal";
@@ -22,6 +21,8 @@ import {
   ArrowUpTrayIcon
 } from '@heroicons/react/24/outline';
 
+const ITEMS_PER_PAGE = 20;
+
 const Ingresos = () => {
   const router = useRouter();
   const { tenantInfo, TENANT_ROLES } = useAuth();
@@ -35,16 +36,20 @@ const Ingresos = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [currentMonthName, setCurrentMonthName] = useState("");
   const [showImportModal, setShowImportModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const toast = useToast();
 
   // Check permissions based on user role in tenant
   const canManageTransactions = TENANT_ROLES && (tenantInfo?.role === TENANT_ROLES.ADMIN || tenantInfo?.role === TENANT_ROLES.CONTADOR);
-  const canDeleteTransactions = TENANT_ROLES && tenantInfo?.role === TENANT_ROLES.ADMIN;
 
   // Memoize tenantId to prevent unnecessary re-renders
   const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
+
+  const currentMonthName = useMemo(() => {
+    const monthName = currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    return monthName.charAt(0).toUpperCase() + monthName.slice(1);
+  }, [currentDate]);
 
   const loadTransactions = useCallback(async () => {
     try {
@@ -63,18 +68,9 @@ const Ingresos = () => {
 
       const transactionQuery = { 
         type: "entrada", 
-        limit: 10,
         startDate: startOfMonth,
         endDate: endOfMonth
       };
-
-      console.log("📊 Cargando transacciones con tenantId:", tenantId);
-      console.log("📊 Servicios disponibles:", { 
-        transactionService: !!transactionService,
-        conceptService: !!conceptService,
-        generalService: !!generalService,
-        subconceptService: !!subconceptService
-      });
 
       const [transactionsData, conceptsData, generalsData, subconceptsData] = await Promise.all(
         [
@@ -89,17 +85,16 @@ const Ingresos = () => {
       setGenerals(generalsData);
       setSubconcepts(subconceptsData);
 
-      // Cargar pagos para todas las transacciones
+      // Cargar pagos de todas las transacciones en paralelo
+      const paymentsResults = await Promise.all(
+        transactionsData.map(t =>
+          paymentService.getByTransaction(t.id, tenantId).catch(() => [])
+        )
+      );
       const paymentsData = {};
-      for (const transaction of transactionsData) {
-        try {
-          const payments = await paymentService.getByTransaction(transaction.id, tenantId);
-          paymentsData[transaction.id] = payments || [];
-        } catch (err) {
-          console.error(`Error loading payments for transaction ${transaction.id}:`, err);
-          paymentsData[transaction.id] = [];
-        }
-      }
+      transactionsData.forEach((t, i) => {
+        paymentsData[t.id] = paymentsResults[i] || [];
+      });
       setPaymentsMap(paymentsData);
     } catch (error) {
       console.error("Error loading transactions:", error);
@@ -109,21 +104,15 @@ const Ingresos = () => {
     }
   }, [toast, currentDate, tenantId]);
 
-  const updateMonthName = useCallback(() => {
-    const monthName = currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-    setCurrentMonthName(monthName.charAt(0).toUpperCase() + monthName.slice(1));
-  }, [currentDate]);
-
   useEffect(() => {
-    // Only load transactions if we have tenant info
     if (tenantId) {
       loadTransactions();
-      updateMonthName();
     }
-  }, [loadTransactions, updateMonthName, tenantId]);
+  }, [loadTransactions, tenantId]);
 
   const handleDateChange = (newDate) => {
     setCurrentDate(newDate);
+    setCurrentPage(1);
   };
 
   const handleTransactionSuccess = (transaction) => {
@@ -155,18 +144,18 @@ const Ingresos = () => {
     router.push(`/admin/transacciones/editar/${transaction.id}`);
   };
 
-  const getGeneralName = (generalId, transaction = null) => {
+  const getGeneralName = (generalId) => {
     if (!generalId) return "N/A";
     const general = generals.find((g) => g.id === generalId);
     return general ? general.name : "N/A";
   };
 
-  const getConceptName = (conceptId, transaction = null) => {
+  const getConceptName = (conceptId) => {
     const concept = concepts.find((c) => c.id === conceptId);
     return concept ? concept.name : "N/A";
   };
 
-  const getSubconceptName = (subconceptId, transaction = null) => {
+  const getSubconceptName = (subconceptId) => {
     if (!subconceptId) return null;
     const subconcept = subconcepts.find((s) => s.id === subconceptId);
     return subconcept ? subconcept.name : null;
@@ -216,8 +205,6 @@ const Ingresos = () => {
     const payments = paymentsMap[transaction.id] || [];
     return payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
   };
-
-
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("es-MX", {
@@ -330,69 +317,42 @@ const Ingresos = () => {
     router.push(`/admin/transacciones/detalle/${transactionId}`);
   };
 
-  const exportToCSV = async () => {
+  const exportToCSV = () => {
     try {
       if (!tenantId) {
         toast.error('Error: No se ha identificado el tenant');
         return;
       }
 
-      // Obtener todas las transacciones del mes sin límite
-      const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-      const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
-
-      const transactionQuery = {
-        type: "entrada",
-        startDate: startOfMonth,
-        endDate: endOfMonth
-      };
-
-      const allTransactions = await transactionService.getAll(transactionQuery, tenantId);
-
-      // Crear headers del CSV
-      const headers = [
-        'Fecha',
-        'General', 
-        'Concepto',
-        'Subconcepto',
-        'Descripción',
-        'Monto',
-        'Estado'
-      ];
-
-      // Convertir transacciones a formato CSV
-      const csvData = allTransactions.map(transaction => [
+      const headers = ['Fecha', 'General', 'Concepto', 'Subconcepto', 'Descripción', 'Monto', 'Estado'];
+      const csvData = transactions.map(transaction => [
         formatDate(transaction.date),
         getGeneralName(transaction.generalId),
-        getConceptName(transaction.conceptId), 
+        getConceptName(transaction.conceptId),
         getSubconceptName(transaction.subconceptId) || '',
         transaction.description || '',
         transaction.amount || 0,
         transaction.status || 'pendiente'
       ]);
 
-      // Combinar headers con datos
-      const fullCsvData = [headers, ...csvData];
+      const csvContent = [headers, ...csvData]
+        .map(row => row.map(cell => `"${cell.toString().replace(/"/g, '""')}"`).join(','))
+        .join('\n');
 
-      // Convertir a string CSV
-      const csvContent = fullCsvData.map(row => 
-        row.map(cell => `"${cell.toString().replace(/"/g, '""')}"`).join(',')
-      ).join('\n');
-
-      // Descargar archivo
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
       link.setAttribute('href', url);
-      
+
       const monthYear = currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
       const tenantName = tenantInfo?.name ? `_${tenantInfo.name.replace(/\s+/g, '_')}` : '';
       link.setAttribute('download', `entradas_${monthYear.replace(' ', '_')}${tenantName}.csv`);
-      
+
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(url);
 
       toast.success('Archivo CSV exportado exitosamente');
     } catch (error) {
@@ -407,7 +367,7 @@ const Ingresos = () => {
       reader.onload = async (e) => {
         try {
           const csvText = e.target.result;
-          const lines = csvText.trim().split('\n');
+          const lines = csvText.trim().split(/\r?\n/);
           
           if (lines.length <= 1) {
             throw new Error('El archivo CSV está vacío o solo contiene headers');
@@ -550,21 +510,15 @@ const Ingresos = () => {
     });
   };
 
-  const filteredTransactions = transactions.filter((transaction) => {
-    // Si hay un término de búsqueda, filtrar por él
+  const filteredTransactions = useMemo(() => transactions.filter((transaction) => {
     if (searchTerm) {
       const query = searchTerm.toLowerCase();
-      
-      // Buscar en el árbol jerárquico completo
-      const generalName = getGeneralName(transaction.generalId, transaction).toLowerCase();
-      const conceptName = getConceptName(transaction.conceptId, transaction).toLowerCase();
-      const subconceptName = (getSubconceptName(transaction.subconceptId, transaction) || "").toLowerCase();
-      
-      // Otros campos
+      const generalName = getGeneralName(transaction.generalId).toLowerCase();
+      const conceptName = getConceptName(transaction.conceptId).toLowerCase();
+      const subconceptName = (getSubconceptName(transaction.subconceptId) || "").toLowerCase();
       const description = (transaction.description || "").toLowerCase();
       const amountStr = (transaction.amount ?? "").toString();
       const statusStr = (transaction.status ?? "").toString().toLowerCase();
-      
       return (
         generalName.includes(query) ||
         conceptName.includes(query) ||
@@ -575,7 +529,23 @@ const Ingresos = () => {
       );
     }
     return true;
-  });
+  }), [transactions, searchTerm, generals, concepts, subconcepts]);
+
+  const sortedTransactions = useMemo(() =>
+    [...filteredTransactions].sort((a, b) => {
+      const statusOrder = { pendiente: 1, parcial: 2, pagado: 3 };
+      return statusOrder[a.status] - statusOrder[b.status];
+    }),
+  [filteredTransactions]);
+
+  const totalPages = Math.ceil(sortedTransactions.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const currentTransactions = sortedTransactions.slice(startIndex, endIndex);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
 
   return (
     <ProtectedRoute>
@@ -588,6 +558,26 @@ const Ingresos = () => {
         ]}
       >
         <div className="space-y-6">
+          {/* Top-right utility buttons */}
+          {canManageTransactions && (
+            <div className="flex justify-end gap-1.5">
+              <button
+                onClick={exportToCSV}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
+              >
+                <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                Exportar CSV
+              </button>
+              <button
+                onClick={() => setShowImportModal(true)}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-md hover:bg-purple-100 transition-colors"
+              >
+                <ArrowUpTrayIcon className="h-3.5 w-3.5" />
+                Importar CSV
+              </button>
+            </div>
+          )}
+
           {/* Header with action button */}
           <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-6 border border-green-200">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
@@ -605,6 +595,7 @@ const Ingresos = () => {
                       onDateChange={handleDateChange}
                       onSuccess={toast.success}
                       onError={toast.error}
+                      accentColor="green"
                     />
                   </div>
                   <p className="text-gray-600 mt-1">
@@ -614,20 +605,6 @@ const Ingresos = () => {
               </div>
               {!showForm && canManageTransactions && (
                 <div className="flex gap-3">
-                  <button
-                    onClick={exportToCSV}
-                    className="px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 focus:ring-4 focus:ring-blue-500/20 focus:ring-offset-2 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl font-medium"
-                  >
-                    <ArrowDownTrayIcon className="h-4 w-4 mr-1.5" />
-                    Exportar CSV
-                  </button>
-                  <button
-                    onClick={() => setShowImportModal(true)}
-                    className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 focus:ring-4 focus:ring-purple-500/20 focus:ring-offset-2 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl font-medium"
-                  >
-                    <ArrowUpTrayIcon className="h-4 w-4 mr-1.5" />
-                    Importar CSV
-                  </button>
                   <button
                     onClick={handleNewTransaction}
                     className="px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 focus:ring-4 focus:ring-green-500/20 focus:ring-offset-2 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl font-medium"
@@ -689,8 +666,7 @@ const Ingresos = () => {
                         Entradas Recientes
                       </h3>
                       <p className="text-sm text-gray-600">
-                        Últimos {Math.min(filteredTransactions.length, 10)}{" "}
-                        entradas registradas
+                        {sortedTransactions.length} entradas registradas
                       </p>
                     </div>
                   </div>
@@ -726,9 +702,9 @@ const Ingresos = () => {
                         <input
                           type="text"
                           value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
+                          onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                           placeholder="Buscar por general, concepto, subconcepto, descripción, monto o estado..."
-                          className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+                          className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent text-sm bg-white"
                         />
                         <svg
                           className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
@@ -750,11 +726,21 @@ const Ingresos = () => {
               </div>
 
               {loading ? (
-                <div className="p-8 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                  <p className="text-muted-foreground mt-2">
-                    Cargando entradas...
-                  </p>
+                <div className="p-12 text-center">
+                  <div className="max-w-sm mx-auto">
+                    <div className="relative">
+                      <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200 border-t-green-600 mx-auto"></div>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-8 h-8 bg-green-600 rounded-full opacity-20"></div>
+                      </div>
+                    </div>
+                    <p className="text-gray-600 mt-4 font-medium">
+                      Cargando entradas...
+                    </p>
+                    <p className="text-gray-500 text-sm mt-1">
+                      Por favor espera un momento
+                    </p>
+                  </div>
                 </div>
               ) : transactions.length === 0 ? (
                 <div className="p-8 text-center">
@@ -785,7 +771,7 @@ const Ingresos = () => {
                           <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                             Concepto
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-green-900 uppercase tracking-wider bg-green-200">
                             Monto
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -797,12 +783,7 @@ const Ingresos = () => {
                         </tr>
                       </thead>
                       <tbody className="bg-background divide-y divide-border">
-                        {filteredTransactions
-                          .sort((a, b) => {
-                            const statusOrder = { pendiente: 1, parcial: 2, pagado: 3 };
-                            return statusOrder[a.status] - statusOrder[b.status];
-                          })
-                          .slice(0, 10)
+                        {currentTransactions
                           .map((transaction) => (
                             <tr
                               key={transaction.id}
@@ -827,7 +808,7 @@ const Ingresos = () => {
                                   ))}
                                 </div>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-800 bg-green-50">
                                 {formatCurrency(transaction.amount)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
@@ -838,9 +819,8 @@ const Ingresos = () => {
                                   {canManageTransactions && (
                                     <button
                                       onClick={() => handleEditTransaction(transaction)}
-                                      className="bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center"
+                                      className="bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center cursor-pointer"
                                       title="Editar entrada"
-                                      cursor="pointer"
                                     >
                                     <PencilIcon className="h-4 w-4" />
                                     </button>
@@ -849,9 +829,8 @@ const Ingresos = () => {
                                     onClick={() =>
                                       handleViewDetails(transaction.id)
                                     }
-                                    className="bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-800 py-1.5 px-2.5 rounded-md transition-colors"
+                                    className="bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-800 py-1.5 px-2.5 rounded-md transition-colors cursor-pointer"
                                     title="Ver detalles"
-                                    cursor="pointer"
                                   >
                                     <EyeIcon className="h-4 w-4" />  
                                   </button>
@@ -865,12 +844,7 @@ const Ingresos = () => {
 
                   {/* Mobile Cards */}
                   <div className="md:hidden divide-y divide-border">
-                    {filteredTransactions
-                      .sort((a, b) => {
-                        const statusOrder = { pendiente: 1, parcial: 2, pagado: 3 };
-                        return statusOrder[a.status] - statusOrder[b.status];
-                      })
-                      .slice(0, 10)
+                    {currentTransactions
                       .map((transaction) => (
                       <div key={transaction.id} className="p-4">
                         <div className="flex justify-between items-start mb-2">
@@ -933,17 +907,98 @@ const Ingresos = () => {
                     ))}
                   </div>
 
-                  {filteredTransactions.length > 10 && (
-                    <div className="px-6 py-4 border-t border-border text-center">
-                      <p className="text-sm text-muted-foreground">
-                        Mostrando las 10 entradas más recientes.{" "}
-                        <Link
-                          href="/admin/transacciones/historial?type=entrada"
-                          className="text-primary hover:text-primary/80"
-                        >
-                          Ver historial completo
-                        </Link>
-                      </p>
+                  {totalPages > 1 && (
+                    <div className="px-6 py-4 border-t border-border">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 flex justify-between sm:hidden">
+                          <button
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 1}
+                            className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Anterior
+                          </button>
+                          <button
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages}
+                            className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Siguiente
+                          </button>
+                        </div>
+                        <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-sm text-gray-700">
+                              Mostrando{" "}
+                              <span className="font-medium">{startIndex + 1}</span> a{" "}
+                              <span className="font-medium">
+                                {Math.min(endIndex, sortedTransactions.length)}
+                              </span>{" "}
+                              de{" "}
+                              <span className="font-medium">{sortedTransactions.length}</span>{" "}
+                              resultados
+                            </p>
+                          </div>
+                          <div>
+                            <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                              <button
+                                onClick={() => handlePageChange(currentPage - 1)}
+                                disabled={currentPage === 1}
+                                className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                                <span className="sr-only">Anterior</span>
+                              </button>
+                              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                                if (
+                                  page === 1 ||
+                                  page === totalPages ||
+                                  Math.abs(page - currentPage) <= 1
+                                ) {
+                                  return (
+                                    <button
+                                      key={page}
+                                      onClick={() => handlePageChange(page)}
+                                      className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                                        page === currentPage
+                                          ? "z-10 bg-green-50 border-green-500 text-green-700"
+                                          : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
+                                      }`}
+                                    >
+                                      {page}
+                                    </button>
+                                  );
+                                } else if (
+                                  page === currentPage - 2 ||
+                                  page === currentPage + 2
+                                ) {
+                                  return (
+                                    <span
+                                      key={page}
+                                      className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700"
+                                    >
+                                      ...
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })}
+                              <button
+                                onClick={() => handlePageChange(currentPage + 1)}
+                                disabled={currentPage === totalPages}
+                                className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <span className="sr-only">Siguiente</span>
+                                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                                </svg>
+                              </button>
+                            </nav>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </>

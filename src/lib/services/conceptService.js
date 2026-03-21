@@ -178,29 +178,28 @@ export const conceptService = {
     }
   },
 
-  // Soft delete concept (set isActive to false)
+  // Delete concept — blocked if it has associated transactions
   async delete(id, tenantId) {
+    if (!tenantId) {
+      throw new Error('Tenant ID es requerido');
+    }
+
+    // Block deletion if there are transactions referencing this concept
+    const hasTransactions = await this.hasAssociatedTransactions(id, tenantId);
+    if (hasTransactions) {
+      throw new Error(
+        'No es posible eliminar este Concepto porque tiene transacciones asociadas. ' +
+        'Para eliminarlo, primero elimina o reasigna las transacciones que lo utilizan.'
+      );
+    }
+
     try {
-      if (!tenantId) {
-        throw new Error('Tenant ID es requerido');
-      }
-      
-      // Check if concept has associated transactions
-      const hasTransactions = await this.hasAssociatedTransactions(id, tenantId);
-
-      if (hasTransactions) {
-        // Soft delete - just deactivate
-        await this.update(id, { isActive: false }, tenantId);
-      } else {
-        // Hard delete if no transactions
-        const docRef = doc(db, getConceptsCollection(tenantId), id);
-        await deleteDoc(docRef);
-      }
-
+      const docRef = doc(db, getConceptsCollection(tenantId), id);
+      await deleteDoc(docRef);
       return true;
     } catch (error) {
       console.error('Error deleting concept:', error);
-      throw new Error('Error al eliminar el concepto');
+      throw new Error(error.message || 'Error al eliminar el concepto');
     }
   },
 

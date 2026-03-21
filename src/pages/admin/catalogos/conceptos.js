@@ -6,6 +6,7 @@ import MassiveCsvImportModal from "../../../components/forms/MassiveCsvImportMod
 import { conceptService } from "../../../lib/services/conceptService";
 import { generalService } from "../../../lib/services/generalService";
 import { useAuth } from "../../../context/AuthContextMultiTenant";
+import ConfirmDialog from '../../../components/ui/ConfirmDialog';
 import { 
   PencilIcon,
   TrashIcon,
@@ -32,6 +33,11 @@ export default function ConceptosPage() {
   const [filterGeneral, setFilterGeneral] = useState("all");
   const [filterType, setFilterType] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, item: null });
+  const [errorDialog, setErrorDialog] = useState({ open: false, message: '' });
+
+  const ITEMS_PER_PAGE = 20;
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -80,24 +86,19 @@ export default function ConceptosPage() {
     setIsModalOpen(true);
   };
 
-  const handleDeleteConcept = async (concept) => {
-    if (
-      !confirm(
-        `¿Estás seguro de que deseas eliminar el concepto "${concept.name}"?`
-      )
-    ) {
-      return;
-    }
+  const handleDeleteConcept = (concept) => {
+    setDeleteDialog({ open: true, item: concept });
+  };
 
+  const confirmDeleteConcept = async () => {
+    const concept = deleteDialog.item;
+    setDeleteDialog({ open: false, item: null });
     try {
-      if (!tenantId) {
-        throw new Error('No tenant ID available');
-      }
-      
+      if (!tenantId) throw new Error('No tenant ID available');
       await conceptService.delete(concept.id, tenantId);
-      await loadData(); // Reload the list
+      await loadData();
     } catch (error) {
-      alert(`Error al eliminar el concepto: ${error.message}`);
+      setErrorDialog({ open: true, message: error.message });
     }
   };
 
@@ -117,6 +118,15 @@ export default function ConceptosPage() {
     const matchesSearch = concept.name.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesGeneralFilter && matchesTypeFilter && matchesSearch;
   });
+
+  const totalPages = Math.ceil(filteredConcepts.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedConcepts = filteredConcepts.slice(startIndex, endIndex);
+
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) setCurrentPage(page);
+  };
 
   const breadcrumbs = [
     { label: "Dashboard", href: "/admin/dashboard" },
@@ -177,7 +187,7 @@ export default function ConceptosPage() {
                 <select
                   id="filterGeneral"
                   value={filterGeneral}
-                  onChange={(e) => setFilterGeneral(e.target.value)}
+                  onChange={(e) => { setFilterGeneral(e.target.value); setCurrentPage(1); }}
                   className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-blue-500"
                 >
                   <option value="all">Todos los generales</option>
@@ -198,7 +208,7 @@ export default function ConceptosPage() {
                 <select
                   id="filterType"
                   value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
+                  onChange={(e) => { setFilterType(e.target.value); setCurrentPage(1); }}
                   className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-blue-500"
                 >
                   <option value="all">Todos los tipos</option>
@@ -220,7 +230,7 @@ export default function ConceptosPage() {
                 type="text"
                 id="search"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                 placeholder="Buscar conceptos..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-blue-500"
               />
@@ -318,7 +328,7 @@ export default function ConceptosPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredConcepts.map((concept) => {
+                    paginatedConcepts.map((concept) => {
                       const general = generals.find(g => g.id === concept.generalId);
                       return (
                         <tr key={concept.id} className="hover:bg-gray-50">
@@ -381,6 +391,29 @@ export default function ConceptosPage() {
                 </tbody>
               </table>
             </div>
+            <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between">
+              <p className="text-sm text-gray-700">
+                Mostrando <span className="font-medium">{filteredConcepts.length === 0 ? 0 : startIndex + 1}</span> a <span className="font-medium">{Math.min(endIndex, filteredConcepts.length)}</span> de <span className="font-medium">{filteredConcepts.length}</span> resultados
+              </p>
+              {totalPages > 1 && (
+                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                  <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                    if (page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1) {
+                      return (<button key={page} onClick={() => handlePageChange(page)} className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${page === currentPage ? 'z-10 bg-orange-50 border-orange-500 text-orange-700' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'}`}>{page}</button>);
+                    } else if (page === currentPage - 2 || page === currentPage + 2) {
+                      return (<span key={page} className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">...</span>);
+                    }
+                    return null;
+                  })}
+                  <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
+                  </button>
+                </nav>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -394,13 +427,29 @@ export default function ConceptosPage() {
         generals={generals}
       />
 
-
-      
       {/* Massive CSV Import Modal */}
       <MassiveCsvImportModal
         isOpen={isMassiveImportModalOpen}
         onClose={() => setIsMassiveImportModalOpen(false)}
         onSuccess={handleMassiveImportSuccess}
+      />
+
+      <ConfirmDialog
+        isOpen={deleteDialog.open}
+        type="confirm"
+        title="Eliminar Concepto"
+        message={`¿Estás seguro de que deseas eliminar el concepto "${deleteDialog.item?.name}"? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        onConfirm={confirmDeleteConcept}
+        onClose={() => setDeleteDialog({ open: false, item: null })}
+      />
+
+      <ConfirmDialog
+        isOpen={errorDialog.open}
+        type="error"
+        title="No se puede eliminar"
+        message={errorDialog.message}
+        onClose={() => setErrorDialog({ open: false, message: '' })}
       />
     </AdminLayout>
   );

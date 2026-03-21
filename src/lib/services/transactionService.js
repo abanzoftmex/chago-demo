@@ -295,57 +295,51 @@ export const transactionService = {
   async getByDateRange(startDate, endDate, filters = {}, tenantId = null) {
     try {
       const collectionPath = getTransactionsCollection(tenantId);
-      let q = collection(db, collectionPath);
 
-      // Apply date range filter
-      q = query(
-        q,
+      // Only filter by date range in Firestore to avoid requiring composite indexes.
+      // All additional equality filters (generalId, conceptId, type, etc.) are applied
+      // client-side after fetching, since combining a range filter with equality
+      // filters on different fields requires a composite index per combination.
+      const q = query(
+        collection(db, collectionPath),
         where("date", ">=", startDate),
-        where("date", "<=", endDate)
+        where("date", "<=", endDate),
+        orderBy("date", "desc")
       );
 
-      // Apply additional filters
-      if (filters.type) {
-        q = query(q, where("type", "==", filters.type));
-      }
-
-      if (filters.providerId) {
-        q = query(q, where("providerId", "==", filters.providerId));
-      }
-
-      if (filters.generalId) {
-        q = query(q, where("generalId", "==", filters.generalId));
-      }
-
-      if (filters.conceptId) {
-        q = query(q, where("conceptId", "==", filters.conceptId));
-      }
-
-      if (filters.subconceptId) {
-        q = query(q, where("subconceptId", "==", filters.subconceptId));
-      }
-
-      if (filters.status) {
-        q = query(q, where("status", "==", filters.status));
-      }
-
-      if (filters.division) {
-        q = query(q, where("division", "==", filters.division));
-      }
-
-      q = query(q, orderBy("date", "desc"));
-
       const querySnapshot = await getDocs(q);
-      const transactions = [];
+      let transactions = [];
 
       querySnapshot.forEach((doc) => {
         transactions.push({ id: doc.id, ...doc.data() });
       });
 
+      // Client-side filtering for all equality filters
+      if (filters.type) {
+        transactions = transactions.filter(t => t.type === filters.type);
+      }
+      if (filters.generalId) {
+        transactions = transactions.filter(t => t.generalId === filters.generalId);
+      }
+      if (filters.conceptId) {
+        transactions = transactions.filter(t => t.conceptId === filters.conceptId);
+      }
+      if (filters.subconceptId) {
+        transactions = transactions.filter(t => t.subconceptId === filters.subconceptId);
+      }
+      if (filters.providerId) {
+        transactions = transactions.filter(t => t.providerId === filters.providerId);
+      }
+      if (filters.status) {
+        transactions = transactions.filter(t => t.status === filters.status);
+      }
+      if (filters.division) {
+        transactions = transactions.filter(t => t.division === filters.division);
+      }
+
       return transactions;
     } catch (error) {
       console.error("Error getting transactions by date range:", error);
-      // En modo demo, retornar array vacío en lugar de error
       return [];
     }
   },
@@ -639,39 +633,15 @@ export const transactionService = {
   async getStatsByDateRange(startDate, endDate, filters = {}, tenantId = null) {
     try {
       const collectionPath = getTransactionsCollection(tenantId);
-      let q = collection(db, collectionPath);
 
-      // Apply date range filter
-      q = query(
-        q,
+      // Only filter by date range in Firestore to avoid composite index requirements.
+      // Equality filters are applied client-side after fetching.
+      const q = query(
+        collection(db, collectionPath),
         where("date", ">=", startDate),
-        where("date", "<=", endDate)
+        where("date", "<=", endDate),
+        orderBy("date", "desc")
       );
-
-      // Apply additional filters (except status - we need all statuses for counting)
-      if (filters.type) {
-        q = query(q, where("type", "==", filters.type));
-      }
-
-      if (filters.providerId) {
-        q = query(q, where("providerId", "==", filters.providerId));
-      }
-
-      if (filters.generalId) {
-        q = query(q, where("generalId", "==", filters.generalId));
-      }
-
-      if (filters.conceptId) {
-        q = query(q, where("conceptId", "==", filters.conceptId));
-      }
-
-      if (filters.subconceptId) {
-        q = query(q, where("subconceptId", "==", filters.subconceptId));
-      }
-
-      if (filters.division) {
-        q = query(q, where("division", "==", filters.division));
-      }
 
       const querySnapshot = await getDocs(q);
 
@@ -683,11 +653,18 @@ export const transactionService = {
         total: 0
       };
 
-      // Count each transaction by status
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        const status = data.status || 'pendiente'; // Default to pendiente if no status
 
+        // Apply equality filters client-side
+        if (filters.type && data.type !== filters.type) return;
+        if (filters.providerId && data.providerId !== filters.providerId) return;
+        if (filters.generalId && data.generalId !== filters.generalId) return;
+        if (filters.conceptId && data.conceptId !== filters.conceptId) return;
+        if (filters.subconceptId && data.subconceptId !== filters.subconceptId) return;
+        if (filters.division && data.division !== filters.division) return;
+
+        const status = data.status || "pendiente";
         if (stats.hasOwnProperty(status)) {
           stats[status]++;
         }

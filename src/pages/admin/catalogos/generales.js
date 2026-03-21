@@ -5,6 +5,7 @@ import GeneralModal from "../../../components/forms/GeneralModal";
 import MassiveCsvImportModal from "../../../components/forms/MassiveCsvImportModal";
 import { generalService } from "../../../lib/services/generalService";
 import { useAuth } from '../../../context/AuthContextMultiTenant';
+import ConfirmDialog from '../../../components/ui/ConfirmDialog';
 import { 
   PencilIcon,
   TrashIcon,
@@ -12,21 +13,18 @@ import {
   PlusIcon,
 } from '@heroicons/react/24/outline';
 
+const breadcrumbs = [
+  { label: "Dashboard", href: "/admin/dashboard" },
+  { label: "Catálogos", href: "#" },
+  { label: "Generales", href: "/admin/catalogos/generales" },
+];
+
 export default function GeneralesPage() {
   const { user, userRole, loading: authLoading, tenantInfo } = useAuth();
   const router = useRouter();
   
   // Memoize tenantId to prevent unnecessary re-renders
   const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
-  
-  // Debug: Log user object to check role
-  useEffect(() => {
-    if (user) {
-      console.log('Current user object:', user);
-      console.log('User role from AuthContext:', userRole);
-      console.log('User role from user object:', user.role || user.userRole || 'No role found');
-    }
-  }, [user, userRole]);
 
   const [generals, setGenerals] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -37,17 +35,21 @@ export default function GeneralesPage() {
   const [editingGeneral, setEditingGeneral] = useState(null);
   const [filter, setFilter] = useState("all"); // all, entrada, salida
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, item: null });
+  const [errorDialog, setErrorDialog] = useState({ open: false, message: '' });
+
+  const ITEMS_PER_PAGE = 20;
 
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/login");
       return;
     }
-
-    if (user) {
+    if (user && tenantId) {
       loadGenerals();
     }
-  }, [user, authLoading, router, tenantId]);
+  }, [user, authLoading, tenantId]);
 
   const loadGenerals = async () => {
     try {
@@ -80,56 +82,48 @@ export default function GeneralesPage() {
     setIsModalOpen(true);
   };
 
-  const handleDeleteGeneral = async (general) => {
-    if (
-      !confirm(
-        `¿Estás seguro de que deseas eliminar el general "${general.name}"?`
-      )
-    ) {
-      return;
-    }
+  const handleDeleteGeneral = (general) => {
+    setDeleteDialog({ open: true, item: general });
+  };
 
+  const confirmDeleteGeneral = async () => {
+    const general = deleteDialog.item;
+    setDeleteDialog({ open: false, item: null });
     try {
-      if (!tenantId) {
-        throw new Error('No tenant ID available');
-      }
-      
+      if (!tenantId) throw new Error('No tenant ID available');
       await generalService.delete(general.id, tenantId, { role: user.userRole });
-      await loadGenerals(); // Reload the list
+      await loadGenerals();
     } catch (error) {
-      alert(`Error al eliminar el general: ${error.message}`);
+      setErrorDialog({ open: true, message: error.message });
     }
   };
 
-  const handleModalSuccess = async (generalData) => {
-    await loadGenerals(); // Reload the list
+  const handleModalSuccess = async () => {
+    await loadGenerals();
   };
 
+  const handleMassiveImportSuccess = handleModalSuccess;
 
-
-  const handleMassiveImportSuccess = async () => {
-    await loadGenerals(); // Reload the list after massive import
-  };
-
-  const filteredGenerals = generals.filter((general) => {
+  const filteredGenerals = useMemo(() => generals.filter((general) => {
     const matchesFilter = filter === "all" || general.type === filter;
-    const matchesSearch = general.name
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
+    const matchesSearch = general.name.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesFilter && matchesSearch;
-  });
+  }), [generals, filter, searchTerm]);
 
-  const breadcrumbs = [
-    { label: "Dashboard", href: "/admin/dashboard" },
-    { label: "Catálogos", href: "#" },
-    { label: "Generales", href: "/admin/catalogos/generales" },
-  ];
+  const totalPages = Math.ceil(filteredGenerals.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedGenerals = filteredGenerals.slice(startIndex, endIndex);
+
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) setCurrentPage(page);
+  };
 
   if (authLoading) {
     return (
       <AdminLayout title="Generales" breadcrumbs={breadcrumbs}>
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
         </div>
       </AdminLayout>
     );
@@ -179,7 +173,7 @@ export default function GeneralesPage() {
                 <select
                   id="filter"
                   value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
+                  onChange={(e) => { setFilter(e.target.value); setCurrentPage(1); }}
                   className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500"
                 >
                   <option value="all">Todos</option>
@@ -201,9 +195,9 @@ export default function GeneralesPage() {
                 type="text"
                 id="search"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                 placeholder="Buscar generales..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
               />
             </div>
           </div>
@@ -213,7 +207,7 @@ export default function GeneralesPage() {
         {loading ? (
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
             </div>
           </div>
         ) : error ? (
@@ -261,6 +255,9 @@ export default function GeneralesPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Fecha de Creación
                     </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Saldo anterior/actual
+                    </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Acciones
                     </th>
@@ -269,7 +266,7 @@ export default function GeneralesPage() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredGenerals.length === 0 ? (
                     <tr>
-                      <td colSpan="4" className="px-6 py-12 text-center">
+                      <td colSpan="5" className="px-6 py-12 text-center">
                         <div className="text-gray-500">
                           <svg
                             className="mx-auto h-12 w-12 mb-4"
@@ -296,7 +293,7 @@ export default function GeneralesPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredGenerals.map((general) => (
+                    paginatedGenerals.map((general) => (
                       <tr key={general.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-bold text-gray-900">
@@ -323,22 +320,32 @@ export default function GeneralesPage() {
                                 .toLocaleDateString("es-ES")
                             : "N/A"}
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          {general.hasPreviousBalance ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                              Sí
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+                              No
+                            </span>
+                          )}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex items-center justify-end space-x-2">
                             <button
                               onClick={() => handleEditGeneral(general)}
-                              className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center"
+                              className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center cursor-pointer"
                               title="Editar general"
-                              cursor="pointer"
                             >
                               <PencilIcon className="h-4 w-4" />
                             </button>
                             {userRole !== 'contador' && userRole !== 'director_general' && (
                               <button
                                 onClick={() => handleDeleteGeneral(general)}
-                                  className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center"
+                                  className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center cursor-pointer"
                                   title="Eliminar general"
-                                  cursor="pointer"
                               >
                                 <TrashIcon className="h-4 w-4" />
                               </button>
@@ -351,6 +358,29 @@ export default function GeneralesPage() {
                 </tbody>
               </table>
             </div>
+            <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between">
+              <p className="text-sm text-gray-700">
+                Mostrando <span className="font-medium">{filteredGenerals.length === 0 ? 0 : startIndex + 1}</span> a <span className="font-medium">{Math.min(endIndex, filteredGenerals.length)}</span> de <span className="font-medium">{filteredGenerals.length}</span> resultados
+              </p>
+              {totalPages > 1 && (
+                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                  <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                    if (page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1) {
+                      return (<button key={page} onClick={() => handlePageChange(page)} className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${page === currentPage ? 'z-10 bg-orange-50 border-orange-500 text-orange-700' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'}`}>{page}</button>);
+                    } else if (page === currentPage - 2 || page === currentPage + 2) {
+                      return (<span key={page} className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">...</span>);
+                    }
+                    return null;
+                  })}
+                  <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
+                  </button>
+                </nav>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -362,13 +392,29 @@ export default function GeneralesPage() {
         onSuccess={handleModalSuccess}
         initialData={editingGeneral}
       />
-      
 
-      
       <MassiveCsvImportModal
         isOpen={isMassiveImportModalOpen}
         onClose={() => setIsMassiveImportModalOpen(false)}
         onSuccess={handleMassiveImportSuccess}
+      />
+
+      <ConfirmDialog
+        isOpen={deleteDialog.open}
+        type="confirm"
+        title="Eliminar General"
+        message={`¿Estás seguro de que deseas eliminar el general "${deleteDialog.item?.name}"? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        onConfirm={confirmDeleteGeneral}
+        onClose={() => setDeleteDialog({ open: false, item: null })}
+      />
+
+      <ConfirmDialog
+        isOpen={errorDialog.open}
+        type="error"
+        title="No se puede eliminar"
+        message={errorDialog.message}
+        onClose={() => setErrorDialog({ open: false, message: '' })}
       />
     </AdminLayout>
   );
