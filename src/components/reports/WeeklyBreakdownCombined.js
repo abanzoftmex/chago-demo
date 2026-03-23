@@ -31,11 +31,10 @@ const WeeklyBreakdownCombined = ({
     transactions, generals, concepts, subconcepts, filters, currentDate, type: null,
   });
 
-  if (!stats || !stats.weeklyBreakdown || !stats.weeklyBreakdown.weeks) {
-    return null;
-  }
-
-  const weeks = stats.weeklyBreakdown.weeks;
+  const weeklyBreakdown = stats?.weeklyBreakdown;
+  const weeks = weeklyBreakdown?.weeks || [];
+  const entradasBreakdown = weeklyBreakdown?.entradas || {};
+  const salidasBreakdown = weeklyBreakdown?.salidas || {};
 
   // O(1) lookup maps — built once per render, shared by handleRowClick
   const generalMap = useMemo(() => Object.fromEntries(generals.map((g) => [g.id, g.name])), [generals]);
@@ -44,14 +43,18 @@ const WeeklyBreakdownCombined = ({
 
   // Combine entradas and salidas into a single ordered list
   const entradasRows = useMemo(
-    () => Object.entries(stats.weeklyBreakdown.entradas || {}).map(([subconcept, weekData]) => ({ subconcept, weekData, type: "entrada" })),
-    [stats.weeklyBreakdown.entradas]
+    () => Object.entries(entradasBreakdown).map(([subconcept, weekData]) => ({ subconcept, weekData, type: "entrada" })),
+    [entradasBreakdown]
   );
   const salidasRows = useMemo(
-    () => Object.entries(stats.weeklyBreakdown.salidas || {}).map(([subconcept, weekData]) => ({ subconcept, weekData, type: "salida" })),
-    [stats.weeklyBreakdown.salidas]
+    () => Object.entries(salidasBreakdown).map(([subconcept, weekData]) => ({ subconcept, weekData, type: "salida" })),
+    [salidasBreakdown]
   );
   const allRows = useMemo(() => [...entradasRows, ...salidasRows], [entradasRows, salidasRows]);
+
+  if (!weeklyBreakdown || weeks.length === 0) {
+    return null;
+  }
 
   const handleRowClick = (week, index, subconcept, type, amount) => {
     const weekTransactions = transactions.filter((t) => {
