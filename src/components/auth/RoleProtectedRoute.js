@@ -9,7 +9,6 @@ const RoleProtectedRoute = ({
 }) => {
   const {
     user,
-    userRole,
     roleLoading,
     loading,
     canUserAccessRoute,
@@ -67,7 +66,16 @@ const RoleProtectedRoute = ({
     };
 
     checkAuthorization();
-  }, [user, userRole, loading, roleLoading, router.pathname]);
+  }, [
+    user,
+    loading,
+    roleLoading,
+    router,
+    canUserAccessRoute,
+    checkPermission,
+    requireAll,
+    requiredPermissions,
+  ]);
 
   // Show loading while checking authentication and authorization
   if (loading || roleLoading || !authorized) {
