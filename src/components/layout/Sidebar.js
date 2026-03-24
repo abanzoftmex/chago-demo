@@ -552,21 +552,6 @@ const Sidebar = ({
                           <span className="ml-3">Historial</span>
                         </button>
                       )}
-
-                      {checkPermission("canViewHistorial") && (
-                        <button
-                          onClick={() =>
-                            handleNavigation("/admin/transacciones/historial")
-                          }
-                          className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/historial"
-                            ? "bg-[#5a5e68] text-[#ededed]"
-                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                            }`}
-                        >
-                          <ClockIcon className="h-5 w-5 flex-shrink-0" />
-                          <span className="ml-3">Historial</span>
-                        </button>
-                      )}
                     </div>
                   )}
                 </div>
@@ -762,6 +747,20 @@ const Sidebar = ({
                         }`}
                     >
                       <span className="ml-3">Registros de actividad</span>
+                    </button>
+                    <button
+                      onClick={() =>
+                        handleNavigation(
+                          "/admin/configuracion/catalogos"
+                        )
+                      }
+                      className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname ===
+                        "/admin/configuracion/catalogos"
+                        ? "bg-[#5a5e68] text-[#ededed]"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                        }`}
+                    >
+                      <span className="ml-3">Gestión de Catálogos</span>
                     </button>
                     {/* Dev Tools - Only in development */}
                     {process.env.NODE_ENV === 'development' && (

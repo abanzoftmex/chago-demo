@@ -17,6 +17,49 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline';
 
+// Clases completas (Tailwind no incluye utilidades con plantillas dinámicas tipo `bg-${color}-600`)
+const catalogCardBtnBase =
+  "w-full px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
+
+const CATALOG_UI = {
+  generales: {
+    iconBox: "bg-blue-100",
+    iconText: "text-blue-600",
+    badge: "bg-blue-100 text-blue-800",
+    exportBtn: `${catalogCardBtnBase} bg-blue-600 hover:bg-blue-700 focus-visible:ring-blue-500`,
+    importBtn: `${catalogCardBtnBase} bg-blue-500 hover:bg-blue-600 focus-visible:ring-blue-400`,
+  },
+  conceptos: {
+    iconBox: "bg-green-100",
+    iconText: "text-green-600",
+    badge: "bg-green-100 text-green-800",
+    exportBtn: `${catalogCardBtnBase} bg-green-600 hover:bg-green-700 focus-visible:ring-green-500`,
+    importBtn: `${catalogCardBtnBase} bg-green-500 hover:bg-green-600 focus-visible:ring-green-400`,
+  },
+  subconceptos: {
+    iconBox: "bg-amber-100",
+    iconText: "text-amber-700",
+    badge: "bg-amber-100 text-amber-900",
+    // Exportar más oscuro que Importar (misma familia ámbar)
+    exportBtn: `${catalogCardBtnBase} bg-amber-600 hover:bg-amber-700 focus-visible:ring-amber-600`,
+    importBtn: `${catalogCardBtnBase} bg-amber-500 hover:bg-amber-600 focus-visible:ring-amber-500`,
+  },
+  proveedores: {
+    iconBox: "bg-purple-100",
+    iconText: "text-purple-600",
+    badge: "bg-purple-100 text-purple-800",
+    exportBtn: `${catalogCardBtnBase} bg-purple-600 hover:bg-purple-700 focus-visible:ring-purple-500`,
+    importBtn: `${catalogCardBtnBase} bg-purple-500 hover:bg-purple-600 focus-visible:ring-purple-400`,
+  },
+  descripciones: {
+    iconBox: "bg-pink-100",
+    iconText: "text-pink-600",
+    badge: "bg-pink-100 text-pink-800",
+    exportBtn: `${catalogCardBtnBase} bg-pink-600 hover:bg-pink-700 focus-visible:ring-pink-500`,
+    importBtn: `${catalogCardBtnBase} bg-pink-500 hover:bg-pink-600 focus-visible:ring-pink-400`,
+  },
+};
+
 const CatalogosPage = () => {
   const { tenantInfo, TENANT_ROLES } = useAuth();
   const router = useRouter();
@@ -691,21 +734,23 @@ const CatalogosPage = () => {
           {/* Catálogos individuales */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
-              { key: 'generales', name: 'Generales', count: catalogsData.generales.length, color: 'blue' },
-              { key: 'conceptos', name: 'Conceptos', count: catalogsData.conceptos.length, color: 'green' },
-              { key: 'subconceptos', name: 'Sub-conceptos', count: catalogsData.subconceptos.length, color: 'yellow' },
-              { key: 'proveedores', name: 'Proveedores', count: catalogsData.proveedores.length, color: 'purple' },
-              { key: 'descripciones', name: 'Descripciones', count: catalogsData.descripciones.length, color: 'pink' }
-            ].map((catalog) => (
+              { key: 'generales', name: 'Generales', count: catalogsData.generales.length },
+              { key: 'conceptos', name: 'Conceptos', count: catalogsData.conceptos.length },
+              { key: 'subconceptos', name: 'Sub-conceptos', count: catalogsData.subconceptos.length },
+              { key: 'proveedores', name: 'Proveedores', count: catalogsData.proveedores.length },
+              { key: 'descripciones', name: 'Descripciones', count: catalogsData.descripciones.length },
+            ].map((catalog) => {
+              const ui = CATALOG_UI[catalog.key];
+              return (
               <div
                 key={catalog.key}
                 className="bg-white rounded-xl border border-gray-200 shadow-lg p-6"
               >
                 <div className="flex items-center justify-between mb-4">
-                  <div className={`p-3 bg-${catalog.color}-100 rounded-lg`}>
-                    <DocumentTextIcon className={`h-6 w-6 text-${catalog.color}-600`} />
+                  <div className={`p-3 rounded-lg ${ui.iconBox}`}>
+                    <DocumentTextIcon className={`h-6 w-6 ${ui.iconText}`} />
                   </div>
-                  <span className={`px-3 py-1 bg-${catalog.color}-100 text-${catalog.color}-800 text-sm font-medium rounded-full`}>
+                  <span className={`px-3 py-1 text-sm font-medium rounded-full ${ui.badge}`}>
                     {catalog.count} elementos
                   </span>
                 </div>
@@ -718,7 +763,7 @@ const CatalogosPage = () => {
                   <button
                     onClick={() => exportCatalogToCSV(catalog.key)}
                     disabled={loading || catalog.count === 0}
-                    className={`w-full px-4 py-2 bg-${catalog.color}-600 text-white rounded-lg hover:bg-${catalog.color}-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center`}
+                    className={ui.exportBtn}
                   >
                     <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
                     Exportar CSV
@@ -727,7 +772,7 @@ const CatalogosPage = () => {
                   <button
                     onClick={() => openIndividualImport(catalog.key)}
                     disabled={loading}
-                    className={`w-full px-4 py-2 bg-${catalog.color}-500 text-white rounded-lg hover:bg-${catalog.color}-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center`}
+                    className={ui.importBtn}
                   >
                     <ArrowUpTrayIcon className="h-4 w-4 mr-2" />
                     Importar CSV
@@ -742,7 +787,8 @@ const CatalogosPage = () => {
                   </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
