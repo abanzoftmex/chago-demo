@@ -201,6 +201,12 @@ service cloud.firestore {
         allow read: if isActiveTenantMember(tenantId);
         allow write: if isAdminOfTenant(tenantId);
       }
+
+      // Settings (branding, etc.) — usado por settingsService (logo en settings/branding)
+      match /settings/{settingId} {
+        allow read: if isActiveTenantMember(tenantId);
+        allow write: if isAdminOfTenant(tenantId);
+      }
       
       // ===== SUBCOLECCIÓN: LOGS AUDITORÍA =====
       

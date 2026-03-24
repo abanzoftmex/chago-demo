@@ -10,6 +10,7 @@
     "lint": "next lint",
     "setup-multi-tenant": "chmod +x scripts/setup-multi-tenant.sh && scripts/setup-multi-tenant.sh",
     "deploy-rules": "firebase deploy --only firestore:rules",
+    "deploy-storage-rules": "firebase deploy --only storage",
     "deploy-indexes": "firebase deploy --only firestore:indexes",
     "deploy-firestore": "firebase deploy --only firestore",
     "simulate-september": "node scripts/simulate-september-2025-clean.cjs simulate",

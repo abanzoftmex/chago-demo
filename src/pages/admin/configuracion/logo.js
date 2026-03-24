@@ -37,6 +37,10 @@ const ConfiguracionLogo = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!file) return;
+    if (!tenantId) {
+      toast.error("No hay una organización activa. Vuelve a iniciar sesión e inténtalo de nuevo.");
+      return;
+    }
     try {
       setSaving(true);
       const url = await settingsService.uploadLogo(file, tenantId);
@@ -121,10 +125,16 @@ const ConfiguracionLogo = () => {
               </p>
             </div>
 
+            {!tenantId && (
+              <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                No se detectó la organización. Cierra sesión y entra de nuevo, o contacta al administrador.
+              </p>
+            )}
+
             <div className="flex justify-end">
               <button
                 type="submit"
-                disabled={saving || !file}
+                disabled={saving || !file || !tenantId}
                 className="px-5 py-2.5 text-sm font-semibold text-white bg-primary rounded-md disabled:opacity-50"
               >
                 {saving ? "Subiendo..." : "Guardar logo"}
