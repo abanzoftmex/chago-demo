@@ -112,10 +112,11 @@ export const AuthProvider = ({ children }) => {
 
         if (tenantInfoResult.success) {
           setUserRoleState(tenantRole);
+          // Datos del doc del tenant después del rol: un campo `role` en el doc no debe pisar el rol en members/
           setTenantInfo({
-            role: tenantRole,
             ...tenantInfoResult.tenant,
-            id: tenantId, // always ensure id is the string tenantId, not overridden by tenant doc data
+            role: tenantRole,
+            id: tenantId,
           });
           setIsLegacyUser(false);
           console.log(`✅ Usuario multi-tenant cargado: ${tenantRole} en tenant ${tenantId}`);
@@ -279,10 +280,12 @@ export const AuthProvider = ({ children }) => {
       try {
         const result = await getTenantInfo(tenantInfo.id);
         if (result.success) {
-          setTenantInfo({
+          setTenantInfo((prev) => ({
+            ...prev,
             ...result.tenant,
-            id: tenantInfo.id, // keep the known string id last so it always wins
-          });
+            id: tenantInfo.id,
+            role: prev?.role,
+          }));
         }
       } catch (error) {
         console.error("Error refreshing tenant info:", error);

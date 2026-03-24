@@ -36,7 +36,7 @@ export const generalService = {
       const docRef = await addDoc(collection(db, getGeneralsCollection(tenantId)), {
         ...generalData,
         createdAt: serverTimestamp(),
-        isActive: true
+        isActive: generalData.isActive !== false,
       });
       
       return { id: docRef.id, ...generalData };

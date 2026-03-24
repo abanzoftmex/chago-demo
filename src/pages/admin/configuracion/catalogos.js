@@ -9,7 +9,18 @@ import { conceptService } from "../../../lib/services/conceptService";
 import { subconceptService } from "../../../lib/services/subconceptService";
 import { providerService } from "../../../lib/services/providerService";
 import { descriptionService } from "../../../lib/services/descriptionService";
-import { 
+import {
+  splitCsvLine,
+  normalizeTipoMovimiento,
+  parseSiNoCell,
+  formatGeneralCreatedAtForExport,
+  detectGeneralesCsvLayout,
+  parseGeneralesDataRow,
+  catalogByNameMap,
+  rowsToCsvString,
+  triggerDownloadBlob,
+} from "../../../lib/catalogs/catalogosHelpers";
+import {
   ArrowDownTrayIcon,
   ArrowUpTrayIcon,
   FolderOpenIcon,
@@ -60,8 +71,53 @@ const CATALOG_UI = {
   },
 };
 
+const CATALOG_CARD_DEFS = [
+  { key: "generales", name: "Generales" },
+  { key: "conceptos", name: "Conceptos" },
+  { key: "subconceptos", name: "Sub-conceptos" },
+  { key: "proveedores", name: "Proveedores" },
+  { key: "descripciones", name: "Descripciones" },
+];
+
+function ImportResultsPanel({ results }) {
+  if (!results) return null;
+  return (
+    <div className="mb-6">
+      <h4 className="font-medium text-gray-900 mb-2">Resultados de la importación:</h4>
+      <div className="bg-gray-50 border rounded-md p-4">
+        <p className="text-sm text-gray-700">
+          <span className="font-medium">Total:</span> {results.total} registros
+        </p>
+        <p className="text-sm text-green-700">
+          <span className="font-medium">Exitosos:</span> {results.successful}
+        </p>
+        {results.errors.length > 0 && (
+          <div className="mt-3">
+            <p className="text-sm font-medium text-red-700">Errores:</p>
+            <div className="mt-1 max-h-32 overflow-y-auto">
+              {results.errors.map((error, index) => (
+                <p key={index} className="text-xs text-red-600">
+                  {error}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const CatalogosPage = () => {
-  const { tenantInfo, TENANT_ROLES } = useAuth();
+  const {
+    user,
+    tenantInfo,
+    TENANT_ROLES,
+    roleLoading,
+    tenantLoading,
+    isLegacyUser,
+    checkPermission,
+  } = useAuth();
   const router = useRouter();
   const toast = useToast();
   
@@ -80,9 +136,49 @@ const CatalogosPage = () => {
 
   // Multi-tenant support
   const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
+  const tenantSlug = useMemo(
+    () => tenantInfo?.name?.replace(/[^a-zA-Z0-9]/g, "_") || "tenant",
+    [tenantInfo?.name]
+  );
 
-  // Check permissions based on user role in tenant
-  const canManageCatalogs = TENANT_ROLES && (tenantInfo?.role === TENANT_ROLES.ADMIN || tenantInfo?.role === TENANT_ROLES.CONTADOR);
+  const generalById = useMemo(() => {
+    const m = new Map();
+    for (const g of catalogsData.generales) m.set(g.id, g);
+    return m;
+  }, [catalogsData.generales]);
+
+  const conceptById = useMemo(() => {
+    const m = new Map();
+    for (const c of catalogsData.conceptos) m.set(c.id, c);
+    return m;
+  }, [catalogsData.conceptos]);
+
+  const generalByName = useMemo(
+    () => catalogByNameMap(catalogsData.generales),
+    [catalogsData.generales]
+  );
+  const conceptByName = useMemo(
+    () => catalogByNameMap(catalogsData.conceptos),
+    [catalogsData.conceptos]
+  );
+
+  const catalogCards = useMemo(
+    () =>
+      CATALOG_CARD_DEFS.map((c) => ({
+        ...c,
+        count: (catalogsData[c.key] || []).length,
+      })),
+    [catalogsData]
+  );
+
+  // Admin/contador en tenant, o usuario legacy con configuración (evita falso negativo antes de cargar rol)
+  const canManageCatalogs =
+    !!TENANT_ROLES &&
+    (tenantInfo?.role === TENANT_ROLES.ADMIN ||
+      tenantInfo?.role === TENANT_ROLES.CONTADOR ||
+      (isLegacyUser && checkPermission("canManageSettings")));
+
+  const authResolved = !!user && !roleLoading && !tenantLoading;
 
   const loadAllCatalogs = useCallback(async () => {
     try {
@@ -119,16 +215,18 @@ const CatalogosPage = () => {
   }, [toast, tenantId]);
 
   useEffect(() => {
+    // No evaluar permisos hasta que termine loadUserRole (si no, tenantInfo es null y parece "sin permiso")
+    if (!authResolved) return;
+
     if (!canManageCatalogs) {
       toast.error("No tienes permisos para gestionar catálogos");
       router.push("/admin/dashboard");
       return;
     }
-    // Only load catalogs if we have tenant info
     if (tenantId) {
       loadAllCatalogs();
     }
-  }, [canManageCatalogs, router, toast, loadAllCatalogs, tenantId]);
+  }, [authResolved, canManageCatalogs, router, toast, loadAllCatalogs, tenantId]);
 
   const exportAllCatalogs = async () => {
     try {
@@ -148,12 +246,15 @@ const CatalogosPage = () => {
           tenantName: tenantInfo?.name || 'unknown',
           version: '1.0'
         },
-        generales: catalogsData.generales.map(item => ({
+        generales: catalogsData.generales.map((item) => ({
           id: item.id,
           nombre: item.name,
-          descripcion: item.description || '',
+          tipo: item.type || '',
           tipo_movimiento: item.type || '',
-          activo: item.isActive !== false
+          descripcion: item.description || '',
+          maneja_saldo_anterior_y_actual: item.hasPreviousBalance === true,
+          activo: item.isActive !== false,
+          fecha_creacion: formatGeneralCreatedAtForExport(item),
         })),
         conceptos: catalogsData.conceptos.map(item => ({
           id: item.id,
@@ -161,7 +262,7 @@ const CatalogosPage = () => {
           descripcion: item.description || '',
           tipo_movimiento: item.type || '',
           general_id: item.generalId || '',
-          general_nombre: catalogsData.generales.find(g => g.id === item.generalId)?.name || '',
+          general_nombre: generalById.get(item.generalId)?.name || "",
           activo: item.isActive !== false
         })),
         subconceptos: catalogsData.subconceptos.map(item => ({
@@ -169,7 +270,7 @@ const CatalogosPage = () => {
           nombre: item.name,
           descripcion: item.description || '',
           concepto_id: item.conceptId || '',
-          concepto_nombre: catalogsData.conceptos.find(c => c.id === item.conceptId)?.name || '',
+          concepto_nombre: conceptById.get(item.conceptId)?.name || "",
           activo: item.isActive !== false
         })),
         proveedores: catalogsData.proveedores.map(item => ({
@@ -191,21 +292,11 @@ const CatalogosPage = () => {
 
       // Crear archivo JSON
       const jsonContent = JSON.stringify(catalogsExport, null, 2);
-      const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      
-      const timestamp = new Date().toISOString().split('T')[0];
-      const tenantName = tenantInfo?.name?.replace(/[^a-zA-Z0-9]/g, '_') || 'tenant';
-      link.setAttribute('download', `catalogos_completos_${tenantName}_${timestamp}.json`);
-      
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const blob = new Blob([jsonContent], { type: "application/json;charset=utf-8;" });
+      const timestamp = new Date().toISOString().split("T")[0];
+      triggerDownloadBlob(blob, `catalogos_completos_${tenantSlug}_${timestamp}.json`);
 
-      toast.success('Catálogos exportados exitosamente');
+      toast.success("Catálogos exportados exitosamente");
     } catch (error) {
       console.error('Error exporting catalogs:', error);
       toast.error('Error al exportar los catálogos');
@@ -222,12 +313,21 @@ const CatalogosPage = () => {
 
       switch (catalogType) {
         case 'generales':
-          headers = ['Nombre', 'Descripción', 'Tipo Movimiento', 'Activo'];
-          data = catalogsData.generales.map(item => [
+          headers = [
+            'Nombre',
+            'Tipo',
+            'Descripción',
+            'Maneja saldo anterior y actual',
+            'Activo',
+            'Fecha creación',
+          ];
+          data = catalogsData.generales.map((item) => [
             item.name,
-            item.description || '',
             item.type || '',
-            item.isActive !== false ? 'Sí' : 'No'
+            item.description || '',
+            item.hasPreviousBalance ? 'Sí' : 'No',
+            item.isActive !== false ? 'Sí' : 'No',
+            formatGeneralCreatedAtForExport(item) || '',
           ]);
           filename = 'generales';
           break;
@@ -237,7 +337,7 @@ const CatalogosPage = () => {
             item.name,
             item.description || '',
             item.type || '',
-            catalogsData.generales.find(g => g.id === item.generalId)?.name || '',
+            generalById.get(item.generalId)?.name || "",
             item.isActive !== false ? 'Sí' : 'No'
           ]);
           filename = 'conceptos';
@@ -247,7 +347,7 @@ const CatalogosPage = () => {
           data = catalogsData.subconceptos.map(item => [
             item.name,
             item.description || '',
-            catalogsData.conceptos.find(c => c.id === item.conceptId)?.name || '',
+            conceptById.get(item.conceptId)?.name || "",
             item.isActive !== false ? 'Sí' : 'No'
           ]);
           filename = 'subconceptos';
@@ -275,28 +375,11 @@ const CatalogosPage = () => {
           break;
       }
 
-      // Combinar headers con datos
       const fullCsvData = [headers, ...data];
-
-      // Convertir a string CSV
-      const csvContent = fullCsvData.map(row => 
-        row.map(cell => `"${cell.toString().replace(/"/g, '""')}"`).join(',')
-      ).join('\n');
-
-      // Descargar archivo
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      
-      const timestamp = new Date().toISOString().split('T')[0];
-      const tenantName = tenantInfo?.name?.replace(/[^a-zA-Z0-9]/g, '_') || 'tenant';
-      link.setAttribute('download', `${filename}_${tenantName}_${timestamp}.csv`);
-      
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const csvContent = rowsToCsvString(fullCsvData);
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const timestamp = new Date().toISOString().split("T")[0];
+      triggerDownloadBlob(blob, `${filename}_${tenantSlug}_${timestamp}.csv`);
 
       toast.success(`Catálogo ${filename} exportado exitosamente`);
     } catch (error) {
@@ -307,7 +390,7 @@ const CatalogosPage = () => {
 
   const handleImportFile = async (file) => {
     if (!file) {
-      alert('Por favor selecciona un archivo');
+      toast.error("Por favor selecciona un archivo");
       return;
     }
 
@@ -341,60 +424,100 @@ const CatalogosPage = () => {
         for (const item of items) {
           try {
             switch (catalogType) {
-              case 'generales':
-                await generalService.create({
-                  name: item.nombre,
-                  description: item.descripcion,
-                  type: item.tipo_movimiento || 'ambos',
-                  isActive: item.activo
-                }, tenantId);
-                break;
-              case 'conceptos':
-                // Buscar general correspondiente
-                const general = catalogsData.generales.find(g => g.name === item.general_nombre);
-                if (general) {
-                  await conceptService.create({
+              case 'generales': {
+                const tipoRaw =
+                  item.tipo_movimiento ?? item.tipo ?? item.type ?? 'ambos';
+                const saldoRaw =
+                  item.maneja_saldo_anterior_y_actual ??
+                  item.hasPreviousBalance;
+                await generalService.create(
+                  {
                     name: item.nombre,
-                    description: item.descripcion,
-                    type: item.tipo_movimiento || 'ambos',
-                    generalId: general.id,
-                    isActive: item.activo
-                  }, tenantId);
-                } else {
+                    description: item.descripcion ?? item.description ?? '',
+                    type: normalizeTipoMovimiento(tipoRaw),
+                    hasPreviousBalance:
+                      typeof saldoRaw === 'boolean'
+                        ? saldoRaw
+                        : parseSiNoCell(saldoRaw, false),
+                    isActive:
+                      typeof item.activo === 'boolean'
+                        ? item.activo
+                        : parseSiNoCell(item.activo, true),
+                  },
+                  tenantId
+                );
+                break;
+              }
+              case "conceptos": {
+                const general = generalByName.get(item.general_nombre);
+                if (!general) {
                   throw new Error(`General "${item.general_nombre}" no encontrado`);
                 }
-                break;
-              case 'subconceptos':
-                // Buscar concepto correspondiente
-                const concept = catalogsData.conceptos.find(c => c.name === item.concepto_nombre);
-                if (concept) {
-                  await subconceptService.create({
+                const tipoConcept =
+                  item.tipo_movimiento ?? item.tipo ?? item.type ?? "ambos";
+                await conceptService.create(
+                  {
                     name: item.nombre,
-                    description: item.descripcion,
-                    conceptId: concept.id,
-                    isActive: item.activo
-                  }, tenantId);
-                } else {
+                    description: item.descripcion ?? item.description ?? "",
+                    type: normalizeTipoMovimiento(tipoConcept),
+                    generalId: general.id,
+                    isActive:
+                      typeof item.activo === "boolean"
+                        ? item.activo
+                        : parseSiNoCell(item.activo, true),
+                  },
+                  tenantId
+                );
+                break;
+              }
+              case "subconceptos": {
+                const concept = conceptByName.get(item.concepto_nombre);
+                if (!concept) {
                   throw new Error(`Concepto "${item.concepto_nombre}" no encontrado`);
                 }
-                break;
-              case 'proveedores':
-                await providerService.create({
-                  name: item.nombre,
-                  contact: item.contacto,
-                  phone: item.telefono,
-                  email: item.email,
-                  address: item.direccion,
-                  isActive: item.activo
-                }, tenantId);
-                break;
-              case 'descripciones':
-                if (descriptionService?.create) {
-                  await descriptionService.create({
+                await subconceptService.create(
+                  {
                     name: item.nombre,
-                    description: item.descripcion,
-                    isActive: item.activo
-                  }, tenantId);
+                    description: item.descripcion ?? item.description ?? "",
+                    conceptId: concept.id,
+                    isActive:
+                      typeof item.activo === "boolean"
+                        ? item.activo
+                        : parseSiNoCell(item.activo, true),
+                  },
+                  tenantId
+                );
+                break;
+              }
+              case "proveedores":
+                await providerService.create(
+                  {
+                    name: item.nombre,
+                    contact: item.contacto,
+                    phone: item.telefono,
+                    email: item.email,
+                    address: item.direccion,
+                    isActive:
+                      typeof item.activo === "boolean"
+                        ? item.activo
+                        : parseSiNoCell(item.activo, true),
+                  },
+                  tenantId
+                );
+                break;
+              case "descripciones":
+                if (descriptionService?.create) {
+                  await descriptionService.create(
+                    {
+                      name: item.nombre,
+                      description: item.descripcion ?? item.description ?? "",
+                      isActive:
+                        typeof item.activo === "boolean"
+                          ? item.activo
+                          : parseSiNoCell(item.activo, true),
+                    },
+                    tenantId
+                  );
                 }
                 break;
             }
@@ -427,7 +550,7 @@ const CatalogosPage = () => {
 
   const handleImportIndividualCsv = async (file, catalogType) => {
     if (!file) {
-      alert('Por favor selecciona un archivo');
+      toast.error("Por favor selecciona un archivo");
       return;
     }
 
@@ -445,7 +568,12 @@ const CatalogosPage = () => {
         throw new Error('El archivo CSV está vacío o solo contiene headers');
       }
 
-      // Saltar la primera línea (headers)
+      const headerRow = splitCsvLine(lines[0]);
+      const generalesLayout =
+        catalogType === 'generales'
+          ? detectGeneralesCsvLayout(headerRow)
+          : null;
+
       const dataLines = lines.slice(1);
       const results = {
         total: dataLines.length,
@@ -458,95 +586,48 @@ const CatalogosPage = () => {
         const lineNumber = i + 2; // +2 porque saltamos header y empezamos en 1
         
         try {
-          // Parsear CSV considerando comillas
-          const values = [];
-          let current = '';
-          let inQuotes = false;
-          let j = 0;
-
-          while (j < line.length) {
-            const char = line[j];
-            const nextChar = line[j + 1];
-
-            if (char === '"' && inQuotes && nextChar === '"') {
-              current += '"';
-              j += 2;
-            } else if (char === '"') {
-              inQuotes = !inQuotes;
-              j++;
-            } else if (char === ',' && !inQuotes) {
-              values.push(current);
-              current = '';
-              j++;
-            } else {
-              current += char;
-              j++;
-            }
-          }
-          values.push(current); // Agregar el último valor
+          const values = splitCsvLine(line);
 
           // Validar y crear según el tipo
           switch (catalogType) {
-            case 'generales':
-              if (values.length < 3) {
-                throw new Error(`Se esperaban al menos 3 columnas (Nombre, Descripción, Tipo Movimiento), encontradas ${values.length}`);
+            case 'generales': {
+              const payload = parseGeneralesDataRow(values, generalesLayout);
+              if (!payload.name) {
+                throw new Error('El nombre es obligatorio');
               }
-              
-              const tipoMovimiento = values[2]?.trim()?.toLowerCase();
-              let finalType = 'ambos'; // valor por defecto
-              
-              if (tipoMovimiento && ['entrada', 'salida', 'ambos'].includes(tipoMovimiento)) {
-                finalType = tipoMovimiento;
-              } else if (tipoMovimiento && ['ingreso', 'gasto', 'ingreso/gasto'].includes(tipoMovimiento)) {
-                // Mapear términos alternativos
-                const mapping = {
-                  'ingreso': 'entrada',
-                  'gasto': 'salida', 
-                  'ingreso/gasto': 'ambos'
-                };
-                finalType = mapping[tipoMovimiento];
-              }
-
-              await generalService.create({
-                name: values[0]?.trim(),
-                description: values[1]?.trim() || '',
-                type: finalType,
-                isActive: values[3]?.trim()?.toLowerCase() !== 'no'
-              }, tenantId);
+              await generalService.create(
+                {
+                  name: payload.name,
+                  description: payload.description,
+                  type: payload.type,
+                  hasPreviousBalance: payload.hasPreviousBalance,
+                  isActive: payload.isActive,
+                },
+                tenantId
+              );
               break;
+            }
 
             case 'conceptos':
               if (values.length < 4) {
                 throw new Error(`Se esperaban al menos 4 columnas (Nombre, Descripción, Tipo Movimiento, General), encontradas ${values.length}`);
               }
               
-              const general = catalogsData.generales.find(g => g.name === values[3]?.trim());
+              const general = generalByName.get(values[3]?.trim());
               if (!general) {
                 throw new Error(`General "${values[3]}" no encontrado`);
               }
 
-              const tipoMovimientoConcept = values[2]?.trim()?.toLowerCase();
-              let finalTypeConcept = 'ambos'; // valor por defecto
-              
-              if (tipoMovimientoConcept && ['entrada', 'salida', 'ambos'].includes(tipoMovimientoConcept)) {
-                finalTypeConcept = tipoMovimientoConcept;
-              } else if (tipoMovimientoConcept && ['ingreso', 'gasto', 'ingreso/gasto'].includes(tipoMovimientoConcept)) {
-                // Mapear términos alternativos
-                const mapping = {
-                  'ingreso': 'entrada',
-                  'gasto': 'salida',
-                  'ingreso/gasto': 'ambos'
-                };
-                finalTypeConcept = mapping[tipoMovimientoConcept];
-              }
-
-              await conceptService.create({
-                name: values[0]?.trim(),
-                description: values[1]?.trim() || '',
-                type: finalTypeConcept,
-                generalId: general.id,
-                isActive: values[4]?.trim()?.toLowerCase() !== 'no'
-              }, tenantId);
+              await conceptService.create(
+                {
+                  name: values[0]?.trim(),
+                  description: values[1]?.trim() || "",
+                  type: normalizeTipoMovimiento(values[2]),
+                  generalId: general.id,
+                  isActive: parseSiNoCell(values[4], true),
+                },
+                tenantId
+              );
               break;
 
             case 'subconceptos':
@@ -554,17 +635,20 @@ const CatalogosPage = () => {
                 throw new Error(`Se esperaban al menos 3 columnas (Nombre, Descripción, Concepto), encontradas ${values.length}`);
               }
               
-              const concept = catalogsData.conceptos.find(c => c.name === values[2]?.trim());
+              const concept = conceptByName.get(values[2]?.trim());
               if (!concept) {
                 throw new Error(`Concepto "${values[2]}" no encontrado`);
               }
 
-              await subconceptService.create({
-                name: values[0]?.trim(),
-                description: values[1]?.trim() || '',
-                conceptId: concept.id,
-                isActive: values[3]?.trim()?.toLowerCase() !== 'no'
-              }, tenantId);
+              await subconceptService.create(
+                {
+                  name: values[0]?.trim(),
+                  description: values[1]?.trim() || "",
+                  conceptId: concept.id,
+                  isActive: parseSiNoCell(values[3], true),
+                },
+                tenantId
+              );
               break;
 
             case 'proveedores':
@@ -578,7 +662,7 @@ const CatalogosPage = () => {
                 phone: values[2]?.trim() || '',
                 email: values[3]?.trim() || '',
                 address: values[4]?.trim() || '',
-                isActive: values[5]?.trim()?.toLowerCase() !== 'no'
+                isActive: parseSiNoCell(values[5], true),
               }, tenantId);
               break;
 
@@ -591,7 +675,7 @@ const CatalogosPage = () => {
                 await descriptionService.create({
                   name: values[0]?.trim(),
                   description: values[1]?.trim() || '',
-                  isActive: values[2]?.trim()?.toLowerCase() !== 'no'
+                  isActive: parseSiNoCell(values[2], true),
                 }, tenantId);
               }
               break;
@@ -631,10 +715,10 @@ const CatalogosPage = () => {
 
     switch (catalogType) {
       case 'generales':
-        csvContent = `Nombre,Descripción,Tipo Movimiento,Activo
-"Ingresos por Cuotas","Ingresos generados por cuotas de socios","ingreso","Sí"
-"Gastos Operativos","Gastos necesarios para el funcionamiento","gasto","Sí"
-"Categoria Mixta","Categoria que puede ser ingreso o gasto","ambos","Sí"`;
+        csvContent = `Nombre,Tipo,Descripción,Maneja saldo anterior y actual,Activo,Fecha creación
+"Ingresos por Cuotas","entrada","Ingresos generados por cuotas de socios","No","Sí",""
+"Gastos Operativos","salida","Gastos necesarios para el funcionamiento","Sí","Sí",""
+"Categoría mixta","ambos","Puede usarse en entradas y salidas","No","Sí",""`;
         break;
       case 'conceptos':
         csvContent = `Nombre,Descripción,Tipo Movimiento,General,Activo
@@ -662,18 +746,9 @@ const CatalogosPage = () => {
         break;
     }
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    
-    const timestamp = new Date().toISOString().split('T')[0];
-    link.setAttribute('download', `plantilla_${catalogType}_${timestamp}.csv`);
-    
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const timestamp = new Date().toISOString().split("T")[0];
+    triggerDownloadBlob(blob, `plantilla_${catalogType}_${timestamp}.csv`);
   };
 
   const openIndividualImport = (catalogType) => {
@@ -838,29 +913,7 @@ const CatalogosPage = () => {
                   </ul>
                 </div>
 
-                {importResults && (
-                  <div className="mb-6">
-                    <h4 className="font-medium text-gray-900 mb-2">Resultados de la importación:</h4>
-                    <div className="bg-gray-50 border rounded-md p-4">
-                      <p className="text-sm text-gray-700">
-                        <span className="font-medium">Total:</span> {importResults.total} registros
-                      </p>
-                      <p className="text-sm text-green-700">
-                        <span className="font-medium">Exitosos:</span> {importResults.successful}
-                      </p>
-                      {importResults.errors.length > 0 && (
-                        <div className="mt-3">
-                          <p className="text-sm font-medium text-red-700">Errores:</p>
-                          <div className="mt-1 max-h-32 overflow-y-auto">
-                            {importResults.errors.map((error, index) => (
-                              <p key={index} className="text-xs text-red-600">{error}</p>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                <ImportResultsPanel results={importResults} />
 
                 <div className="flex justify-end">
                   <button
@@ -931,10 +984,29 @@ const CatalogosPage = () => {
                   <div className="text-sm text-yellow-700">
                     {selectedCatalogType === 'generales' && (
                       <div>
-                        <p className="font-medium">Columnas: Nombre, Descripción, Tipo Movimiento, Activo</p>
+                        <p className="font-medium">
+                          Columnas (export actual): Nombre, Tipo, Descripción, Maneja saldo anterior y
+                          actual, Activo, Fecha creación
+                        </p>
                         <ul className="mt-1 space-y-1">
-                          <li>• <strong>Tipo Movimiento:</strong> ingreso, gasto, ambos</li>
-                          <li>• <strong>Activo:</strong> Sí/No (opcional, por defecto Sí)</li>
+                          <li>
+                            • <strong>Tipo:</strong> entrada, salida, ambos (también se aceptan ingreso,
+                            gasto como en plantillas antiguas)
+                          </li>
+                          <li>
+                            • <strong>Maneja saldo anterior y actual:</strong> Sí/No — mismo criterio
+                            que en el formulario de alta (comparativa en dashboard)
+                          </li>
+                          <li>• <strong>Activo:</strong> Sí/No (por defecto Sí si se omite)</li>
+                          <li>
+                            • <strong>Fecha creación:</strong> solo informativa en la exportación; al
+                            importar se asigna la fecha actual en el sistema
+                          </li>
+                          <li>
+                            • <strong>Archivos antiguos:</strong> si la cabecera sigue siendo Nombre,
+                            Descripción, Tipo Movimiento, Activo, se importan igual (sin saldo
+                            anterior; queda en No)
+                          </li>
                         </ul>
                       </div>
                     )}
@@ -979,29 +1051,7 @@ const CatalogosPage = () => {
                   </div>
                 </div>
 
-                {importResults && (
-                  <div className="mb-6">
-                    <h4 className="font-medium text-gray-900 mb-2">Resultados de la importación:</h4>
-                    <div className="bg-gray-50 border rounded-md p-4">
-                      <p className="text-sm text-gray-700">
-                        <span className="font-medium">Total:</span> {importResults.total} registros
-                      </p>
-                      <p className="text-sm text-green-700">
-                        <span className="font-medium">Exitosos:</span> {importResults.successful}
-                      </p>
-                      {importResults.errors.length > 0 && (
-                        <div className="mt-3">
-                          <p className="text-sm font-medium text-red-700">Errores:</p>
-                          <div className="mt-1 max-h-32 overflow-y-auto">
-                            {importResults.errors.map((error, index) => (
-                              <p key={index} className="text-xs text-red-600">{error}</p>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                <ImportResultsPanel results={importResults} />
 
                 <div className="flex justify-end">
                   <button
