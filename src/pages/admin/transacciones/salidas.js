@@ -14,6 +14,17 @@ import { generalService } from "../../../lib/services/generalService";
 import { subconceptService } from "../../../lib/services/subconceptService";
 import { paymentService } from "../../../lib/services/paymentService";
 import {
+  formatDateIsoLocal,
+  parseTransactionCsvDate,
+} from "../../../lib/transactions/transactionCsvDate";
+import {
+  splitCsvLine,
+  rowsToCsvString,
+  triggerDownloadBlob,
+  catalogByNameMap,
+} from "../../../lib/catalogs/catalogosHelpers";
+import ConceptHierarchyBreadcrumb from "../../../components/transactions/ConceptHierarchyBreadcrumb";
+import {
   PlusIcon,
   ArrowTrendingDownIcon,
   PencilIcon,
@@ -23,9 +34,34 @@ import {
   TrashIcon,
   ArrowDownTrayIcon,
   ArrowUpTrayIcon,
-} from '@heroicons/react/24/outline';
+} from "@heroicons/react/24/outline";
 
 const ITEMS_PER_PAGE = 20;
+
+const SALIDA_CSV_HEADERS = [
+  "Fecha",
+  "General",
+  "Concepto",
+  "Subconcepto",
+  "Proveedor",
+  "Descripción",
+  "Monto",
+  "Estado",
+  "Notas",
+];
+
+const VALID_SALIDA_STATUSES = ["pendiente", "parcial", "pagado"];
+
+const STATUS_SORT_ORDER = { pendiente: 1, parcial: 2, pagado: 3 };
+
+const mxnCurrency = new Intl.NumberFormat("es-MX", {
+  style: "currency",
+  currency: "MXN",
+});
+
+function formatCurrencyMx(amount) {
+  return mxnCurrency.format(amount);
+}
 
 const SolicitudesPago = () => {
   const router = useRouter();
@@ -49,8 +85,48 @@ const SolicitudesPago = () => {
   const canManageTransactions = TENANT_ROLES && (tenantInfo?.role === TENANT_ROLES.ADMIN || tenantInfo?.role === TENANT_ROLES.CONTADOR);
   const canDeleteTransactions = TENANT_ROLES && tenantInfo?.role === TENANT_ROLES.ADMIN;
 
-  // Memoize tenantId to prevent unnecessary re-renders
   const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
+
+  const generalById = useMemo(() => {
+    const m = new Map();
+    for (const g of generals) m.set(g.id, g);
+    return m;
+  }, [generals]);
+
+  const conceptById = useMemo(() => {
+    const m = new Map();
+    for (const c of concepts) m.set(c.id, c);
+    return m;
+  }, [concepts]);
+
+  const subconceptById = useMemo(() => {
+    const m = new Map();
+    for (const s of subconcepts) m.set(s.id, s);
+    return m;
+  }, [subconcepts]);
+
+  const providerById = useMemo(() => {
+    const m = new Map();
+    for (const p of providers) m.set(p.id, p);
+    return m;
+  }, [providers]);
+
+  const generalByName = useMemo(
+    () => catalogByNameMap(generals),
+    [generals]
+  );
+  const conceptByName = useMemo(
+    () => catalogByNameMap(concepts),
+    [concepts]
+  );
+  const subconceptByName = useMemo(
+    () => catalogByNameMap(subconcepts),
+    [subconcepts]
+  );
+  const providerByName = useMemo(
+    () => catalogByNameMap(providers),
+    [providers]
+  );
 
   const currentMonthName = useMemo(() => {
     const monthName = currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
@@ -153,17 +229,32 @@ const SolicitudesPago = () => {
     router.push(`/admin/transacciones/editar/${transaction.id}`);
   };
 
+  const getProviderLabel = useCallback(
+    (transaction) => {
+      if (transaction?.isInitialExpense && transaction?.providerName) {
+        return transaction.providerName;
+      }
+      if (!transaction?.providerId) return "N/A";
+      return providerById.get(transaction.providerId)?.name ?? "N/A";
+    },
+    [providerById]
+  );
+
   const handleDeleteTransaction = async (transaction) => {
     if (!canDeleteTransactions) {
       toast.error("No tienes permisos para eliminar transacciones");
       return;
     }
 
-    const confirmMessage = `¿Estás seguro de eliminar esta transacción?\n\nProveedor: ${getProviderName(transaction.providerId, transaction)}\nMonto: ${formatCurrency(transaction.amount)}\nFecha: ${formatDate(transaction.date)}\n\nEsta acción no se puede deshacer.`;
-    
+    const confirmMessage = `¿Estás seguro de eliminar esta transacción?\n\nProveedor: ${getProviderLabel(transaction)}\nMonto: ${formatCurrencyMx(transaction.amount)}\nFecha: ${formatDate(transaction.date)}\n\nEsta acción no se puede deshacer.`;
+
     if (window.confirm(confirmMessage)) {
       try {
-        await transactionService.delete(transaction.id, { uid: 'admin' }, 'Eliminación manual desde interfaz');
+        await transactionService.delete(
+          transaction.id,
+          { uid: "admin" },
+          "Eliminación manual desde interfaz"
+        );
         setTransactions((prev) => prev.filter((t) => t.id !== transaction.id));
         toast.success("Transacción eliminada exitosamente");
       } catch (error) {
@@ -173,50 +264,28 @@ const SolicitudesPago = () => {
     }
   };
 
-  const getGeneralName = (generalId, transaction = null) => {
-    if (!generalId) return "N/A";
-    const general = generals.find((g) => g.id === generalId);
-    return general ? general.name : "N/A";
-  };
-
-  const getConceptName = (conceptId, transaction = null) => {
-    // Si es un gasto inicial con conceptName, usar ese nombre
-    if (transaction?.isInitialExpense && transaction?.conceptName) {
-      return transaction.conceptName;
-    }
-    
-    const concept = concepts.find((c) => c.id === conceptId);
-    return concept ? concept.name : "N/A";
-  };
-
-  const getSubconceptName = (subconceptId, transaction = null) => {
-    if (!subconceptId) return null;
-    const subconcept = subconcepts.find((s) => s.id === subconceptId);
-    return subconcept ? subconcept.name : null;
-  };
-
-  const getConceptHierarchy = (transaction) => {
-    const generalName = getGeneralName(transaction.generalId, transaction);
-    const conceptName = getConceptName(transaction.conceptId, transaction);
-    const subconceptName = getSubconceptName(transaction.subconceptId, transaction);
-
-    // Construir el árbol jerárquico
-    const hierarchy = [];
-    
-    if (generalName && generalName !== "N/A") {
-      hierarchy.push(generalName);
-    }
-    
-    if (conceptName && conceptName !== "N/A") {
-      hierarchy.push(conceptName);
-    }
-    
-    if (subconceptName) {
-      hierarchy.push(subconceptName);
-    }
-
-    return hierarchy.length > 0 ? hierarchy : ["N/A"];
-  };
+  const getConceptHierarchy = useCallback(
+    (transaction) => {
+      const hierarchy = [];
+      if (transaction.generalId) {
+        const gn = generalById.get(transaction.generalId)?.name;
+        if (gn) hierarchy.push(gn);
+      }
+      let cn = null;
+      if (transaction?.isInitialExpense && transaction?.conceptName) {
+        cn = transaction.conceptName;
+      } else if (transaction.conceptId) {
+        cn = conceptById.get(transaction.conceptId)?.name;
+      }
+      if (cn && cn !== "N/A") hierarchy.push(cn);
+      if (transaction.subconceptId) {
+        const sn = subconceptById.get(transaction.subconceptId)?.name;
+        if (sn) hierarchy.push(sn);
+      }
+      return hierarchy.length > 0 ? hierarchy : ["N/A"];
+    },
+    [generalById, conceptById, subconceptById]
+  );
 
   const getRemainingAmount = (transaction) => {
     // Usar el campo 'balance' guardado en la transacción (actualizado por updateTransactionPaymentStatus)
@@ -240,17 +309,6 @@ const SolicitudesPago = () => {
     return payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
   };
 
-  const getProviderName = (providerId, transaction = null) => {
-    // Si es un gasto inicial con providerName, usar ese nombre
-    if (transaction?.isInitialExpense && transaction?.providerName) {
-      return transaction.providerName;
-    }
-    
-    if (!providerId) return "N/A";
-    const provider = providers.find((p) => p.id === providerId);
-    return provider ? provider.name : "N/A";
-  };
-
   const getInitialExpenseBadge = (transaction) => {
     if (transaction.isInitialExpense) {
       return (
@@ -263,13 +321,6 @@ const SolicitudesPago = () => {
       );
     }
     return null;
-  };
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("es-MX", {
-      style: "currency",
-      currency: "MXN",
-    }).format(amount);
   };
 
   const formatDate = (date) => {
@@ -358,14 +409,14 @@ const SolicitudesPago = () => {
         {/* Mostrar monto pagado para estado parcial y pagado */}
         {(status === "parcial" || status === "pagado") && paidAmount > 0 && (
           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-green-50 text-green-700 border border-green-200">
-            Pagado: {formatCurrency(paidAmount)}
+            Pagado: {formatCurrencyMx(paidAmount)}
           </span>
         )}
         
         {/* Mostrar saldo pendiente para estado pendiente y parcial */}
         {(status === "pendiente" || status === "parcial") && remainingAmount > 0 && (
           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-700 border border-gray-300">
-            Saldo pendiente: {formatCurrency(remainingAmount)}
+            Saldo pendiente: {formatCurrencyMx(remainingAmount)}
           </span>
         )}
       </div>
@@ -376,41 +427,82 @@ const SolicitudesPago = () => {
     router.push(`/admin/transacciones/detalle/${transactionId}`);
   };
 
-  const filteredTransactions = useMemo(() => transactions.filter((transaction) => {
-    if (searchTerm) {
-      const query = searchTerm.toLowerCase();
-      const generalName = getGeneralName(transaction.generalId, transaction).toLowerCase();
-      const conceptName = getConceptName(transaction.conceptId, transaction).toLowerCase();
-      const subconceptName = (getSubconceptName(transaction.subconceptId, transaction) || "").toLowerCase();
-      const providerName = getProviderName(transaction.providerId, transaction).toLowerCase();
+  const filteredTransactions = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return transactions;
+    return transactions.filter((transaction) => {
+      const generalName = transaction.generalId
+        ? (generalById.get(transaction.generalId)?.name ?? "N/A")
+        : "N/A";
+      let conceptName = "N/A";
+      if (transaction?.isInitialExpense && transaction?.conceptName) {
+        conceptName = transaction.conceptName;
+      } else if (transaction.conceptId) {
+        conceptName = conceptById.get(transaction.conceptId)?.name ?? "N/A";
+      }
+      const subconceptName = transaction.subconceptId
+        ? (subconceptById.get(transaction.subconceptId)?.name ?? "")
+        : "";
+      const providerName = getProviderLabel(transaction);
       const description = (transaction.description || "").toLowerCase();
       const amountStr = (transaction.amount ?? "").toString();
       const statusStr = (transaction.status ?? "").toString().toLowerCase();
       return (
-        generalName.includes(query) ||
-        conceptName.includes(query) ||
-        subconceptName.includes(query) ||
-        providerName.includes(query) ||
-        description.includes(query) ||
-        amountStr.includes(query) ||
-        statusStr.includes(query)
+        generalName.toLowerCase().includes(q) ||
+        conceptName.toLowerCase().includes(q) ||
+        subconceptName.toLowerCase().includes(q) ||
+        providerName.toLowerCase().includes(q) ||
+        description.includes(q) ||
+        amountStr.includes(q) ||
+        statusStr.includes(q)
       );
+    });
+  }, [
+    transactions,
+    searchTerm,
+    generalById,
+    conceptById,
+    subconceptById,
+    getProviderLabel,
+  ]);
+
+  const sortedTransactions = useMemo(
+    () =>
+      [...filteredTransactions].sort(
+        (a, b) =>
+          (STATUS_SORT_ORDER[a.status] ?? 99) -
+          (STATUS_SORT_ORDER[b.status] ?? 99)
+      ),
+    [filteredTransactions]
+  );
+
+  const statusCounts = useMemo(() => {
+    let pendiente = 0;
+    let parcial = 0;
+    let pagado = 0;
+    for (const t of filteredTransactions) {
+      if (t.status === "pendiente") pendiente++;
+      else if (t.status === "parcial") parcial++;
+      else if (t.status === "pagado") pagado++;
     }
-    return true;
-  }), [transactions, searchTerm, generals, concepts, subconcepts, providers]);
+    return { pendiente, parcial, pagado };
+  }, [filteredTransactions]);
 
-  const sortedTransactions = useMemo(() =>
-    [...filteredTransactions].sort((a, b) => {
-      const statusOrder = { pendiente: 1, parcial: 2, pagado: 3 };
-      return statusOrder[a.status] - statusOrder[b.status];
-    }),
-  [filteredTransactions]);
-
-  // Calculate pagination
-  const totalPages = Math.ceil(sortedTransactions.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
-  const currentTransactions = sortedTransactions.slice(startIndex, endIndex);
+  const { totalPages, startIndex, endIndex, currentTransactions } = useMemo(
+    () => {
+      const total = sortedTransactions.length;
+      const pages = Math.ceil(total / ITEMS_PER_PAGE) || 0;
+      const start = (currentPage - 1) * ITEMS_PER_PAGE;
+      const end = start + ITEMS_PER_PAGE;
+      return {
+        totalPages: pages,
+        startIndex: start,
+        endIndex: end,
+        currentTransactions: sortedTransactions.slice(start, end),
+      };
+    },
+    [sortedTransactions, currentPage]
+  );
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -418,269 +510,241 @@ const SolicitudesPago = () => {
 
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
-    setCurrentPage(1); // Reset to first page when searching
+    setCurrentPage(1);
   };
 
-  // CSV Export function
-  const exportToCSV = () => {
+  const exportToCSV = useCallback(() => {
     try {
-      // Validate tenant ID
       if (!tenantId) {
         toast.error("Error: No hay información de tenant disponible");
         return;
       }
 
-      // Create CSV headers specific to Salidas (include provider field)
-      const headers = [
-        'Fecha',
-        'Descripcion',
-        'Monto',
-        'General',
-        'Concepto', 
-        'Subconcepto',
-        'Proveedor',
-        'Estado',
-        'Notas'
-      ];
+      const conceptExportLabel = (t) =>
+        t?.isInitialExpense && t?.conceptName
+          ? t.conceptName
+          : conceptById.get(t.conceptId)?.name ?? "N/A";
 
-      // Convert transactions to CSV rows
-      const rows = filteredTransactions.map(transaction => [
-        formatDate(transaction.date),
-        transaction.description || '',
-        transaction.amount || 0,
-        getGeneralName(transaction.generalId, transaction),
-        getConceptName(transaction.conceptId, transaction),
-        getSubconceptName(transaction.subconceptId, transaction) || '',
-        getProviderName(transaction.providerId, transaction),
-        transaction.status || 'pendiente',
-        transaction.notes || ''
-      ]);
+      const rows = filteredTransactions.map((t) => {
+        const prov = getProviderLabel(t);
+        return [
+          formatDateIsoLocal(t.date),
+          generalById.get(t.generalId)?.name ?? "N/A",
+          conceptExportLabel(t),
+          subconceptById.get(t.subconceptId)?.name ?? "",
+          prov === "N/A" ? "" : prov,
+          t.description || "",
+          t.amount || 0,
+          t.status || "pendiente",
+          t.notes || "",
+        ];
+      });
 
-      // Combine headers and rows
-      const csvContent = [headers, ...rows]
-        .map(row => row.map(cell => `"${cell}"`).join(','))
-        .join('\n');
-
-      // Create and download file with tenant-aware naming
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      
-      // Create tenant-aware filename
-      const monthYear = currentDate.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
-      const fileName = `salidas_${tenantInfo?.name || 'tenant'}_${monthYear}.csv`;
-      
-      link.href = URL.createObjectURL(blob);
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(link.href);
-      
+      const csvContent = rowsToCsvString([SALIDA_CSV_HEADERS, ...rows]);
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const monthYear = currentDate.toLocaleDateString("es-ES", {
+        month: "short",
+        year: "numeric",
+      });
+      const tenantSlug = (tenantInfo?.name || "tenant").replace(/\s+/g, "_");
+      const fileName = `salidas_${tenantSlug}_${monthYear}.csv`;
+      triggerDownloadBlob(blob, fileName);
       toast.success(`Archivo CSV exportado: ${fileName}`);
     } catch (error) {
-      console.error('Error exporting CSV:', error);
-      toast.error('Error al exportar CSV: ' + error.message);
+      console.error("Error exporting CSV:", error);
+      toast.error("Error al exportar CSV: " + error.message);
     }
-  };
+  }, [
+    tenantId,
+    toast,
+    filteredTransactions,
+    generalById,
+    conceptById,
+    subconceptById,
+    getProviderLabel,
+    currentDate,
+    tenantInfo?.name,
+  ]);
 
-  // CSV Import handler
   const handleImportCSV = () => {
-    // Validate tenant ID before opening modal
     if (!tenantId) {
-      toast.error("Error: No hay información de tenant disponible para importar");
+      toast.error(
+        "Error: No hay información de tenant disponible para importar"
+      );
       return;
     }
-    
     setShowImportModal(true);
   };
 
-  // Handle successful CSV import
-  const handleImportSuccess = () => {
-    setShowImportModal(false);
-    loadTransactions(); // Refresh the transactions list
-    toast.success('Salidas importadas exitosamente');
-  };
+  const handleProcessImportCSV = useCallback(
+    (file, importTenantId) => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () =>
+          reject(new Error("No se pudo leer el archivo"));
+        reader.onload = async (e) => {
+          try {
+            const csvText = e.target.result;
+            const lines = csvText.trim().split(/\r?\n/);
 
-  // Handle CSV import processing
-  const handleProcessImportCSV = (file, importTenantId) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const csvText = e.target.result;
-          const lines = csvText.trim().split(/\r?\n/);
-          
-          if (lines.length <= 1) {
-            throw new Error('El archivo CSV está vacío o solo contiene headers');
-          }
-
-          // Saltar la primera línea (headers)
-          const dataLines = lines.slice(1);
-          const importResults = {
-            total: dataLines.length,
-            successful: 0,
-            errors: []
-          };
-
-          for (let i = 0; i < dataLines.length; i++) {
-            const line = dataLines[i];
-            const lineNumber = i + 2; // +2 porque saltamos header y empezamos en 1
-            
-            try {
-              // Parsear CSV considerando comillas
-              const values = [];
-              let current = '';
-              let inQuotes = false;
-              let j = 0;
-
-              while (j < line.length) {
-                const char = line[j];
-                const nextChar = line[j + 1];
-
-                if (char === '"' && inQuotes && nextChar === '"') {
-                  current += '"';
-                  j += 2;
-                } else if (char === '"') {
-                  inQuotes = !inQuotes;
-                  j++;
-                } else if (char === ',' && !inQuotes) {
-                  values.push(current);
-                  current = '';
-                  j++;
-                } else {
-                  current += char;
-                  j++;
-                }
-              }
-              values.push(current); // Agregar el último valor
-
-              if (values.length < 7) {
-                throw new Error(`Línea ${lineNumber}: Se esperaban al menos 7 columnas (para salidas sin proveedor) u 8 (con proveedor), encontradas ${values.length}`);
-              }
-
-              // Parsear fecha correctamente
-              const dateString = values[0]?.trim();
-              if (!dateString) {
-                throw new Error(`Línea ${lineNumber}: La fecha es requerida`);
-              }
-              
-              let transactionDate;
-              
-              // Intentar diferentes formatos de fecha
-              if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                // Formato YYYY-MM-DD
-                transactionDate = new Date(dateString + 'T00:00:00');
-              } else if (dateString.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
-                // Formato DD/MM/YYYY
-                const [day, month, year] = dateString.split('/');
-                transactionDate = new Date(year, month - 1, day);
-              } else if (dateString.match(/^\d{2}-\d{2}-\d{4}$/)) {
-                // Formato DD-MM-YYYY  
-                const [day, month, year] = dateString.split('-');
-                transactionDate = new Date(year, month - 1, day);
-              } else {
-                // Último intento con Date constructor
-                transactionDate = new Date(dateString);
-              }
-              
-              // Validar que la fecha sea válida
-              if (isNaN(transactionDate.getTime())) {
-                throw new Error(`Línea ${lineNumber}: Fecha inválida "${dateString}". Use formato YYYY-MM-DD, DD/MM/YYYY o DD-MM-YYYY`);
-              }
-
-              // Determinar si es formato con 8 columnas (con proveedor) o 7 (sin proveedor)
-              const hasProvider = values.length >= 8;
-              
-              let generalName, conceptName, subconceptName, providerName, description, amount, status;
-              
-              if (hasProvider) {
-                // Formato: Fecha,General,Concepto,Subconcepto,Proveedor,Descripción,Monto,Estado
-                generalName = values[1]?.trim();
-                conceptName = values[2]?.trim();
-                subconceptName = values[3]?.trim();
-                providerName = values[4]?.trim();
-                description = values[5]?.trim();
-                amount = values[6];
-                status = values[7];
-              } else {
-                // Formato: Fecha,General,Concepto,Subconcepto,Descripción,Monto,Estado
-                generalName = values[1]?.trim();
-                conceptName = values[2]?.trim();
-                subconceptName = values[3]?.trim();
-                description = values[4]?.trim();
-                amount = values[5];
-                status = values[6];
-              }
-
-              // Buscar IDs correspondientes
-              const general = generals.find(g => g.name === generalName);
-              if (!general) {
-                throw new Error(`Línea ${lineNumber}: General "${generalName}" no encontrado`);
-              }
-
-              const concept = concepts.find(c => c.name === conceptName);
-              if (!concept) {
-                throw new Error(`Línea ${lineNumber}: Concepto "${conceptName}" no encontrado`);
-              }
-
-              let subconceptId = null;
-              if (subconceptName) {
-                const subconcept = subconcepts.find(s => s.name === subconceptName);
-                if (!subconcept) {
-                  throw new Error(`Línea ${lineNumber}: Subconcepto "${subconceptName}" no encontrado`);
-                }
-                subconceptId = subconcept.id;
-              }
-
-              let providerId = null;
-              if (hasProvider && providerName) {
-                const provider = providers.find(p => p.name === providerName);
-                if (!provider) {
-                  throw new Error(`Línea ${lineNumber}: Proveedor "${providerName}" no encontrado`);
-                }
-                providerId = provider.id;
-              }
-
-              // Crear objeto de transacción
-              const transactionData = {
-                type: 'salida',
-                generalId: general.id,
-                conceptId: concept.id,
-                subconceptId: subconceptId,
-                providerId: providerId,
-                description: description || '',
-                amount: parseFloat(amount) || 0,
-                status: status?.trim()?.toLowerCase() || 'pendiente',
-                date: transactionDate
-              };
-
-              // Validar campos requeridos
-              if (transactionData.amount <= 0) {
-                throw new Error(`Línea ${lineNumber}: El monto debe ser mayor a 0`);
-              }
-
-              if (!['pendiente', 'parcial', 'pagado'].includes(transactionData.status)) {
-                throw new Error(`Línea ${lineNumber}: Estado inválido "${transactionData.status}". Use: pendiente, parcial, pagado`);
-              }
-
-              // Crear transacción en el tenant específico
-              await transactionService.create(transactionData, { uid: 'import-user' }, importTenantId);
-              importResults.successful++;
-
-            } catch (error) {
-              importResults.errors.push(error.message);
+            if (lines.length <= 1) {
+              throw new Error(
+                "El archivo CSV está vacío o solo contiene headers"
+              );
             }
+
+            const dataLines = lines.slice(1);
+            const importResults = {
+              total: dataLines.length,
+              successful: 0,
+              errors: [],
+            };
+
+            for (let i = 0; i < dataLines.length; i++) {
+              const line = dataLines[i];
+              const lineNumber = i + 2;
+
+              try {
+                const values = splitCsvLine(line);
+
+                if (values.length < 7) {
+                  throw new Error(
+                    `Línea ${lineNumber}: Se esperaban al menos 7 columnas (sin columna Proveedor) u 8+ (con Proveedor y opcional Notas); hay ${values.length}`
+                  );
+                }
+
+                const dateString = values[0]?.trim();
+                if (!dateString) {
+                  throw new Error(`Línea ${lineNumber}: La fecha es requerida`);
+                }
+
+                const transactionDate = parseTransactionCsvDate(dateString);
+                if (!transactionDate) {
+                  throw new Error(
+                    `Línea ${lineNumber}: Fecha inválida "${dateString}". Use YYYY-MM-DD (recomendado, así exporta el sistema), o DD/MM/YYYY o DD/MM/AA (día primero, formato México)`
+                  );
+                }
+
+                const hasProviderColumn = values.length >= 8;
+
+                let generalName;
+                let conceptName;
+                let subconceptName;
+                let providerName = "";
+                let description;
+                let amount;
+                let status;
+                let notes = "";
+
+                if (hasProviderColumn) {
+                  generalName = values[1]?.trim();
+                  conceptName = values[2]?.trim();
+                  subconceptName = values[3]?.trim();
+                  providerName = values[4]?.trim() || "";
+                  description = values[5]?.trim();
+                  amount = values[6];
+                  status = values[7];
+                  if (values.length >= 9) {
+                    notes = values[8]?.trim() || "";
+                  }
+                } else {
+                  generalName = values[1]?.trim();
+                  conceptName = values[2]?.trim();
+                  subconceptName = values[3]?.trim();
+                  description = values[4]?.trim();
+                  amount = values[5];
+                  status = values[6];
+                }
+
+                const general = generalByName.get(generalName);
+                if (!general) {
+                  throw new Error(
+                    `Línea ${lineNumber}: General "${generalName}" no encontrado`
+                  );
+                }
+
+                const concept = conceptByName.get(conceptName);
+                if (!concept) {
+                  throw new Error(
+                    `Línea ${lineNumber}: Concepto "${conceptName}" no encontrado`
+                  );
+                }
+
+                let subconceptId = null;
+                if (subconceptName) {
+                  const subconcept = subconceptByName.get(subconceptName);
+                  if (!subconcept) {
+                    throw new Error(
+                      `Línea ${lineNumber}: Subconcepto "${subconceptName}" no encontrado`
+                    );
+                  }
+                  subconceptId = subconcept.id;
+                }
+
+                let providerId = null;
+                if (hasProviderColumn && providerName) {
+                  const provider = providerByName.get(providerName);
+                  if (!provider) {
+                    throw new Error(
+                      `Línea ${lineNumber}: Proveedor "${providerName}" no encontrado`
+                    );
+                  }
+                  providerId = provider.id;
+                }
+
+                const transactionData = {
+                  type: "salida",
+                  generalId: general.id,
+                  conceptId: concept.id,
+                  subconceptId,
+                  providerId,
+                  description: description || "",
+                  amount: parseFloat(String(amount).replace(/,/g, "")) || 0,
+                  status: status?.trim()?.toLowerCase() || "pendiente",
+                  date: transactionDate,
+                  notes: notes || "",
+                };
+
+                if (transactionData.amount <= 0) {
+                  throw new Error(
+                    `Línea ${lineNumber}: El monto debe ser mayor a 0`
+                  );
+                }
+
+                if (!VALID_SALIDA_STATUSES.includes(transactionData.status)) {
+                  throw new Error(
+                    `Línea ${lineNumber}: Estado inválido "${transactionData.status}". Use: pendiente, parcial, pagado`
+                  );
+                }
+
+                await transactionService.create(
+                  transactionData,
+                  { uid: "import-user" },
+                  importTenantId
+                );
+                importResults.successful++;
+              } catch (error) {
+                importResults.errors.push(
+                  `Línea ${lineNumber}: ${error.message}`
+                );
+              }
+            }
+
+            resolve(importResults);
+          } catch (error) {
+            reject(error);
           }
-
-          resolve(importResults);
-        } catch (error) {
-          reject(error);
-        }
-      };
-
-      reader.readAsText(file);
-    });
-  };
+        };
+        reader.readAsText(file);
+      });
+    },
+    [
+      generalByName,
+      conceptByName,
+      subconceptByName,
+      providerByName,
+    ]
+  );
 
   return (
     <ProtectedRoute>
@@ -838,28 +902,13 @@ const SolicitudesPago = () => {
                   <div className="flex items-center gap-2 flex-wrap">
                     <div className="flex items-center space-x-2">
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                        {
-                          sortedTransactions.filter(
-                            (t) => t.status === "pendiente"
-                          ).length
-                        }{" "}
-                        Pendientes
+                        {statusCounts.pendiente} Pendientes
                       </span>
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                        {
-                          sortedTransactions.filter(
-                            (t) => t.status === "parcial"
-                          ).length
-                        }{" "}
-                        Parciales
+                        {statusCounts.parcial} Parciales
                       </span>
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        {
-                          sortedTransactions.filter(
-                            (t) => t.status === "pagado"
-                          ).length
-                        }{" "}
-                        Pagadas
+                        {statusCounts.pagado} Pagadas
                       </span>
                     </div>
                     <div className="w-full md:w-80">
@@ -937,19 +986,7 @@ const SolicitudesPago = () => {
                         onClick={handleNewTransaction}
                         className="inline-flex items-center px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 focus:ring-4 focus:ring-red-500/20 transition-all duration-200 font-medium shadow-lg"
                       >
-                        <svg
-                          className="w-5 h-5 mr-2"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 4v16m8-8H4"
-                          />
-                        </svg>
+                        <PlusIcon className="w-5 h-5 mr-2" />
                         Crear primer gasto
                       </button>
                     </div>
@@ -995,33 +1032,24 @@ const SolicitudesPago = () => {
                                 {formatDate(transaction.date)}
                               </td>
                               <td className="px-6 py-4 text-sm text-foreground">
-                                <div className="flex items-center space-x-1 flex-wrap">
-                                  {getConceptHierarchy(transaction).map((level, index, array) => (
-                                    <div key={index} className="flex items-center space-x-1">
-                                      <span className={index === array.length - 1 ? "font-medium text-gray-900" : "text-gray-600"}>
-                                        {level}
-                                      </span>
-                                      {index < array.length - 1 && (
-                                        <svg className="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                        </svg>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
+                                <ConceptHierarchyBreadcrumb
+                                  levels={getConceptHierarchy(transaction)}
+                                  lastClassName="font-medium text-gray-900"
+                                  midClassName="text-gray-600"
+                                />
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
-                                {getProviderName(transaction.providerId, transaction)}
+                                {getProviderLabel(transaction)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-800 bg-red-50">
-                                {formatCurrency(transaction.amount)}
+                                {formatCurrencyMx(transaction.amount)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 {getStatusBadge(transaction.status, transaction)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 {transaction.isRecurring ? (
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-rose-400 text-white order border-blue-200">
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-rose-400 text-white border border-blue-200">
                                     <ArrowPathIcon className="h-4 w-4 mr-1" />
                                     Recurrente
                                   </span>
@@ -1091,28 +1119,19 @@ const SolicitudesPago = () => {
                               {getStatusBadge(transaction.status, transaction)}
                             </div>
                             <div className="text-sm font-medium text-foreground mb-1">
-                              <div className="flex items-center space-x-1 flex-wrap">
-                                {getConceptHierarchy(transaction).map((level, index, array) => (
-                                  <div key={index} className="flex items-center space-x-1">
-                                    <span className={index === array.length - 1 ? "font-semibold" : "text-gray-600 font-normal"}>
-                                      {level}
-                                    </span>
-                                    {index < array.length - 1 && (
-                                      <svg className="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                      </svg>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
+                              <ConceptHierarchyBreadcrumb
+                                levels={getConceptHierarchy(transaction)}
+                                lastClassName="font-semibold"
+                                midClassName="text-gray-600 font-normal"
+                              />
                             </div>
                             <p className="text-sm text-muted-foreground">
-                              {getProviderName(transaction.providerId, transaction)}
+                              {getProviderLabel(transaction)}
                             </p>
                           </div>
                           <div className="text-right">
                             <p className="text-lg font-semibold text-foreground">
-                              {formatCurrency(transaction.amount)}
+                              {formatCurrencyMx(transaction.amount)}
                             </p>
                             <p className="text-sm text-muted-foreground">
                               {formatDate(transaction.date)}
@@ -1276,9 +1295,12 @@ const SolicitudesPago = () => {
         <TransactionCsvImportModal
           isOpen={showImportModal}
           onClose={() => setShowImportModal(false)}
-          onSuccess={handleImportSuccess}
+          onSuccess={(message) => {
+            toast.success(message);
+            loadTransactions();
+          }}
           onImport={handleProcessImportCSV}
-          transactionType="salida"
+          type="salida"
           tenantId={tenantId}
         />
       )}

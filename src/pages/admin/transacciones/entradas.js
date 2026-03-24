@@ -16,16 +16,46 @@ import {
   formatDateIsoLocal,
   parseTransactionCsvDate,
 } from "../../../lib/transactions/transactionCsvDate";
-import { 
+import {
+  splitCsvLine,
+  rowsToCsvString,
+  triggerDownloadBlob,
+  catalogByNameMap,
+} from "../../../lib/catalogs/catalogosHelpers";
+import ConceptHierarchyBreadcrumb from "../../../components/transactions/ConceptHierarchyBreadcrumb";
+import {
   PlusIcon,
   ArrowTrendingUpIcon,
   PencilIcon,
   EyeIcon,
   ArrowDownTrayIcon,
-  ArrowUpTrayIcon
-} from '@heroicons/react/24/outline';
+  ArrowUpTrayIcon,
+} from "@heroicons/react/24/outline";
 
 const ITEMS_PER_PAGE = 20;
+
+const ENTRADA_CSV_HEADERS = [
+  "Fecha",
+  "General",
+  "Concepto",
+  "Subconcepto",
+  "Descripción",
+  "Monto",
+  "Estado",
+];
+
+const VALID_ENTRADA_STATUSES = ["pendiente", "parcial", "pagado"];
+
+const STATUS_SORT_ORDER = { pendiente: 1, parcial: 2, pagado: 3 };
+
+const mxnCurrency = new Intl.NumberFormat("es-MX", {
+  style: "currency",
+  currency: "MXN",
+});
+
+function formatCurrencyMx(amount) {
+  return mxnCurrency.format(amount);
+}
 
 const Ingresos = () => {
   const router = useRouter();
@@ -47,8 +77,38 @@ const Ingresos = () => {
   // Check permissions based on user role in tenant
   const canManageTransactions = TENANT_ROLES && (tenantInfo?.role === TENANT_ROLES.ADMIN || tenantInfo?.role === TENANT_ROLES.CONTADOR);
 
-  // Memoize tenantId to prevent unnecessary re-renders
   const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
+
+  const generalById = useMemo(() => {
+    const m = new Map();
+    for (const g of generals) m.set(g.id, g);
+    return m;
+  }, [generals]);
+
+  const conceptById = useMemo(() => {
+    const m = new Map();
+    for (const c of concepts) m.set(c.id, c);
+    return m;
+  }, [concepts]);
+
+  const subconceptById = useMemo(() => {
+    const m = new Map();
+    for (const s of subconcepts) m.set(s.id, s);
+    return m;
+  }, [subconcepts]);
+
+  const generalByName = useMemo(
+    () => catalogByNameMap(generals),
+    [generals]
+  );
+  const conceptByName = useMemo(
+    () => catalogByNameMap(concepts),
+    [concepts]
+  );
+  const subconceptByName = useMemo(
+    () => catalogByNameMap(subconcepts),
+    [subconcepts]
+  );
 
   const currentMonthName = useMemo(() => {
     const monthName = currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
@@ -148,45 +208,25 @@ const Ingresos = () => {
     router.push(`/admin/transacciones/editar/${transaction.id}`);
   };
 
-  const getGeneralName = (generalId) => {
-    if (!generalId) return "N/A";
-    const general = generals.find((g) => g.id === generalId);
-    return general ? general.name : "N/A";
-  };
-
-  const getConceptName = (conceptId) => {
-    const concept = concepts.find((c) => c.id === conceptId);
-    return concept ? concept.name : "N/A";
-  };
-
-  const getSubconceptName = (subconceptId) => {
-    if (!subconceptId) return null;
-    const subconcept = subconcepts.find((s) => s.id === subconceptId);
-    return subconcept ? subconcept.name : null;
-  };
-
-  const getConceptHierarchy = (transaction) => {
-    const generalName = getGeneralName(transaction.generalId, transaction);
-    const conceptName = getConceptName(transaction.conceptId, transaction);
-    const subconceptName = getSubconceptName(transaction.subconceptId, transaction);
-
-    // Construir el árbol jerárquico
-    const hierarchy = [];
-    
-    if (generalName && generalName !== "N/A") {
-      hierarchy.push(generalName);
-    }
-    
-    if (conceptName && conceptName !== "N/A") {
-      hierarchy.push(conceptName);
-    }
-    
-    if (subconceptName) {
-      hierarchy.push(subconceptName);
-    }
-
-    return hierarchy.length > 0 ? hierarchy : ["N/A"];
-  };
+  const getConceptHierarchy = useCallback(
+    (transaction) => {
+      const hierarchy = [];
+      if (transaction.generalId) {
+        const gn = generalById.get(transaction.generalId)?.name;
+        if (gn) hierarchy.push(gn);
+      }
+      if (transaction.conceptId) {
+        const cn = conceptById.get(transaction.conceptId)?.name;
+        if (cn) hierarchy.push(cn);
+      }
+      if (transaction.subconceptId) {
+        const sn = subconceptById.get(transaction.subconceptId)?.name;
+        if (sn) hierarchy.push(sn);
+      }
+      return hierarchy.length > 0 ? hierarchy : ["N/A"];
+    },
+    [generalById, conceptById, subconceptById]
+  );
 
   const getRemainingAmount = (transaction) => {
     // Usar el campo 'balance' guardado en la transacción (actualizado por updateTransactionPaymentStatus)
@@ -208,13 +248,6 @@ const Ingresos = () => {
     // Fallback: calcular desde paymentsMap
     const payments = paymentsMap[transaction.id] || [];
     return payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
-  };
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("es-MX", {
-      style: "currency",
-      currency: "MXN",
-    }).format(amount);
   };
 
   const formatDate = (date) => {
@@ -303,14 +336,14 @@ const Ingresos = () => {
         {/* Mostrar monto pagado para estado parcial y pagado */}
         {(status === "parcial" || status === "pagado") && paidAmount > 0 && (
           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-green-50 text-green-700 border border-green-200">
-            Recibido: {formatCurrency(paidAmount)}
+            Recibido: {formatCurrencyMx(paidAmount)}
           </span>
         )}
         
         {/* Mostrar saldo pendiente para estado pendiente y parcial */}
         {(status === "pendiente" || status === "parcial") && remainingAmount > 0 && (
           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-700 border border-gray-300">
-            Saldo pendiente: {formatCurrency(remainingAmount)}
+            Saldo pendiente: {formatCurrencyMx(remainingAmount)}
           </span>
         )}
       </div>
@@ -321,214 +354,246 @@ const Ingresos = () => {
     router.push(`/admin/transacciones/detalle/${transactionId}`);
   };
 
-  const exportToCSV = () => {
+  const exportToCSV = useCallback(() => {
     try {
       if (!tenantId) {
-        toast.error('Error: No se ha identificado el tenant');
+        toast.error("Error: No se ha identificado el tenant");
         return;
       }
 
-      const headers = ['Fecha', 'General', 'Concepto', 'Subconcepto', 'Descripción', 'Monto', 'Estado'];
       const csvData = transactions.map((transaction) => [
         formatDateIsoLocal(transaction.date),
-        getGeneralName(transaction.generalId),
-        getConceptName(transaction.conceptId),
-        getSubconceptName(transaction.subconceptId) || '',
-        transaction.description || '',
+        generalById.get(transaction.generalId)?.name ?? "N/A",
+        conceptById.get(transaction.conceptId)?.name ?? "N/A",
+        subconceptById.get(transaction.subconceptId)?.name ?? "",
+        transaction.description || "",
         transaction.amount || 0,
-        transaction.status || 'pendiente'
+        transaction.status || "pendiente",
       ]);
 
-      const csvContent = [headers, ...csvData]
-        .map(row => row.map(cell => `"${cell.toString().replace(/"/g, '""')}"`).join(','))
-        .join('\n');
+      const csvContent = rowsToCsvString([ENTRADA_CSV_HEADERS, ...csvData]);
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const monthYear = currentDate.toLocaleDateString("es-ES", {
+        month: "long",
+        year: "numeric",
+      });
+      const tenantSlug = tenantInfo?.name
+        ? `_${tenantInfo.name.replace(/\s+/g, "_")}`
+        : "";
+      triggerDownloadBlob(
+        blob,
+        `entradas_${monthYear.replace(" ", "_")}${tenantSlug}.csv`
+      );
 
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.setAttribute('href', url);
-
-      const monthYear = currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-      const tenantName = tenantInfo?.name ? `_${tenantInfo.name.replace(/\s+/g, '_')}` : '';
-      link.setAttribute('download', `entradas_${monthYear.replace(' ', '_')}${tenantName}.csv`);
-
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      toast.success('Archivo CSV exportado exitosamente');
+      toast.success("Archivo CSV exportado exitosamente");
     } catch (error) {
-      console.error('Error exporting to CSV:', error);
-      toast.error('Error al exportar el archivo CSV');
+      console.error("Error exporting to CSV:", error);
+      toast.error("Error al exportar el archivo CSV");
     }
-  };
+  }, [
+    tenantId,
+    toast,
+    transactions,
+    generalById,
+    conceptById,
+    subconceptById,
+    currentDate,
+    tenantInfo?.name,
+  ]);
 
-  const handleImportCSV = (file, importTenantId) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const csvText = e.target.result;
-          const lines = csvText.trim().split(/\r?\n/);
-          
-          if (lines.length <= 1) {
-            throw new Error('El archivo CSV está vacío o solo contiene headers');
-          }
+  const handleImportCSV = useCallback(
+    (file, importTenantId) => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () =>
+          reject(new Error("No se pudo leer el archivo"));
+        reader.onload = async (e) => {
+          try {
+            const csvText = e.target.result;
+            const lines = csvText.trim().split(/\r?\n/);
 
-          // Saltar la primera línea (headers)
-          const dataLines = lines.slice(1);
-          const importResults = {
-            total: dataLines.length,
-            successful: 0,
-            errors: []
-          };
+            if (lines.length <= 1) {
+              throw new Error(
+                "El archivo CSV está vacío o solo contiene headers"
+              );
+            }
 
-          for (let i = 0; i < dataLines.length; i++) {
-            const line = dataLines[i];
-            const lineNumber = i + 2; // +2 porque saltamos header y empezamos en 1
-            
-            try {
-              // Parsear CSV considerando comillas
-              const values = [];
-              let current = '';
-              let inQuotes = false;
-              let j = 0;
+            const dataLines = lines.slice(1);
+            const importResults = {
+              total: dataLines.length,
+              successful: 0,
+              errors: [],
+            };
 
-              while (j < line.length) {
-                const char = line[j];
-                const nextChar = line[j + 1];
+            for (let i = 0; i < dataLines.length; i++) {
+              const line = dataLines[i];
+              const lineNumber = i + 2;
 
-                if (char === '"' && inQuotes && nextChar === '"') {
-                  current += '"';
-                  j += 2;
-                } else if (char === '"') {
-                  inQuotes = !inQuotes;
-                  j++;
-                } else if (char === ',' && !inQuotes) {
-                  values.push(current);
-                  current = '';
-                  j++;
-                } else {
-                  current += char;
-                  j++;
+              try {
+                const values = splitCsvLine(line);
+
+                if (values.length < 7) {
+                  throw new Error(
+                    `Línea ${lineNumber}: Se esperaban al menos 7 columnas, encontradas ${values.length}`
+                  );
                 }
-              }
-              values.push(current); // Agregar el último valor
 
-              if (values.length < 7) {
-                throw new Error(`Línea ${lineNumber}: Se esperaban al menos 7 columnas, encontradas ${values.length}`);
-              }
+                const generalName = values[1]?.trim();
+                const conceptName = values[2]?.trim();
+                const subconceptName = values[3]?.trim();
 
-              // Buscar IDs correspondientes
-              const generalName = values[1]?.trim();
-              const conceptName = values[2]?.trim();
-              const subconceptName = values[3]?.trim();
-
-              const general = generals.find(g => g.name === generalName);
-              if (!general) {
-                throw new Error(`Línea ${lineNumber}: General "${generalName}" no encontrado`);
-              }
-
-              const concept = concepts.find(c => c.name === conceptName);
-              if (!concept) {
-                throw new Error(`Línea ${lineNumber}: Concepto "${conceptName}" no encontrado`);
-              }
-
-              let subconceptId = null;
-              if (subconceptName) {
-                const subconcept = subconcepts.find(s => s.name === subconceptName);
-                if (!subconcept) {
-                  throw new Error(`Línea ${lineNumber}: Subconcepto "${subconceptName}" no encontrado`);
+                const general = generalByName.get(generalName);
+                if (!general) {
+                  throw new Error(
+                    `Línea ${lineNumber}: General "${generalName}" no encontrado`
+                  );
                 }
-                subconceptId = subconcept.id;
-              }
 
-              // Parsear fecha correctamente  
-              const dateString = values[0]?.trim();
-              if (!dateString) {
-                throw new Error(`Línea ${lineNumber}: La fecha es requerida`);
-              }
-              
-              const transactionDate = parseTransactionCsvDate(dateString);
-              if (!transactionDate) {
-                throw new Error(
-                  `Línea ${lineNumber}: Fecha inválida "${dateString}". Use YYYY-MM-DD (recomendado, así exporta el sistema), o DD/MM/YYYY o DD/MM/AA (día primero, formato México)`
+                const concept = conceptByName.get(conceptName);
+                if (!concept) {
+                  throw new Error(
+                    `Línea ${lineNumber}: Concepto "${conceptName}" no encontrado`
+                  );
+                }
+
+                let subconceptId = null;
+                if (subconceptName) {
+                  const subconcept = subconceptByName.get(subconceptName);
+                  if (!subconcept) {
+                    throw new Error(
+                      `Línea ${lineNumber}: Subconcepto "${subconceptName}" no encontrado`
+                    );
+                  }
+                  subconceptId = subconcept.id;
+                }
+
+                const dateString = values[0]?.trim();
+                if (!dateString) {
+                  throw new Error(`Línea ${lineNumber}: La fecha es requerida`);
+                }
+
+                const transactionDate = parseTransactionCsvDate(dateString);
+                if (!transactionDate) {
+                  throw new Error(
+                    `Línea ${lineNumber}: Fecha inválida "${dateString}". Use YYYY-MM-DD (recomendado, así exporta el sistema), o DD/MM/YYYY o DD/MM/AA (día primero, formato México)`
+                  );
+                }
+
+                const transactionData = {
+                  type: "entrada",
+                  generalId: general.id,
+                  conceptId: concept.id,
+                  subconceptId,
+                  description: values[4]?.trim() || "",
+                  amount: parseFloat(values[5]) || 0,
+                  status: values[6]?.trim()?.toLowerCase() || "pendiente",
+                  date: transactionDate,
+                };
+
+                if (transactionData.amount <= 0) {
+                  throw new Error(
+                    `Línea ${lineNumber}: El monto debe ser mayor a 0`
+                  );
+                }
+
+                if (!VALID_ENTRADA_STATUSES.includes(transactionData.status)) {
+                  throw new Error(
+                    `Línea ${lineNumber}: Estado inválido "${transactionData.status}". Use: pendiente, parcial, pagado`
+                  );
+                }
+
+                await transactionService.create(
+                  transactionData,
+                  { uid: "import-user" },
+                  importTenantId
+                );
+                importResults.successful++;
+              } catch (error) {
+                importResults.errors.push(
+                  `Línea ${lineNumber}: ${error.message}`
                 );
               }
-
-              // Crear objeto de transacción
-              const transactionData = {
-                type: 'entrada',
-                generalId: general.id,
-                conceptId: concept.id,
-                subconceptId: subconceptId,
-                description: values[4]?.trim() || '',
-                amount: parseFloat(values[5]) || 0,
-                status: values[6]?.trim()?.toLowerCase() || 'pendiente',
-                date: transactionDate
-              };
-
-              // Validar campos requeridos
-              if (transactionData.amount <= 0) {
-                throw new Error(`Línea ${lineNumber}: El monto debe ser mayor a 0`);
-              }
-
-              if (!['pendiente', 'parcial', 'pagado'].includes(transactionData.status)) {
-                throw new Error(`Línea ${lineNumber}: Estado inválido "${transactionData.status}". Use: pendiente, parcial, pagado`);
-              }
-
-              // Crear transacción en el tenant específico
-              await transactionService.create(transactionData, { uid: 'import-user' }, importTenantId);
-              importResults.successful++;
-
-            } catch (error) {
-              importResults.errors.push(`Línea ${lineNumber}: ${error.message}`);
             }
+
+            resolve(importResults);
+          } catch (error) {
+            reject(error);
           }
+        };
+        reader.readAsText(file);
+      });
+    },
+    [generalByName, conceptByName, subconceptByName]
+  );
 
-          resolve(importResults);
-        } catch (error) {
-          reject(error);
-        }
-      };
-      reader.readAsText(file);
-    });
-  };
-
-  const filteredTransactions = useMemo(() => transactions.filter((transaction) => {
-    if (searchTerm) {
-      const query = searchTerm.toLowerCase();
-      const generalName = getGeneralName(transaction.generalId).toLowerCase();
-      const conceptName = getConceptName(transaction.conceptId).toLowerCase();
-      const subconceptName = (getSubconceptName(transaction.subconceptId) || "").toLowerCase();
+  const filteredTransactions = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return transactions;
+    return transactions.filter((transaction) => {
+      const generalName = transaction.generalId
+        ? (generalById.get(transaction.generalId)?.name ?? "N/A")
+        : "N/A";
+      const conceptName = transaction.conceptId
+        ? (conceptById.get(transaction.conceptId)?.name ?? "N/A")
+        : "N/A";
+      const subconceptName = transaction.subconceptId
+        ? (subconceptById.get(transaction.subconceptId)?.name ?? "")
+        : "";
       const description = (transaction.description || "").toLowerCase();
       const amountStr = (transaction.amount ?? "").toString();
       const statusStr = (transaction.status ?? "").toString().toLowerCase();
       return (
-        generalName.includes(query) ||
-        conceptName.includes(query) ||
-        subconceptName.includes(query) ||
-        description.includes(query) ||
-        amountStr.includes(query) ||
-        statusStr.includes(query)
+        generalName.toLowerCase().includes(q) ||
+        conceptName.toLowerCase().includes(q) ||
+        subconceptName.toLowerCase().includes(q) ||
+        description.includes(q) ||
+        amountStr.includes(q) ||
+        statusStr.includes(q)
       );
+    });
+  }, [
+    transactions,
+    searchTerm,
+    generalById,
+    conceptById,
+    subconceptById,
+  ]);
+
+  const sortedTransactions = useMemo(
+    () =>
+      [...filteredTransactions].sort(
+        (a, b) =>
+          (STATUS_SORT_ORDER[a.status] ?? 99) -
+          (STATUS_SORT_ORDER[b.status] ?? 99)
+      ),
+    [filteredTransactions]
+  );
+
+  const statusCounts = useMemo(() => {
+    let pendiente = 0;
+    let parcial = 0;
+    let pagado = 0;
+    for (const t of filteredTransactions) {
+      if (t.status === "pendiente") pendiente++;
+      else if (t.status === "parcial") parcial++;
+      else if (t.status === "pagado") pagado++;
     }
-    return true;
-  }), [transactions, searchTerm, generals, concepts, subconcepts]);
+    return { pendiente, parcial, pagado };
+  }, [filteredTransactions]);
 
-  const sortedTransactions = useMemo(() =>
-    [...filteredTransactions].sort((a, b) => {
-      const statusOrder = { pendiente: 1, parcial: 2, pagado: 3 };
-      return statusOrder[a.status] - statusOrder[b.status];
-    }),
-  [filteredTransactions]);
-
-  const totalPages = Math.ceil(sortedTransactions.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
-  const currentTransactions = sortedTransactions.slice(startIndex, endIndex);
+  const { totalPages, startIndex, endIndex, currentTransactions } =
+    useMemo(() => {
+      const total = sortedTransactions.length;
+      const pages = Math.ceil(total / ITEMS_PER_PAGE) || 0;
+      const start = (currentPage - 1) * ITEMS_PER_PAGE;
+      const end = start + ITEMS_PER_PAGE;
+      return {
+        totalPages: pages,
+        startIndex: start,
+        endIndex: end,
+        currentTransactions: sortedTransactions.slice(start, end),
+      };
+    }, [sortedTransactions, currentPage]);
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -660,28 +725,13 @@ const Ingresos = () => {
                   <div className="flex items-center gap-2 flex-wrap">
                     <div className="flex items-center space-x-2">
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                        {
-                          filteredTransactions.filter(
-                            (t) => t.status === "pendiente"
-                          ).length
-                        }{" "}
-                        Pendientes
+                        {statusCounts.pendiente} Pendientes
                       </span>
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                        {
-                          filteredTransactions.filter(
-                            (t) => t.status === "parcial"
-                          ).length
-                        }{" "}
-                        Parciales
+                        {statusCounts.parcial} Parciales
                       </span>
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        {
-                          filteredTransactions.filter(
-                            (t) => t.status === "pagado"
-                          ).length
-                        }{" "}
-                        Pagados
+                        {statusCounts.pagado} Pagados
                       </span>
                     </div>
                     <div className="w-full md:w-80">
@@ -759,19 +809,7 @@ const Ingresos = () => {
                         onClick={handleNewTransaction}
                         className="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 focus:ring-4 focus:ring-green-500/20 transition-all duration-200 font-medium shadow-lg"
                       >
-                        <svg
-                          className="w-5 h-5 mr-2"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 4v16m8-8H4"
-                          />
-                        </svg>
+                        <PlusIcon className="w-5 h-5 mr-2" />
                         Crear primera entrada
                       </button>
                     </div>
@@ -812,23 +850,14 @@ const Ingresos = () => {
                                 {formatDate(transaction.date)}
                               </td>
                               <td className="px-6 py-4 text-sm text-foreground">
-                                <div className="flex items-center space-x-1 flex-wrap">
-                                  {getConceptHierarchy(transaction).map((level, index, array) => (
-                                    <div key={index} className="flex items-center space-x-1">
-                                      <span className={index === array.length - 1 ? "font-medium text-gray-900" : "text-gray-600"}>
-                                        {level}
-                                      </span>
-                                      {index < array.length - 1 && (
-                                        <svg className="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                        </svg>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
+                                <ConceptHierarchyBreadcrumb
+                                  levels={getConceptHierarchy(transaction)}
+                                  lastClassName="font-medium text-gray-900"
+                                  midClassName="text-gray-600"
+                                />
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-800 bg-green-50">
-                                {formatCurrency(transaction.amount)}
+                                {formatCurrencyMx(transaction.amount)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 {getStatusBadge(transaction.status, transaction)}
@@ -875,25 +904,16 @@ const Ingresos = () => {
                               {getStatusBadge(transaction.status, transaction)}
                             </div>
                             <div className="text-sm font-medium text-foreground mb-1">
-                              <div className="flex items-center space-x-1 flex-wrap">
-                                {getConceptHierarchy(transaction).map((level, index, array) => (
-                                  <div key={index} className="flex items-center space-x-1">
-                                    <span className={index === array.length - 1 ? "font-semibold" : "text-gray-600 font-normal"}>
-                                      {level}
-                                    </span>
-                                    {index < array.length - 1 && (
-                                      <svg className="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                      </svg>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
+                              <ConceptHierarchyBreadcrumb
+                                levels={getConceptHierarchy(transaction)}
+                                lastClassName="font-semibold"
+                                midClassName="text-gray-600 font-normal"
+                              />
                             </div>
                           </div>
                           <div className="text-right">
                             <p className="text-lg font-semibold text-foreground">
-                              {formatCurrency(transaction.amount)}
+                              {formatCurrencyMx(transaction.amount)}
                             </p>
                             <p className="text-sm text-muted-foreground">
                               {formatDate(transaction.date)}

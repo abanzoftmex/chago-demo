@@ -23,9 +23,12 @@ export default function TransactionCsvImportModal({
       const example2 = '"2024-03-02","Ingresos por Eventos","Torneos","Torneo de Primavera","Inscripciones torneo",2000.00,pagado';
       csvContent = `${headers}\n${example1}\n${example2}`;
     } else {
-      const headers = 'Fecha,General,Concepto,Subconcepto,Proveedor,Descripción,Monto,Estado';
-      const example1 = '"2024-03-01","Gastos Operativos","Servicios Básicos","Electricidad","CFE","Recibo CFE marzo",800.50,pendiente';
-      const example2 = '"2024-03-02","Gastos Operativos","Material de Oficina","Papelería","Office Depot","Compra de material",350.00,pagado';
+      const headers =
+        "Fecha,General,Concepto,Subconcepto,Proveedor,Descripción,Monto,Estado,Notas";
+      const example1 =
+        '"2024-03-01","Gastos Operativos","Servicios Básicos","Electricidad","CFE","Recibo CFE marzo",800.50,pendiente,""';
+      const example2 =
+        '"2024-03-02","Gastos Operativos","Material de Oficina","Papelería","Office Depot","Compra de material",350.00,pagado,"Opcional"';
       csvContent = `${headers}\n${example1}\n${example2}`;
     }
 
@@ -195,10 +198,9 @@ export default function TransactionCsvImportModal({
                 </p>
                 <div className="bg-gray-50 p-4 rounded-md mb-4">
                   <code className="text-sm">
-                    {type === "entrada" 
+                    {type === "entrada"
                       ? "Fecha,General,Concepto,Subconcepto,Descripción,Monto,Estado"
-                      : "Fecha,General,Concepto,Subconcepto,Proveedor,Descripción,Monto,Estado"
-                    }
+                      : "Fecha,General,Concepto,Subconcepto,Proveedor,Descripción,Monto,Estado,Notas"}
                   </code>
                 </div>
                 
@@ -218,6 +220,12 @@ export default function TransactionCsvImportModal({
                   <li><strong>Descripción:</strong> Descripción de la transacción (opcional)</li>
                   <li><strong>Monto:</strong> Cantidad numérica sin símbolos (ej: 1250.50)</li>
                   <li><strong>Estado:</strong> pendiente, parcial o pagado</li>
+                  {type === "salida" && (
+                    <li>
+                      <strong>Notas:</strong> opcional (columna extra al exportar desde el sistema; en
+                      plantillas antiguas de 8 columnas no hace falta)
+                    </li>
+                  )}
                 </ul>
                 
                 <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
