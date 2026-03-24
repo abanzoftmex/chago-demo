@@ -12,6 +12,10 @@ import { conceptService } from "../../../lib/services/conceptService";
 import { generalService } from "../../../lib/services/generalService";
 import { subconceptService } from "../../../lib/services/subconceptService";
 import { paymentService } from "../../../lib/services/paymentService";
+import {
+  formatDateIsoLocal,
+  parseTransactionCsvDate,
+} from "../../../lib/transactions/transactionCsvDate";
 import { 
   PlusIcon,
   ArrowTrendingUpIcon,
@@ -325,8 +329,8 @@ const Ingresos = () => {
       }
 
       const headers = ['Fecha', 'General', 'Concepto', 'Subconcepto', 'Descripción', 'Monto', 'Estado'];
-      const csvData = transactions.map(transaction => [
-        formatDate(transaction.date),
+      const csvData = transactions.map((transaction) => [
+        formatDateIsoLocal(transaction.date),
         getGeneralName(transaction.generalId),
         getConceptName(transaction.conceptId),
         getSubconceptName(transaction.subconceptId) || '',
@@ -447,28 +451,11 @@ const Ingresos = () => {
                 throw new Error(`Línea ${lineNumber}: La fecha es requerida`);
               }
               
-              let transactionDate;
-              
-              // Intentar diferentes formatos de fecha
-              if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                // Formato YYYY-MM-DD
-                transactionDate = new Date(dateString + 'T00:00:00');
-              } else if (dateString.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
-                // Formato DD/MM/YYYY
-                const [day, month, year] = dateString.split('/');
-                transactionDate = new Date(year, month - 1, day);
-              } else if (dateString.match(/^\d{2}-\d{2}-\d{4}$/)) {
-                // Formato DD-MM-YYYY  
-                const [day, month, year] = dateString.split('-');
-                transactionDate = new Date(year, month - 1, day);
-              } else {
-                // Último intento con Date constructor
-                transactionDate = new Date(dateString);
-              }
-              
-              // Validar que la fecha sea válida
-              if (isNaN(transactionDate.getTime())) {
-                throw new Error(`Línea ${lineNumber}: Fecha inválida "${dateString}". Use formato YYYY-MM-DD, DD/MM/YYYY o DD-MM-YYYY`);
+              const transactionDate = parseTransactionCsvDate(dateString);
+              if (!transactionDate) {
+                throw new Error(
+                  `Línea ${lineNumber}: Fecha inválida "${dateString}". Use YYYY-MM-DD (recomendado, así exporta el sistema), o DD/MM/YYYY o DD/MM/AA (día primero, formato México)`
+                );
               }
 
               // Crear objeto de transacción

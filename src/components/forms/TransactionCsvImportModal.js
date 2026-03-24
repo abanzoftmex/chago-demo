@@ -133,7 +133,11 @@ export default function TransactionCsvImportModal({
                 <ul className="text-sm text-yellow-700 space-y-1">
                   <li>• El archivo debe estar en formato CSV con codificación UTF-8</li>
                   <li>• Los nombres de General, Concepto{type === "salida" ? ", Proveedor" : ""} y Subconcepto deben coincidir exactamente con los existentes</li>
-                  <li>• Las fechas deben estar en formato YYYY-MM-DD</li>
+                  <li>
+                    • Fechas: <strong>YYYY-MM-DD</strong> (así exporta el sistema). También se aceptan{" "}
+                    <strong>DD/MM/YYYY</strong> y <strong>DD/MM/AA</strong> (día primero, México); no uses
+                    el parseo ambiguo de Excel sin revisar.
+                  </li>
                   <li>• Los estados válidos son: pendiente, parcial, pagado</li>
                   {type === "salida" && (
                     <li>• El campo Proveedor es opcional, déjalo vacío si no aplica</li>
@@ -200,7 +204,11 @@ export default function TransactionCsvImportModal({
                 
                 <h5 className="font-medium text-gray-800 mb-2">Descripción de columnas:</h5>
                 <ul className="text-sm text-gray-600 space-y-2">
-                  <li><strong>Fecha:</strong> Formato YYYY-MM-DD (ej: 2024-03-15)</li>
+                  <li>
+                    <strong>Fecha:</strong> Preferente <strong>YYYY-MM-DD</strong> (ej: 2024-03-15), igual que
+                    al exportar desde el sistema. Alternativas con día primero: DD/MM/YYYY o DD/MM/AA (ej:
+                    7/3/2026 o 07/03/26 = 7 de marzo).
+                  </li>
                   <li><strong>General:</strong> Nombre exacto del catálogo general existente en este tenant</li>
                   <li><strong>Concepto:</strong> Nombre exacto del concepto existente en este tenant</li>
                   <li><strong>Subconcepto:</strong> Nombre del subconcepto (opcional, dejar vacío si no aplica)</li>
