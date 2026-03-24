@@ -267,33 +267,18 @@ const Dashboard = () => {
         title="Dashboard"
         breadcrumbs={[{ name: "Inicio", href: "/admin/dashboard" }]}
       >
-        <div className="space-y-6">
-          {/* Loading skeleton */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {[...Array(4)].map((_, i) => (
-              <div
-                key={i}
-                className="bg-background rounded-lg border border-border p-6"
-              >
-                <div className="animate-pulse">
-                  <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
-                  <div className="h-8 bg-muted rounded w-1/2"></div>
-                </div>
+        <div className="p-12 text-center">
+          <div className="max-w-sm mx-auto">
+            <div className="relative">
+              <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200 border-t-red-600 mx-auto"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-8 h-8 bg-red-600 rounded-full opacity-20"></div>
               </div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-background rounded-lg border border-border p-6">
-              <div className="animate-pulse h-64 bg-muted rounded"></div>
             </div>
-            <div className="bg-background rounded-lg border border-border p-6">
-              <div className="animate-pulse h-64 bg-muted rounded"></div>
-            </div>
-          </div>
-
-          <div className="bg-background rounded-lg border border-border p-6">
-            <div className="animate-pulse h-64 bg-muted rounded"></div>
+            <p className="text-gray-600 mt-4 font-medium">Cargando datos...</p>
+            <p className="text-gray-500 text-sm mt-1">
+              Por favor espera un momento
+            </p>
           </div>
         </div>
       </AdminLayout>

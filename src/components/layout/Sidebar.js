@@ -21,6 +21,9 @@ import {
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 
+/** En false oculta el ítem Reportes del menú (la página sigue en /admin/reportes). */
+const SHOW_REPORTES_IN_NAV = false;
+
 const Sidebar = ({
   isOpen,
   collapsed,
@@ -296,8 +299,8 @@ const Sidebar = ({
                 </div>
               )}
 
-            {/* Reportes - Solo Admin */}
-            {checkPermission("canViewReports") && (
+            {/* Reportes - Solo Admin (oculto temporalmente: SHOW_REPORTES_IN_NAV) */}
+            {SHOW_REPORTES_IN_NAV && checkPermission("canViewReports") && (
               <button
                 onClick={() => handleNavigation("/admin/reportes")}
                 className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/reportes"
@@ -661,7 +664,7 @@ const Sidebar = ({
                 </div>
               )}
 
-            {checkPermission("canViewReports") && (
+            {SHOW_REPORTES_IN_NAV && checkPermission("canViewReports") && (
               <button
                 onClick={() => handleNavigation("/admin/reportes")}
                 className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/reportes"
