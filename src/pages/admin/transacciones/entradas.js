@@ -743,17 +743,49 @@ const Ingresos = () => {
                   </div>
                 </div>
               ) : transactions.length === 0 ? (
-                <div className="p-8 text-center">
-                  <div className="border-2 border-dashed border-border rounded-lg h-32 flex items-center justify-center">
-                    <div className="text-center">
-                      <p className="text-muted-foreground mb-2">
-                        No hay entradas registradas
-                      </p>
+                <div className="p-12 text-center">
+                  <div className="max-w-lg mx-auto">
+                    <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <svg
+                        className="w-12 h-12 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      No hay entradas registradas este mes
+                    </h3>
+                    <p className="text-gray-600 mb-6">
+                      Comienza creando tu primera entrada para gestionar los ingresos de tu organización
+                    </p>
+
+                    <div className="flex justify-center">
                       <button
                         onClick={handleNewTransaction}
-                        className="text-primary hover:text-primary text-sm font-medium"
+                        className="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 focus:ring-4 focus:ring-green-500/20 transition-all duration-200 font-medium shadow-lg"
                       >
-                        Registrar primera entrada
+                        <svg
+                          className="w-5 h-5 mr-2"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 4v16m8-8H4"
+                          />
+                        </svg>
+                        Crear primera entrada
                       </button>
                     </div>
                   </div>
