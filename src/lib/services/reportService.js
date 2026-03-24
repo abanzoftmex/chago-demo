@@ -9,32 +9,71 @@ import { createEnhancedPDFReport } from './pdfTemplates';
 import { formatDivision } from '../constants/divisions';
 import * as XLSX from 'xlsx';
 
+/**
+ * Equivalente en memoria a transactionService.getByDateRange + filtros de igualdad en cliente.
+ * Útil cuando ya se cargó getAll (p. ej. dashboard) para evitar otra ida a Firestore.
+ */
+export function filterTransactionsByDateRange(transactions, startDate, endDate, filters = {}) {
+  if (!Array.isArray(transactions)) return [];
+  const startMs = (startDate instanceof Date ? startDate : new Date(startDate)).getTime();
+  const endMs = (endDate instanceof Date ? endDate : new Date(endDate)).getTime();
+
+  return transactions.filter((t) => {
+    const d = t.date?.toDate ? t.date.toDate() : new Date(t.date);
+    if (Number.isNaN(d.getTime())) return false;
+    const tms = d.getTime();
+    if (tms < startMs || tms > endMs) return false;
+    if (filters.type && t.type !== filters.type) return false;
+    if (filters.generalId && t.generalId !== filters.generalId) return false;
+    if (filters.conceptId && t.conceptId !== filters.conceptId) return false;
+    if (filters.subconceptId && t.subconceptId !== filters.subconceptId) return false;
+    if (filters.providerId && t.providerId !== filters.providerId) return false;
+    if (filters.status && t.status !== filters.status) return false;
+    if (filters.division && t.division !== filters.division) return false;
+    return true;
+  });
+}
+
 export const reportService = {
   // Obtener transacciones filtradas para reportes incluyendo el arrastre de pendientes
   // El "arrastre" incluye TODOS los gastos pendientes de todos los meses (no solo anteriores)
-  async getFilteredTransactions(filters, tenantId) {
+  // options.allTransactionsCache: si se pasa (p. ej. resultado de getAll ya cargado), evita getAll duplicado
+  // y, si está definido, el rango del mes se filtra en memoria en lugar de getByDateRange.
+  async getFilteredTransactions(filters, tenantId, options = {}) {
     try {
       let transactions = [];
 
       if (filters.startDate && filters.endDate) {
-        // Obtener transacciones del período seleccionado
-        transactions = await transactionService.getByDateRange(
-          filters.startDate,
-          filters.endDate,
-          {
-            type: filters.type,
-            providerId: filters.providerId,
-            generalId: filters.generalId,
-            conceptId: filters.conceptId,
-            subconceptId: filters.subconceptId,
-            division: filters.division
-          },
-          tenantId
-        );
+        const rangeFilters = {
+          type: filters.type,
+          providerId: filters.providerId,
+          generalId: filters.generalId,
+          conceptId: filters.conceptId,
+          subconceptId: filters.subconceptId,
+          division: filters.division,
+        };
+
+        const cache = options.allTransactionsCache;
+        if (cache != null) {
+          transactions = filterTransactionsByDateRange(
+            cache,
+            filters.startDate,
+            filters.endDate,
+            rangeFilters
+          );
+        } else {
+          transactions = await transactionService.getByDateRange(
+            filters.startDate,
+            filters.endDate,
+            rangeFilters,
+            tenantId
+          );
+        }
 
         // Obtener TODAS las transacciones pendientes hasta el mes del reporte
         // Solo incluir gastos pendientes que sean del mes del reporte o anteriores
-        const allTransactions = await transactionService.getAll({}, tenantId);
+        const allTransactions =
+          cache != null ? cache : await transactionService.getAll({}, tenantId);
         const reportEndDate = new Date(filters.endDate);
         const reportYear = reportEndDate.getFullYear();
         const reportMonth = reportEndDate.getMonth(); // 0-based (0=enero, 11=diciembre)
@@ -89,62 +128,13 @@ export const reportService = {
           return true;
         });
 
-        // console.log('🔍 Filtrado de gastos pendientes por mes:', {
-        //   reportMonth: `${reportYear}-${String(reportMonth + 1).padStart(2, '0')}`,
-        //   totalPendingInSystem: allTransactions.filter(t => t.type === 'salida' && t.status === 'pendiente').length,
-        //   pendingUntilReportMonth: allPendingTransactions.length,
-        //   pendingByMonth: allPendingTransactions.reduce((acc, t) => {
-        //     const tDate = t.date?.toDate ? t.date.toDate() : new Date(t.date);
-        //     const monthKey = `${tDate.getFullYear()}-${String(tDate.getMonth() + 1).padStart(2, '0')}`;
-        //     acc[monthKey] = (acc[monthKey] || 0) + 1;
-        //     return acc;
-        //   }, {})
-        // });
-
-        // Debug específico: buscar transacciones de agosto 2025
-        const augustTransactions = allTransactions.filter(transaction => {
-          const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
-          if (isNaN(transactionDate.getTime())) return false;
-          return transactionDate.getMonth() === 7 && transactionDate.getFullYear() === 2025; // Agosto = mes 7
-        });
-
-
-        // Debug específico: buscar transacciones tipo 'salida' de agosto
-        const augustSalidas = allTransactions.filter(transaction => {
-          const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
-          if (isNaN(transactionDate.getTime())) return false;
-          return transactionDate.getMonth() === 7 && transactionDate.getFullYear() === 2025 && transaction.type === 'salida';
-        });
-
-        // Debug específico: buscar la transacción del 5 de agosto 2025
-        const specificDateTransactions = allTransactions.filter(transaction => {
-          const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
-          if (isNaN(transactionDate.getTime())) return false;
-          const dateStr = transactionDate.toISOString().split('T')[0];
-          return dateStr === '2025-08-05' || dateStr === '2025-08-04' || dateStr === '2025-08-06'; // Rango por si hay diferencia de zona horaria
-        });
-
-
-
-
-        // Todas las transacciones pendientes de tipo 'salida' contribuyen al arrastre
         const pendingExpenses = allPendingTransactions;
 
-        // Agregar todas las transacciones pendientes al reporte para el cálculo del arrastre
-        const beforeMerge = transactions.length;
         transactions = [...transactions, ...pendingExpenses];
-        const afterMerge = transactions.length;
 
-        // Eliminar duplicados (en caso de que una transacción pendiente ya esté en el período)
-        const uniqueTransactions = transactions.reduce((acc, current) => {
-          const exists = acc.find(item => item.id === current.id);
-          if (!exists) {
-            acc.push(current);
-          }
-          return acc;
-        }, []);
-
-        transactions = uniqueTransactions;
+        transactions = Array.from(
+          new Map(transactions.map((t) => [t.id, t])).values()
+        );
 
 
       } else {

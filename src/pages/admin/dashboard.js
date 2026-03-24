@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { useToast } from "../../components/ui/Toast";
 import { useAuth } from "../../context/AuthContextMultiTenant";
@@ -12,12 +12,51 @@ import { transactionService } from "../../lib/services/transactionService";
 import { conceptService } from "../../lib/services/conceptService";
 import { subconceptService } from "../../lib/services/subconceptService";
 import { recurringExpenseService } from "../../lib/services/recurringExpenseService";
-import { reportService } from "../../lib/services/reportService";
+import {
+  reportService,
+  filterTransactionsByDateRange,
+} from "../../lib/services/reportService";
 import TreeComparisonSection from "../../components/reports/TreeComparisonSection";
 import WeeklyBreakdownCombined from "../../components/reports/WeeklyBreakdownCombined";
 import WeeklyBreakdownEntradas from "../../components/reports/WeeklyBreakdownEntradas";
 import WeeklyBreakdownSalidas from "../../components/reports/WeeklyBreakdownSalidas";
 import { formatCurrency, formatCurrencyWithBadge, calculateTreeComparison } from "../../lib/utils/reportUtils";
+
+function groupTransactionsByDay(transactions, currentDate) {
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const dailyData = {};
+  for (let day = 1; day <= daysInMonth; day++) {
+    dailyData[`Día ${day}`] = {
+      entradas: 0,
+      salidas: 0,
+      entradasCount: 0,
+      salidasCount: 0,
+    };
+  }
+
+  transactions.forEach((transaction) => {
+    const transactionDate = transaction.date?.toDate
+      ? transaction.date.toDate()
+      : new Date(transaction.date);
+    const day = transactionDate.getDate();
+    const dayKey = `Día ${day}`;
+
+    if (dailyData[dayKey]) {
+      if (transaction.type === "entrada") {
+        dailyData[dayKey].entradas += transaction.amount || 0;
+        dailyData[dayKey].entradasCount++;
+      } else if (transaction.type === "salida") {
+        dailyData[dayKey].salidas += transaction.amount || 0;
+        dailyData[dayKey].salidasCount++;
+      }
+    }
+  });
+
+  return dailyData;
+}
 
 const Dashboard = () => {
   const { error, success } = useToast();
@@ -35,7 +74,14 @@ const Dashboard = () => {
 
   const [monthlyTrends, setMonthlyTrends] = useState([]);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [currentMonthName, setCurrentMonthName] = useState("");
+
+  const currentMonthName = useMemo(() => {
+    const monthName = currentDate.toLocaleDateString("es-ES", {
+      month: "long",
+      year: "numeric",
+    });
+    return monthName.charAt(0).toUpperCase() + monthName.slice(1);
+  }, [currentDate]);
 
   // States for report sections
   const [stats, setStats] = useState(null);
@@ -49,119 +95,46 @@ const Dashboard = () => {
     endDate: "",
   });
 
-  useEffect(() => {
-    if (tenantInfo?.id) {
-      loadDashboardData();
-      updateMonthName();
-    }
-  }, [currentDate, tenantInfo]);
+  const loadDashboardDataRef = useRef(async () => {});
 
-  // Separate useEffect for recurring transactions - only on component mount
-  useEffect(() => {
-    if (tenantInfo?.id) {
-      checkAndGenerateRecurringTransactions();
-    }
-  }, [tenantInfo]); // Only run when tenantInfo becomes available
-
-  const updateMonthName = () => {
-    const monthName = currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-    setCurrentMonthName(monthName.charAt(0).toUpperCase() + monthName.slice(1));
-  };
-
-  const checkAndGenerateRecurringTransactions = async () => {
-    try {
-      if (!tenantInfo?.id) {
-        return; // Don't run if tenant not available
-      }
-      
-      // First, run migration for existing expenses that don't have generatedMonths
-      await recurringExpenseService.migrateExistingExpenses(tenantInfo.id);
-      
-      // Then generate pending transactions for current month
-      const generatedTransactions = await recurringExpenseService.generatePendingTransactions(tenantInfo.id, user);
-      
-      if (generatedTransactions.length > 0) {
-        const currentMonthName = new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-        success(`🎯 Sistema automático: Se generaron ${generatedTransactions.length} gastos recurrentes para ${currentMonthName}`);
-        // Reload dashboard data to reflect the new transactions
-        setTimeout(() => {
-          loadDashboardData();
-        }, 1000);
-      }
-    } catch (error) {
-      console.error("Error auto-generating recurring transactions:", error);
-      // Keep it silent for users - no error toast
-    }
-  };
-
-  // Función para agrupar transacciones por día del mes
-  const groupTransactionsByDay = (transactions, currentDate) => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    
-    // Inicializar todos los días del mes con valores en 0
-    const dailyData = {};
-    for (let day = 1; day <= daysInMonth; day++) {
-      dailyData[`Día ${day}`] = {
-        entradas: 0,
-        salidas: 0,
-        entradasCount: 0,
-        salidasCount: 0,
-      };
-    }
-    
-    // Agrupar transacciones por día
-    transactions.forEach(transaction => {
-      const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
-      const day = transactionDate.getDate();
-      const dayKey = `Día ${day}`;
-      
-      if (dailyData[dayKey]) {
-        if (transaction.type === 'entrada') {
-          dailyData[dayKey].entradas += transaction.amount || 0;
-          dailyData[dayKey].entradasCount++;
-        } else if (transaction.type === 'salida') {
-          dailyData[dayKey].salidas += transaction.amount || 0;
-          dailyData[dayKey].salidasCount++;
-        }
-      }
-    });
-    
-    return dailyData;
-  };
-
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
 
-      // Get first and last day of the selected month
-      const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-      const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
+      const startOfMonth = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth(),
+        1
+      );
+      const endOfMonth = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth() + 1,
+        0,
+        23,
+        59,
+        59
+      );
 
-      // Format dates for filters
       const formatDateLocal = (date) => {
         const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
         return `${year}-${month}-${day}`;
       };
 
       const startDateStr = formatDateLocal(startOfMonth);
       const endDateStr = formatDateLocal(endOfMonth);
 
-      // Update filters for report components
       setFilters({
         startDate: startDateStr,
-        endDate: endDateStr
+        endDate: endDateStr,
       });
 
       const tenantId = tenantInfo?.id;
       if (!tenantId) {
-        throw new Error('No tenant ID available');
+        throw new Error("No tenant ID available");
       }
 
-      // Build filter data before parallel block so it can be used inside it
       const filterData = {
         startDate: startOfMonth,
         endDate: endOfMonth,
@@ -169,44 +142,54 @@ const Dashboard = () => {
         generalId: null,
         conceptId: null,
         subconceptId: null,
-        division: null
+        division: null,
       };
 
-      // Load all dashboard data in parallel for the selected month
       const [
         summaryData,
         trendsData,
-        allTransactions,
+        allTransactionsComplete,
         allConcepts,
         generalsData,
         subconceptsData,
-        transactionsForReport,
-        allTransactionsComplete
       ] = await Promise.all([
         dashboardService.getMonthSummary(startOfMonth, endOfMonth, tenantId),
         dashboardService.getMonthlyTrends(tenantId),
-        transactionService.getByDateRange(startOfMonth, endOfMonth, {}, tenantId),
+        transactionService.getAll({}, tenantId),
         conceptService.getAll(tenantId),
         generalService.getAll(tenantId),
         subconceptService.getAll(tenantId),
-        reportService.getFilteredTransactions(filterData, tenantId),
-        transactionService.getAll({}, tenantId)
       ]);
 
-      // generateReportStats depends on transactionsForReport — must be sequential
-      const statsData = await reportService.generateReportStats(transactionsForReport, filterData, tenantId);
+      const transactionsForReport = await reportService.getFilteredTransactions(
+        filterData,
+        tenantId,
+        { allTransactionsCache: allTransactionsComplete }
+      );
 
-      // Store data for report components
+      const statsData = await reportService.generateReportStats(
+        transactionsForReport,
+        filterData,
+        tenantId
+      );
+
+      const monthTxForChart = filterTransactionsByDateRange(
+        allTransactionsComplete,
+        startOfMonth,
+        endOfMonth,
+        {}
+      );
+      const dailyTransactions = groupTransactionsByDay(
+        monthTxForChart,
+        currentDate
+      );
+
       setGenerals(generalsData);
       setConcepts(allConcepts);
       setSubconcepts(subconceptsData);
       setStats(statsData);
       setTransactionsReport(transactionsForReport);
       setAllTransactionsReport(allTransactionsComplete);
-
-      // Agrupar transacciones por día
-      const dailyTransactions = groupTransactionsByDay(allTransactions, currentDate);
-
       setSummary(summaryData);
       setDailyData(dailyTransactions);
       setMonthlyTrends(trendsData);
@@ -216,7 +199,63 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentDate, tenantInfo?.id, error]);
+
+  loadDashboardDataRef.current = loadDashboardData;
+
+  const checkAndGenerateRecurringTransactions = useCallback(async () => {
+    try {
+      if (!tenantInfo?.id) {
+        return;
+      }
+
+      await recurringExpenseService.migrateExistingExpenses(tenantInfo.id);
+
+      const generatedTransactions =
+        await recurringExpenseService.generatePendingTransactions(
+          tenantInfo.id,
+          user
+        );
+
+      if (generatedTransactions.length > 0) {
+        const name = new Date().toLocaleDateString("es-ES", {
+          month: "long",
+          year: "numeric",
+        });
+        success(
+          `🎯 Sistema automático: Se generaron ${generatedTransactions.length} gastos recurrentes para ${name}`
+        );
+        setTimeout(() => {
+          loadDashboardDataRef.current();
+        }, 1000);
+      }
+    } catch (e) {
+      console.error("Error auto-generating recurring transactions:", e);
+    }
+  }, [tenantInfo?.id, user, success]);
+
+  useEffect(() => {
+    if (tenantInfo?.id) {
+      loadDashboardData();
+    }
+  }, [tenantInfo?.id, loadDashboardData]);
+
+  useEffect(() => {
+    if (tenantInfo?.id) {
+      checkAndGenerateRecurringTransactions();
+    }
+  }, [tenantInfo?.id, checkAndGenerateRecurringTransactions]);
+
+  const treeComparisonData = useMemo(() => {
+    if (!stats) return [];
+    return calculateTreeComparison(
+      allTransactionsReport,
+      stats,
+      filters,
+      generals,
+      concepts
+    );
+  }, [allTransactionsReport, stats, filters, generals, concepts]);
 
   const handleDateChange = (newDate) => {
     setCurrentDate(newDate);
@@ -299,7 +338,7 @@ const Dashboard = () => {
             <TreeComparisonSection
               stats={stats}
               currentMonthName={currentMonthName}
-              calculateTreeComparison={() => calculateTreeComparison(allTransactionsReport, stats, filters, generals, concepts)}
+              calculateTreeComparison={() => treeComparisonData}
               formatCurrency={formatCurrency}
               formatCurrencyWithBadge={formatCurrencyWithBadge}
               subconcepts={subconcepts}

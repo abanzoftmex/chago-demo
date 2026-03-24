@@ -11,6 +11,7 @@
     "setup-multi-tenant": "chmod +x scripts/setup-multi-tenant.sh && scripts/setup-multi-tenant.sh",
     "deploy-rules": "firebase deploy --only firestore:rules",
     "deploy-indexes": "firebase deploy --only firestore:indexes",
+    "deploy-firestore": "firebase deploy --only firestore",
     "simulate-september": "node scripts/simulate-september-2025-clean.cjs simulate",
     "simulate-october": "node scripts/simulate-october-2025.cjs simulate",
     "simulate-help": "node scripts/simulate-september-2025-clean.cjs help"
@@ -40,6 +41,7 @@
     "zustand": "^5.0.6"
   },
   "devDependencies": {
+    "firebase-tools": "^14.24.0",
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
     "eslint": "^9",

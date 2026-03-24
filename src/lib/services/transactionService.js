@@ -146,36 +146,81 @@ export const transactionService = {
       return transactions;
     } catch (error) {
       console.error("Error getting transactions:", error);
-      // Fallback to original method if date filtering fails
+      // Sin índice compuesto (p. ej. generalId + type + orderBy createdAt), Firestore falla.
+      // Leemos la colección y aplicamos filtros en cliente (mismos resultados; más lecturas si hay muchos docs).
       try {
         const collectionPath = getTransactionsCollection(tenantId);
-        let fallbackQ = collection(db, collectionPath);
-
-        // Apply basic filters without date filtering
-        if (filters.type) {
-          fallbackQ = query(fallbackQ, where("type", "==", filters.type));
-        }
-
-        fallbackQ = query(fallbackQ, orderBy("createdAt", "desc"));
-
-        if (filters.limit) {
-          fallbackQ = query(fallbackQ, limit(filters.limit * 3)); // Get more to filter later
-        }
-
-        const fallbackSnapshot = await getDocs(fallbackQ);
+        const fallbackSnapshot = await getDocs(collection(db, collectionPath));
         let fallbackTransactions = [];
-
-        fallbackSnapshot.forEach((doc) => {
-          fallbackTransactions.push({ id: doc.id, ...doc.data() });
+        fallbackSnapshot.forEach((docSnap) => {
+          fallbackTransactions.push({ id: docSnap.id, ...docSnap.data() });
         });
 
-        // Apply date filtering after getting results
+        if (filters.type) {
+          fallbackTransactions = fallbackTransactions.filter(
+            (t) => t.type === filters.type
+          );
+        }
+        if (filters.providerId) {
+          fallbackTransactions = fallbackTransactions.filter(
+            (t) => t.providerId === filters.providerId
+          );
+        }
+        if (filters.generalId) {
+          fallbackTransactions = fallbackTransactions.filter(
+            (t) => t.generalId === filters.generalId
+          );
+        }
+        if (filters.conceptId) {
+          fallbackTransactions = fallbackTransactions.filter(
+            (t) => t.conceptId === filters.conceptId
+          );
+        }
+        if (filters.subconceptId) {
+          fallbackTransactions = fallbackTransactions.filter(
+            (t) => t.subconceptId === filters.subconceptId
+          );
+        }
+        if (filters.status) {
+          fallbackTransactions = fallbackTransactions.filter(
+            (t) => t.status === filters.status
+          );
+        }
+        if (filters.excludeStatus) {
+          fallbackTransactions = fallbackTransactions.filter(
+            (t) => t.status !== filters.excludeStatus
+          );
+        }
+        if (filters.division) {
+          fallbackTransactions = fallbackTransactions.filter(
+            (t) => t.division === filters.division
+          );
+        }
         if (filters.startDate && filters.endDate) {
-          fallbackTransactions = fallbackTransactions.filter(transaction => {
+          fallbackTransactions = fallbackTransactions.filter((transaction) => {
             if (!transaction.date) return false;
-            const transactionDate = transaction.date.toDate ? transaction.date.toDate() : new Date(transaction.date);
-            return transactionDate >= filters.startDate && transactionDate <= filters.endDate;
+            const transactionDate = transaction.date.toDate
+              ? transaction.date.toDate()
+              : new Date(transaction.date);
+            return (
+              transactionDate >= filters.startDate &&
+              transactionDate <= filters.endDate
+            );
           });
+        }
+
+        fallbackTransactions.sort((a, b) => {
+          const da = a.createdAt?.toDate
+            ? a.createdAt.toDate()
+            : new Date(a.createdAt || 0);
+          const db = b.createdAt?.toDate
+            ? b.createdAt.toDate()
+            : new Date(b.createdAt || 0);
+          return db.getTime() - da.getTime();
+        });
+
+        if (filters.limit) {
+          fallbackTransactions = fallbackTransactions.slice(0, filters.limit);
         }
 
         return fallbackTransactions;
