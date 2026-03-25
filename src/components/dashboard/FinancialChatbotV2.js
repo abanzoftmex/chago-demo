@@ -295,7 +295,7 @@ const FinancialChatbotV2 = () => {
             title="Transacciones Detalladas"
             data={data.transactions.map((t) => ({
               fecha: t.dateString || new Date(t.date).toLocaleDateString("es-MX"),
-              concepto: t.concept || t.concepto,
+              concepto: [t.concept || t.concepto, t.subconceptName].filter(Boolean).join(" › "),
               monto: t.amount,
               tipo: t.type === "salida" ? "Salida" : "Entrada",
             }))}

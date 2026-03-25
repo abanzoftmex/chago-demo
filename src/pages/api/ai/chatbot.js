@@ -153,7 +153,8 @@ export default async function handler(req, res) {
     const financialData = prepareFinancialData(
       transactions,
       concepts,
-      providers
+      providers,
+      subconcepts
     );
 
     // Preparar datos específicos según la consulta
@@ -220,7 +221,82 @@ export default async function handler(req, res) {
   }
 }
 
-function prepareFinancialData(transactions, concepts, providers) {
+function stripDiacritics(str) {
+  return String(str || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+/** Extrae términos para buscar en descripción / subconcepto / concepto (ej. "tortillas"). */
+function extractSearchTerms(questionLower) {
+  const terms = new Set();
+  const stop = new Set([
+    "de",
+    "del",
+    "la",
+    "las",
+    "los",
+    "el",
+    "un",
+    "una",
+    "por",
+    "compra",
+    "compras",
+    "salida",
+    "salidas",
+    "gasto",
+    "gastos",
+    "total",
+    "cual",
+    "cuales",
+    "cuanto",
+    "cuánto",
+    "mis",
+    "que",
+    "este",
+    "esta",
+    "actual",
+    "mes",
+  ]);
+
+  const patterns = [
+    /compras?\s+de\s+([^?.,;\n]+)/i,
+    /(?:entrada|entradas|ingreso|ingresos)\s+(?:de|por|relacionad[oa]s?\s+con)\s+([^?.,;\n]+)/i,
+    /(?:subconcepto|descripci[oó]n)[^?]*?["']([^"']+)["']/i,
+  ];
+
+  for (const re of patterns) {
+    const m = questionLower.match(re);
+    if (!m || !m[1]) continue;
+    const phrase = m[1].trim();
+    if (phrase.length < 2) continue;
+    const normalizedPhrase = stripDiacritics(phrase);
+    if (normalizedPhrase.length >= 2) terms.add(normalizedPhrase);
+
+    phrase.split(/\s+/).forEach((w) => {
+      const t = stripDiacritics(w).replace(/[^a-z0-9áéíóúñü]/gi, "");
+      if (t.length >= 3 && !stop.has(t)) terms.add(t);
+    });
+  }
+
+  return [...terms];
+}
+
+function transactionMatchesSearchTerms(t, searchTerms) {
+  if (!searchTerms?.length) return true;
+  const hay = stripDiacritics(
+    [t.description, t.subconceptName, t.concept, t.provider].filter(Boolean).join(" ")
+  );
+  return searchTerms.some((term) => hay.includes(term));
+}
+
+function prepareFinancialData(transactions, concepts, providers, subconcepts = []) {
+  const subconceptMap = {};
+  subconcepts.forEach((s) => {
+    subconceptMap[s.id] = s.name;
+  });
+
   const now = new Date();
 
   // Funciones helper para filtrar por fecha
@@ -355,6 +431,10 @@ function prepareFinancialData(transactions, concepts, providers) {
     const concept = concepts.find((c) => c.id === t.conceptId);
     const provider = providers.find((p) => p.id === t.providerId);
     const date = t.date.toDate ? t.date.toDate() : new Date(t.date);
+    const subconceptName =
+      t.subconceptId && subconceptMap[t.subconceptId]
+        ? subconceptMap[t.subconceptId]
+        : "";
 
     return {
       id: t.id,
@@ -369,6 +449,8 @@ function prepareFinancialData(transactions, concepts, providers) {
       week: getWeekNumber(date),
       concept: concept ? concept.name : "Sin concepto",
       conceptId: t.conceptId,
+      subconceptId: t.subconceptId || null,
+      subconceptName,
       provider: provider ? provider.name : "Sin proveedor",
       providerId: t.providerId,
       status: t.status,
@@ -519,6 +601,8 @@ function analyzeQuestion(question) {
     metrics: [],
     chartType: null,
     specific: false,
+    /** Términos para filtrar por descripción / subconcepto / concepto */
+    searchTerms: [],
   };
 
   // Meses en español para detectar consultas específicas
@@ -584,16 +668,26 @@ function analyzeQuestion(question) {
     }
   }
 
-  // Análisis de métricas solicitadas
-  if (questionLower.includes("gasto") || questionLower.includes("gasté")) {
+  // Análisis de métricas solicitadas (entradas/salidas: plural y singular)
+  if (
+    questionLower.includes("gasto") ||
+    questionLower.includes("gasté") ||
+    questionLower.includes("salida")
+  ) {
     analysis.metrics.push("gastos");
   }
-  if (questionLower.includes("ingreso")) {
+  if (questionLower.includes("ingreso") || questionLower.includes("entrada")) {
     analysis.metrics.push("ingresos");
+  }
+  if (questionLower.includes("egreso")) {
+    analysis.metrics.push("gastos");
   }
   if (questionLower.includes("balance")) {
     analysis.metrics.push("balance");
   }
+  analysis.metrics = [...new Set(analysis.metrics)];
+
+  analysis.searchTerms = extractSearchTerms(questionLower);
 
   // Análisis de tipo de gráfica sugerida
   if (
@@ -625,6 +719,33 @@ function analyzeQuestion(question) {
   }
 
   return analysis;
+}
+
+function timeFrameLabel(questionAnalysis) {
+  const tf = questionAnalysis?.timeframe;
+  if (tf === "current_month") return "mes actual";
+  if (tf === "current_week") return "semana en curso";
+  if (tf === "last_2_months") return "últimos 2 meses";
+  if (tf === "current_year") return "año en curso";
+  if (tf === "specific_month" && questionAnalysis.specificMonth != null) {
+    const months = [
+      "enero",
+      "febrero",
+      "marzo",
+      "abril",
+      "mayo",
+      "junio",
+      "julio",
+      "agosto",
+      "septiembre",
+      "octubre",
+      "noviembre",
+      "diciembre",
+    ];
+    const y = questionAnalysis.specificYear || new Date().getFullYear();
+    return `${months[questionAnalysis.specificMonth]} ${y}`;
+  }
+  return "período filtrado";
 }
 
 // Función para generar datos de gráfico específicos según la pregunta
@@ -788,6 +909,23 @@ function filterDataByQuestion(financialData, questionAnalysis) {
     });
   }
 
+  // Filtro por texto en descripción, subconcepto, concepto o proveedor
+  if (questionAnalysis.searchTerms?.length) {
+    filteredTransactions = filteredTransactions.filter((t) =>
+      transactionMatchesSearchTerms(t, questionAnalysis.searchTerms)
+    );
+  }
+
+  // Solo entradas o solo salidas cuando la pregunta es claramente de un tipo
+  const m = questionAnalysis.metrics || [];
+  const wantsIngresos = m.includes("ingresos");
+  const wantsGastos = m.includes("gastos");
+  if (wantsIngresos && !wantsGastos) {
+    filteredTransactions = filteredTransactions.filter((t) => t.type === "entrada");
+  } else if (wantsGastos && !wantsIngresos) {
+    filteredTransactions = filteredTransactions.filter((t) => t.type === "salida");
+  }
+
   // Recalcular métricas con transacciones filtradas
   const filteredGastos = filteredTransactions.filter(
     (t) => t.type === "salida"
@@ -798,6 +936,28 @@ function filterDataByQuestion(financialData, questionAnalysis) {
 
   const totalGastos = filteredGastos.reduce((sum, t) => sum + t.amount, 0);
   const totalIngresos = filteredIngresos.reduce((sum, t) => sum + t.amount, 0);
+
+  const insights = {};
+  if (filteredIngresos.length > 0) {
+    const mayor = filteredIngresos.reduce((a, b) => (a.amount >= b.amount ? a : b));
+    insights.mayorEntrada = {
+      amount: mayor.amount,
+      concept: mayor.concept,
+      dateString: mayor.dateString,
+      description: mayor.description || "",
+      subconceptName: mayor.subconceptName || "",
+    };
+  }
+  if (filteredGastos.length > 0) {
+    const mayorG = filteredGastos.reduce((a, b) => (a.amount >= b.amount ? a : b));
+    insights.mayorSalida = {
+      amount: mayorG.amount,
+      concept: mayorG.concept,
+      dateString: mayorG.dateString,
+      description: mayorG.description || "",
+      subconceptName: mayorG.subconceptName || "",
+    };
+  }
 
   // Recalcular gastos por concepto con datos filtrados
   const gastosPorConcepto = {};
@@ -870,6 +1030,16 @@ function filterDataByQuestion(financialData, questionAnalysis) {
     transaccionesDetalladas: filteredTransactions,
     periodo: questionAnalysis.timeframe || "all",
     sugerenciaTipoGrafica: questionAnalysis.chartType,
+    insights,
+    filtrosAplicados: {
+      searchTerms: questionAnalysis.searchTerms || [],
+      tipoMovimiento:
+        wantsIngresos && !wantsGastos
+          ? "solo_entradas"
+          : wantsGastos && !wantsIngresos
+            ? "solo_salidas"
+            : "ambos",
+    },
   };
 }
 
@@ -1014,6 +1184,12 @@ IMPORTANTE: Esta es una consulta NUEVA y ÚNICA. NO reutilices respuestas anteri
 
 DATOS FINANCIEROS FILTRADOS PARA ESTA CONSULTA (${timeFrameText[cleanedData.periodo] || "período solicitado"}):
 ${JSON.stringify(cleanedData, null, 2)}
+
+PRIORIDAD SOBRE RESÚMENES GENÉRICOS (obligatorio):
+- Revisa "filtrosAplicados": si tipoMovimiento es "solo_entradas" o "solo_salidas", NO mezcles el otro tipo en totales ni en narrativa.
+- Si "filtrosAplicados.searchTerms" no está vacío, las transacciones YA están filtradas por descripción, subconcepto, concepto o proveedor que contengan esos términos. Responde con el total de ESE subconjunto y lista o tabla relevante.
+- Usa "insights.mayorEntrada" o "insights.mayorSalida" cuando la pregunta pida la de mayor monto, el movimiento más alto, o "cuál es la que más tiene".
+- NO respondas con un "resumen general" de toda la cartera si los datos anteriores ya corresponden a un subconjunto filtrado (mes actual, solo entradas, búsqueda por texto, etc.).
 
 ${querySpecificData
       ? `
@@ -1208,10 +1384,76 @@ function generateFallbackResponse(question, filteredData, questionAnalysis) {
     gastosPorConcepto,
     gastosPorProveedor,
     transaccionesDetalladas,
+    insights,
+    filtrosAplicados,
   } = filteredData;
 
   // Análisis simple basado en palabras clave
   const questionLower = question.toLowerCase();
+
+  const wantsIngresos = questionAnalysis.metrics?.includes("ingresos");
+  const wantsGastos = questionAnalysis.metrics?.includes("gastos");
+
+  if (wantsIngresos && !wantsGastos && insights?.mayorEntrada) {
+    const me = insights.mayorEntrada;
+    const ingresosTx = (transaccionesDetalladas || []).filter(
+      (t) => t.type === "entrada"
+    );
+    let texto = `**Total de entradas** (${timeFrameLabel(questionAnalysis)}): **${formatCurrency(metricas.totalIngresos)}**.\n\n`;
+    texto += `La **entrada de mayor monto** es **${formatCurrency(me.amount)}** (${me.dateString}).\n`;
+    texto += `* **Concepto:** ${me.concept}\n`;
+    if (me.subconceptName) texto += `* **Subconcepto:** ${me.subconceptName}\n`;
+    if (me.description) texto += `* **Descripción:** ${me.description}\n`;
+    return {
+      text: texto,
+      data: {
+        metrics: {
+          "Total entradas": metricas.totalIngresos,
+          "Mayor entrada (monto)": me.amount,
+        },
+        transactions: ingresosTx
+          .sort((a, b) => new Date(b.date) - new Date(a.date))
+          .slice(0, 20),
+        percentages: [],
+        chartData: null,
+      },
+    };
+  }
+
+  if (
+    wantsGastos &&
+    !wantsIngresos &&
+    filtrosAplicados?.searchTerms?.length > 0
+  ) {
+    const salidasTx = (transaccionesDetalladas || []).filter(
+      (t) => t.type === "salida"
+    );
+    let texto = `**Total de salidas** filtradas (${filtrosAplicados.searchTerms.join(", ")} — ${timeFrameLabel(questionAnalysis)}): **${formatCurrency(metricas.totalGastos)}**.\n\n`;
+    if (insights?.mayorSalida) {
+      const ms = insights.mayorSalida;
+      texto += `El **gasto de mayor monto** en este filtro es **${formatCurrency(ms.amount)}** (${ms.dateString}).\n`;
+      texto += `* **Concepto:** ${ms.concept}\n`;
+      if (ms.subconceptName) texto += `* **Subconcepto:** ${ms.subconceptName}\n`;
+      if (ms.description) texto += `* **Descripción:** ${ms.description}\n`;
+    }
+    if (salidasTx.length === 0) {
+      texto = `No hay salidas que coincidan con la búsqueda (${filtrosAplicados.searchTerms.join(", ")}) en el período analizado.`;
+    }
+    return {
+      text: texto,
+      data: {
+        metrics: {
+          "Total salidas (filtro)": metricas.totalGastos,
+          Movimientos: salidasTx.length,
+        },
+        transactions: salidasTx
+          .sort((a, b) => new Date(b.date) - new Date(a.date))
+          .slice(0, 20),
+        percentages: [],
+        chartData: null,
+      },
+    };
+  }
 
   // Preguntas sobre gastos más altos
   if (
