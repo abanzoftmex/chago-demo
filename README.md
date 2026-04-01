@@ -2,7 +2,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Startedzv
 
-First, run the development server:aa
+First, run the development server:aas
 a
 ```bashaaa
 npm run devaa
