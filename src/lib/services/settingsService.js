@@ -94,21 +94,32 @@ export const settingsService = {
 
   async uploadLogo(file, tenantId) {
     try {
-      const storagePath = tenantId ? `branding/${tenantId}/logo` : 'branding/logo';
+      const ext = file.name?.split(".").pop() || "png";
+      const storagePath = tenantId
+        ? `branding/${tenantId}/logo.${ext}`
+        : `branding/logo.${ext}`;
       const storageRef = ref(storage, storagePath);
-      await uploadBytes(storageRef, file, { contentType: file.type });
-      const url = await getDownloadURL(storageRef);
+      const metadata = {
+        contentType: file.type || "application/octet-stream",
+        customMetadata: {
+          originalFileName: file.name,
+          uploadedAt: new Date().toISOString(),
+        },
+      };
+
+      const snapshot = await uploadBytes(storageRef, file, metadata);
+      const url = await getDownloadURL(snapshot.ref);
 
       const brandingRef = tenantId
         ? doc(db, "tenants", tenantId, "settings", "branding")
         : doc(db, SETTINGS_COLLECTION, "branding");
 
       await setDoc(brandingRef, { logoUrl: url, updatedAt: serverTimestamp() }, { merge: true });
-      // Invalidate SWR cache so sidebar and any consumer re-fetches immediately
       await mutate(["logo", tenantId], url, false);
       return url;
     } catch (error) {
       console.error("Error uploading logo:", error);
+      console.error("Error code:", error.code, "Server response:", error.serverResponse);
       throw new Error("Error al subir el logo: " + error.message);
     }
   },
