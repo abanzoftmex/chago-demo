@@ -105,7 +105,7 @@ const DevTools = () => {
       const newStatus = await reportService.getCarryoverInfo(now.getFullYear(), now.getMonth() + 1);
       setCarryoverStatus(newStatus);
       
-      success("Arrastre mensual procesado exitosamente");
+      toast.success("Arrastre mensual procesado exitosamente");
     } catch (err) {
       console.error("Error processing carryover:", err);
       setCarryoverResult({
@@ -113,7 +113,7 @@ const DevTools = () => {
         message: err.message || "Error al procesar el arrastre mensual",
         data: null
       });
-      error(err.message || "Error al procesar el arrastre mensual");
+      toast.error(err.message || "Error al procesar el arrastre mensual");
     } finally {
       setCarryoverLoading(false);
     }
@@ -283,15 +283,15 @@ const DevTools = () => {
                 </div>
 
                 <button
-                  onClick={handleProcessCarryover}
-                  disabled={processingCarryover}
+                  onClick={handleCarryoverProcess}
+                  disabled={carryoverLoading}
                   className={`px-4 py-2 text-white rounded-lg focus:ring-2 transition-colors ${
-                    processingCarryover 
+                    carryoverLoading 
                       ? 'bg-gray-400 cursor-not-allowed' 
                       : 'bg-green-600 hover:bg-green-700 focus:ring-green-500'
                   }`}
                 >
-                  {processingCarryover ? (
+                  {carryoverLoading ? (
                     <span className="flex items-center">
                       <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>

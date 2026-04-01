@@ -9,11 +9,11 @@ export function useLogoUrl() {
   const { tenantInfo } = useAuth();
   const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
 
-  const { data: logoUrl } = useSWR(
+  const { data: logoUrl, isLoading } = useSWR(
     tenantId ? ["logo", tenantId] : null,
     ([, id]) => logoFetcher(id),
     { revalidateOnFocus: false }
   );
 
-  return logoUrl ?? null;
+  return { logoUrl: logoUrl ?? null, isLoading };
 }

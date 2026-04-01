@@ -33,7 +33,7 @@ const Sidebar = ({
 }) => {
   const router = useRouter();
   const { checkPermission, userRole } = useAuth();
-  const logoUrl = useLogoUrl();
+  const { logoUrl, isLoading: logoLoading } = useLogoUrl();
 
 
 
@@ -84,7 +84,9 @@ const Sidebar = ({
         <div className="flex flex-col w-full bg-white border-r border-gray-200">
           {/* Logo */}
           <div className="flex items-center justify-center mb-4 mt-4 px-2">
-            {logoUrl ? (
+            {logoLoading ? (
+              <div className={`rounded-2xl shadow-md bg-gray-100 animate-pulse ${collapsed ? 'w-10 h-10' : 'w-[120px] h-[60px]'}`} />
+            ) : logoUrl ? (
               <img
                 src={logoUrl}
                 alt="Logo"
@@ -460,7 +462,9 @@ const Sidebar = ({
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-center px-4 py-6 border-b border-gray-200 relative">
-            {logoUrl ? (
+            {logoLoading ? (
+              <div className="w-[120px] h-[60px] rounded-2xl shadow-md bg-gray-100 animate-pulse" />
+            ) : logoUrl ? (
               <img src={logoUrl} alt="Logo" className="max-w-[120px] h-auto rounded-2xl shadow-md" />
             ) : (
               <div className="flex items-center justify-center w-[120px] h-[60px] rounded-2xl shadow-md bg-primary text-white font-bold text-xl tracking-widest">
