@@ -16,6 +16,7 @@ export default async function handler(req, res) {
   try {
     const {
       userId,
+      email,
       password,
       role,
       displayName,
@@ -37,6 +38,9 @@ export default async function handler(req, res) {
     if (!userId) {
       return res.status(400).json({ message: "ID de usuario requerido" });
     }
+
+    const normalizedEmail =
+      typeof email === "string" && email.trim() ? email.trim().toLowerCase() : null;
 
     // Verify the token and get user info
     let currentUser;
@@ -95,8 +99,26 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: "Rol inválido" });
     }
 
+    const authUser = await admin.auth().getUser(userId);
+
+    if (normalizedEmail) {
+      try {
+        const existingUser = await admin.auth().getUserByEmail(normalizedEmail);
+        if (existingUser.uid !== userId) {
+          return res.status(400).json({ message: "El correo electrónico ya está registrado" });
+        }
+      } catch (error) {
+        if (error.code !== "auth/user-not-found") {
+          throw error;
+        }
+      }
+    }
+
     // Update user in Firebase Auth if password or displayName provided
     const authUpdates = {};
+    if (normalizedEmail && normalizedEmail !== authUser.email?.toLowerCase()) {
+      authUpdates.email = normalizedEmail;
+    }
     if (password && password.length >= 6) {
       authUpdates.password = password;
     }
@@ -125,6 +147,9 @@ export default async function handler(req, res) {
     if (displayName) {
       updates.displayName = displayName;
     }
+    if (normalizedEmail) {
+      updates.email = normalizedEmail;
+    }
 
     const memberRef = admin
       .firestore()
@@ -136,12 +161,13 @@ export default async function handler(req, res) {
     batch.update(memberRef, updates);
 
     // Update user document if displayName changed
-    if (displayName) {
+    if (displayName || normalizedEmail) {
       const userRef = admin.firestore().collection("users").doc(userId);
       batch.set(
         userRef,
         {
-          displayName: displayName,
+          ...(displayName ? { displayName } : {}),
+          ...(normalizedEmail ? { email: normalizedEmail } : {}),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
         { merge: true }
@@ -189,6 +215,14 @@ export default async function handler(req, res) {
 
     if (error.code === "auth/weak-password") {
       return res.status(400).json({ message: "La contraseña es muy débil" });
+    }
+
+    if (error.code === "auth/email-already-exists") {
+      return res.status(400).json({ message: "El correo electrónico ya está registrado" });
+    }
+
+    if (error.code === "auth/invalid-email") {
+      return res.status(400).json({ message: "Correo electrónico inválido" });
     }
 
     return res.status(500).json({

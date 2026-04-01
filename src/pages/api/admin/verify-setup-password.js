@@ -1,3 +1,8 @@
+import {
+  createSetupSessionCookie,
+  setupSessionDurationMs,
+} from "../../../lib/server/setupSession";
+
 /**
  * API para verificar la contraseña maestra del setup de tenants
  * POST /api/admin/verify-setup-password
@@ -26,7 +31,11 @@ export default function handler(req, res) {
   }
 
   if (password === setupPassword) {
-    return res.status(200).json({ authorized: true });
+    res.setHeader("Set-Cookie", createSetupSessionCookie(setupPassword));
+    return res.status(200).json({
+      authorized: true,
+      expiresInMs: setupSessionDurationMs,
+    });
   }
 
   return res.status(401).json({ 

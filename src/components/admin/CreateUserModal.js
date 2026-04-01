@@ -98,7 +98,7 @@ const CreateUserModal = ({ onClose, onUserCreated, editingUser = null }) => {
               htmlFor="email"
               className="block text-sm font-medium text-gray-700"
             >
-              Email {editingUser ? "(no editable)" : "*"}
+              Email *
             </label>
             <input
               type="email"
@@ -107,13 +107,12 @@ const CreateUserModal = ({ onClose, onUserCreated, editingUser = null }) => {
               required
               value={formData.email}
               onChange={handleChange}
-              disabled={editingUser}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
               placeholder="usuario@ejemplo.com"
             />
             {editingUser && (
               <p className="mt-1 text-xs text-gray-500">
-                El email no se puede cambiar por motivos de seguridad
+                Puedes actualizar el correo sin cambiar el UID del usuario. El sistema validará que no exista otro usuario con ese email.
               </p>
             )}
           </div>
