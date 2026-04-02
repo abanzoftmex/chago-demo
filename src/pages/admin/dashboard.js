@@ -11,6 +11,7 @@ import { generalService } from "../../lib/services/generalService";
 import { transactionService } from "../../lib/services/transactionService";
 import { conceptService } from "../../lib/services/conceptService";
 import { subconceptService } from "../../lib/services/subconceptService";
+import { providerService } from "../../lib/services/providerService";
 import { recurringExpenseService } from "../../lib/services/recurringExpenseService";
 import {
   reportService,
@@ -90,6 +91,7 @@ const Dashboard = () => {
   const [generals, setGenerals] = useState([]);
   const [concepts, setConcepts] = useState([]);
   const [subconcepts, setSubconcepts] = useState([]);
+  const [providers, setProviders] = useState([]);
   const [filters, setFilters] = useState({
     startDate: "",
     endDate: "",
@@ -152,6 +154,7 @@ const Dashboard = () => {
         allConcepts,
         generalsData,
         subconceptsData,
+        providersData,
       ] = await Promise.all([
         dashboardService.getMonthSummary(startOfMonth, endOfMonth, tenantId),
         dashboardService.getMonthlyTrends(tenantId),
@@ -159,6 +162,7 @@ const Dashboard = () => {
         conceptService.getAll(tenantId),
         generalService.getAll(tenantId),
         subconceptService.getAll(tenantId),
+        providerService.getAll(tenantId),
       ]);
 
       const transactionsForReport = await reportService.getFilteredTransactions(
@@ -187,6 +191,7 @@ const Dashboard = () => {
       setGenerals(generalsData);
       setConcepts(allConcepts);
       setSubconcepts(subconceptsData);
+      setProviders(providersData || []);
       setStats(statsData);
       setTransactionsReport(transactionsForReport);
       setAllTransactionsReport(allTransactionsComplete);
@@ -328,6 +333,7 @@ const Dashboard = () => {
               formatCurrencyWithBadge={formatCurrencyWithBadge}
               subconcepts={subconcepts}
               generals={generals}
+              providers={providers}
             />
 
             {/* Weekly Breakdown Combined (Entradas + Salidas) */}
@@ -338,6 +344,7 @@ const Dashboard = () => {
               generals={generals}
               concepts={concepts}
               subconcepts={subconcepts}
+              providers={providers}
               filters={filters}
               currentDate={currentDate}
               formatCurrency={formatCurrency}
@@ -351,6 +358,7 @@ const Dashboard = () => {
               generals={generals}
               concepts={concepts}
               subconcepts={subconcepts}
+              providers={providers}
               filters={filters}
               currentDate={currentDate}
               formatCurrency={formatCurrency}
@@ -364,6 +372,7 @@ const Dashboard = () => {
               generals={generals}
               concepts={concepts}
               subconcepts={subconcepts}
+              providers={providers}
               filters={filters}
               currentDate={currentDate}
               formatCurrency={formatCurrency}

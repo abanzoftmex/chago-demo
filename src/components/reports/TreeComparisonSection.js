@@ -1,5 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { EyeIcon, XMarkIcon, ArrowUpIcon, ArrowDownIcon } from "@heroicons/react/24/outline";
+import {
+  buildProviderNameMap,
+  getTransactionProviderLabel,
+} from "../../lib/utils/reportUtils";
 
 const TreeComparisonSection = ({
   stats,
@@ -9,8 +13,14 @@ const TreeComparisonSection = ({
   formatCurrencyWithBadge,
   subconcepts,
   generals,
+  providers = [],
 }) => {
   const [selectedTreeTransactions, setSelectedTreeTransactions] = useState(null);
+
+  const providerNameMap = useMemo(
+    () => buildProviderNameMap(providers),
+    [providers]
+  );
 
   const treeData = calculateTreeComparison();
 
@@ -90,7 +100,10 @@ const TreeComparisonSection = ({
                         <td className="px-3 py-2 whitespace-nowrap text-center">
                           <div className="inline-flex flex-col items-center">
                             <span className="text-sm font-bold text-foreground">
-                              {stats?.weeklyBreakdown?.weeks?.[tree.weekInfo?.weekIndex]?.weekNumber ?? tree.weekNumber}
+                              {tree.isoWeekNumber ??
+                                stats?.weeklyBreakdown?.weeks?.[tree.weekInfo?.weekIndex]
+                                  ?.weekNumber ??
+                                tree.weekNumber}
                             </span>
                             {tree.weekInfo && (
                               <span className="text-[10px] text-muted-foreground mt-0.5">
@@ -180,7 +193,7 @@ const TreeComparisonSection = ({
                         <td className="px-3 py-2 whitespace-nowrap text-xs text-right">
                           <button
                             onClick={() => setSelectedTreeTransactions(tree)}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700 hover:text-blue-800 font-medium transition-colors cursor-pointer border border-blue-300"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-100 hover:bg-purple-200 text-purple-800 hover:text-purple-900 font-medium transition-colors cursor-pointer border border-purple-300"
                           >
                             <EyeIcon className="h-3 w-3" />
                             <span>{tree.transactionCount}</span>
@@ -198,6 +211,13 @@ const TreeComparisonSection = ({
 
       {/* Modal de Transacciones de Árbol Mixto */}
       {selectedTreeTransactions && (() => {
+        const modalWeekYearNumber =
+          selectedTreeTransactions.isoWeekNumber ??
+          stats?.weeklyBreakdown?.weeks?.[
+            selectedTreeTransactions.weekInfo?.weekIndex
+          ]?.weekNumber ??
+          selectedTreeTransactions.weekNumber;
+
         // Ordenar todas las transacciones cronológicamente usando createdAt (timestamp completo)
         const sortedTransactions = [...selectedTreeTransactions.transactions].sort((a, b) => {
           // Prioridad 1: Usar createdAt si está disponible (tiene timestamp completo)
@@ -237,13 +257,13 @@ const TreeComparisonSection = ({
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedTreeTransactions(null)} />
             <div className="relative bg-white rounded-xl shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden">
-              <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 rounded-t-xl">
+              <div className="bg-gradient-to-r from-purple-600 to-purple-800 px-6 py-4 rounded-t-xl">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-lg font-bold text-white">
-                      Detalle de Movimientos - Semana {selectedTreeTransactions.weekNumber}
+                      Detalle de Movimientos - Semana {modalWeekYearNumber}
                     </h3>
-                    <p className="text-blue-100 text-sm mt-0.5">
+                    <p className="text-purple-100 text-sm mt-0.5">
                       {selectedTreeTransactions.weekInfo && (
                         <span className="mr-3">
                           📅 {selectedTreeTransactions.weekInfo.startDate} - {selectedTreeTransactions.weekInfo.endDate}
@@ -380,7 +400,10 @@ const TreeComparisonSection = ({
                                 {transaction.description || 'Sin descripción'}
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                                {transaction.providerName || 'Sin proveedor'}
+                                {getTransactionProviderLabel(
+                                  transaction,
+                                  providerNameMap
+                                )}
                               </td>
                             </tr>
                           );
@@ -399,7 +422,8 @@ const TreeComparisonSection = ({
 
               <div className="px-6 py-3 bg-gray-50 border-t border-gray-200 rounded-b-xl">
                 <div className="text-xs text-gray-600 text-center">
-                  Mostrando <strong>{transactionsWithBalance.length}</strong> transacciones de la Semana {selectedTreeTransactions.weekNumber} • Ordenadas por fecha/hora de registro
+                  Mostrando <strong>{transactionsWithBalance.length}</strong> transacciones de la Semana{" "}
+                  {modalWeekYearNumber} • Ordenadas por fecha/hora de registro
                 </div>
               </div>
             </div>

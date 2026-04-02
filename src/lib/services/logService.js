@@ -126,56 +126,73 @@ export const logService = {
         q = query(q, where("transactionType", "==", filters.transactionType));
       }
 
-      // Apply date filters
+      // Apply date filters (inicio/fin del día en hora local para evitar desfases)
       if (filters.startDate) {
-        const startTimestamp = Timestamp.fromDate(new Date(filters.startDate));
-        q = query(q, where("timestamp", ">=", startTimestamp));
+        const [y, m, d] = filters.startDate.split("-").map((n) => parseInt(n, 10));
+        const startDateLocal = new Date(y, m - 1, d, 0, 0, 0, 0);
+        q = query(q, where("timestamp", ">=", Timestamp.fromDate(startDateLocal)));
       }
 
       if (filters.endDate) {
-        const endTimestamp = Timestamp.fromDate(new Date(filters.endDate + " 23:59:59"));
-        q = query(q, where("timestamp", "<=", endTimestamp));
+        const [y, m, d] = filters.endDate.split("-").map((n) => parseInt(n, 10));
+        const endDateLocal = new Date(y, m - 1, d, 23, 59, 59, 999);
+        q = query(q, where("timestamp", "<=", Timestamp.fromDate(endDateLocal)));
       }
 
-      // Apply ordering by timestamp (newest first)
+      // Orden obligatorio antes de startAfter / limit
       q = query(q, orderBy("timestamp", "desc"));
-
-      // Apply pagination
-      if (filters.limit) {
-        const lim = typeof filters.limit === 'string' ? parseInt(filters.limit, 10) : filters.limit;
-        if (lim && !Number.isNaN(lim)) {
-          q = query(q, limit(lim));
-        }
-      }
 
       if (filters.startAfter) {
         q = query(q, startAfter(filters.startAfter));
       }
 
+      const lim =
+        filters.limit != null
+          ? typeof filters.limit === "string"
+            ? parseInt(filters.limit, 10)
+            : filters.limit
+          : null;
+      if (lim && !Number.isNaN(lim)) {
+        q = query(q, limit(lim));
+      }
+
       const querySnapshot = await getDocs(q);
       let logs = [];
 
-      querySnapshot.forEach((doc) => {
-        logs.push({ id: doc.id, ...doc.data() });
+      querySnapshot.forEach((docSnap) => {
+        logs.push({ id: docSnap.id, ...docSnap.data() });
       });
+
+      const lastDocSnapshot =
+        querySnapshot.docs.length > 0
+          ? querySnapshot.docs[querySnapshot.docs.length - 1]
+          : null;
 
       // Apply text search filter if provided (client-side filtering)
       if (filters.searchText && filters.searchText.trim()) {
         const searchText = filters.searchText.toLowerCase().trim();
-        logs = logs.filter(log => {
+        logs = logs.filter((log) => {
+          const extra = [
+            log.deletionReason || "",
+            log.transactionType || "",
+            typeof log.entityId === "string" ? log.entityId : "",
+          ].join(" ");
           const searchableFields = [
-            log.details || '',
-            log.userName || '',
-            log.entityType || '',
-            log.action || '',
-            log.entityId || ''
-          ].join(' ').toLowerCase();
+            log.details || "",
+            log.userName || "",
+            log.entityType || "",
+            log.action || "",
+            log.entityId || "",
+            extra,
+          ]
+            .join(" ")
+            .toLowerCase();
 
           return searchableFields.includes(searchText);
         });
       }
 
-      return logs;
+      return { logs, lastDocSnapshot };
     } catch (error) {
       console.error("Error getting logs:", error);
       throw new Error("Error al obtener los registros de log");

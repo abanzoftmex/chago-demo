@@ -3,7 +3,11 @@ import { EyeIcon, XMarkIcon, ClockIcon, CheckCircleIcon } from "@heroicons/react
 import { useWeekDayBreakdown } from "../../lib/hooks/useWeekDayBreakdown";
 import { usePersistedDisabledRows } from "../../lib/hooks/usePersistedDisabledRows";
 import WeekDayBreakdownModal from "./WeekDayBreakdownModal";
-import { parseWeekDate } from "../../lib/utils/reportUtils";
+import {
+  parseWeekDate,
+  buildProviderNameMap,
+  getTransactionProviderLabel,
+} from "../../lib/utils/reportUtils";
 import { useAuth } from "../../context/AuthContextMultiTenant";
 
 const PAYMENT_STATUS_CONFIG = {
@@ -20,6 +24,7 @@ const WeeklyBreakdownCombined = ({
   generals,
   concepts,
   subconcepts,
+  providers = [],
   filters,
   currentDate,
   formatCurrency
@@ -40,6 +45,7 @@ const WeeklyBreakdownCombined = ({
   const generalMap = useMemo(() => Object.fromEntries(generals.map((g) => [g.id, g.name])), [generals]);
   const conceptMap = useMemo(() => Object.fromEntries(concepts.map((c) => [c.id, c.name])), [concepts]);
   const subconceptMap = useMemo(() => Object.fromEntries(subconcepts.map((s) => [s.id, s.name])), [subconcepts]);
+  const providerNameMap = useMemo(() => buildProviderNameMap(providers), [providers]);
 
   // Combine entradas and salidas into a single ordered list
   const entradasRows = useMemo(
@@ -425,7 +431,10 @@ const WeeklyBreakdownCombined = ({
                                   {transaction.description || "Sin descripción"}
                                 </td>
                                 <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-600">
-                                  {transaction.providerName || "Sin proveedor"}
+                                  {getTransactionProviderLabel(
+                                    transaction,
+                                    providerNameMap
+                                  )}
                                 </td>
                                 <td className="px-3 py-2 whitespace-nowrap text-xs">
                                   <span

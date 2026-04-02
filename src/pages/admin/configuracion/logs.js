@@ -4,7 +4,6 @@ import AdminLayout from "../../../components/layout/AdminLayout";
 import RoleProtectedRoute from "../../../components/auth/RoleProtectedRoute";
 import { logService } from "../../../lib/services";
 import { useAuth } from "../../../context/AuthContextMultiTenant";
-import { useToast } from "../../../components/ui/Toast";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { generalService } from "../../../lib/services/generalService";
@@ -36,8 +35,6 @@ const LogsPage = () => {
   
   // Memoize tenantId to prevent unnecessary re-renders
   const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
-  const toast = useToast();
-
   // Función para obtener el tipo de transacción desde diferentes fuentes
   const getTransactionType = (log) => {
     return logService.extractTransactionType(log);
@@ -222,9 +219,9 @@ const LogsPage = () => {
   const [pagination, setPagination] = useState({
     currentPage: 1,
     hasMore: true,
-    lastDoc: null,
+    lastDocSnapshot: null,
     totalLoaded: 0,
-    docHistory: [], // Historial de documentos para navegación hacia atrás
+    docHistory: [],
   });
 
   // Estados para datos de referencia
@@ -265,45 +262,38 @@ const LogsPage = () => {
     }
   };
 
-  const loadLogs = async (page = 1, append = false) => {
+  const loadLogs = async (page = 1, append = false, filtersOverride = null) => {
     try {
       setLoading(true);
       setError("");
 
+      const activeFilters = filtersOverride ?? filters;
+      const lim = parseInt(String(activeFilters.limit), 10) || 20;
+
       const paginationFilters = {
-        ...filters,
+        ...activeFilters,
         tenantId,
-        startAfter: page > 1 ? pagination.lastDoc : null,
+        startAfter: page > 1 ? pagination.lastDocSnapshot : null,
       };
 
-      const logsData = await logService.getAll(paginationFilters);
-
-      // Debug: mostrar datos de logs
-      console.log("=== LOGS DATA DEBUG ===");
-      console.log("Raw logs data:", logsData);
-      if (logsData.length > 0) {
-        console.log("First log example:", logsData[0]);
-        console.log("First log entityData:", logsData[0].entityData);
-        console.log("First log previousData:", logsData[0].previousData);
-      }
-      console.log("=== END LOGS DATA DEBUG ===");
+      const { logs: logsData, lastDocSnapshot } = await logService.getAll(
+        paginationFilters
+      );
 
       if (append) {
-        setLogs(prevLogs => [...prevLogs, ...logsData]);
+        setLogs((prevLogs) => [...prevLogs, ...logsData]);
       } else {
         setLogs(logsData);
       }
 
-      // Update pagination state
-      const hasMore = logsData.length === parseInt(filters.limit);
-      const lastDoc = logsData.length > 0 ? logsData[logsData.length - 1] : null;
+      const hasMore = logsData.length === lim;
 
-      setPagination(prev => ({
+      setPagination((prev) => ({
         currentPage: page,
         hasMore,
-        lastDoc,
+        lastDocSnapshot,
         totalLoaded: append ? prev.totalLoaded + logsData.length : logsData.length,
-        docHistory: append ? [...prev.docHistory, prev.lastDoc] : [],
+        docHistory: append ? [...prev.docHistory, prev.lastDocSnapshot] : [],
       }));
     } catch (err) {
       console.error("Error loading logs:", err);
@@ -323,11 +313,11 @@ const LogsPage = () => {
     }));
 
     // If changing limit, reset pagination
-    if (name === 'limit') {
+    if (name === "limit") {
       setPagination({
         currentPage: 1,
         hasMore: true,
-        lastDoc: null,
+        lastDocSnapshot: null,
         totalLoaded: 0,
         docHistory: [],
       });
@@ -335,18 +325,31 @@ const LogsPage = () => {
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       e.preventDefault();
-      applyFilters();
+      const name = e.currentTarget.name;
+      const value = e.currentTarget.value;
+      const nextFilters =
+        name && Object.prototype.hasOwnProperty.call(filters, name)
+          ? { ...filters, [name]: value }
+          : filters;
+      setFilters(nextFilters);
+      setPagination({
+        currentPage: 1,
+        hasMore: true,
+        lastDocSnapshot: null,
+        totalLoaded: 0,
+        docHistory: [],
+      });
+      loadLogs(1, false, nextFilters);
     }
   };
 
   const applyFilters = () => {
-    // Reset pagination when applying filters
     setPagination({
       currentPage: 1,
       hasMore: true,
-      lastDoc: null,
+      lastDocSnapshot: null,
       totalLoaded: 0,
       docHistory: [],
     });
@@ -354,29 +357,23 @@ const LogsPage = () => {
   };
 
   const resetFilters = () => {
-    // Limpiar todos los filtros y resetear la vista
-    setFilters({
+    const cleared = {
       action: "",
       transactionType: "",
       searchText: "",
       startDate: "",
       endDate: "",
       limit: 20,
-    });
-
-    // Resetear paginación completamente para volver al estado inicial
+    };
+    setFilters(cleared);
     setPagination({
       currentPage: 1,
       hasMore: true,
-      lastDoc: null,
+      lastDocSnapshot: null,
       totalLoaded: 0,
       docHistory: [],
     });
-
-    // Recargar los datos desde el inicio
-    setTimeout(() => {
-      loadLogs(1, false);
-    }, 0);
+    loadLogs(1, false, cleared);
   };
 
   const loadNextPage = () => {
@@ -387,19 +384,20 @@ const LogsPage = () => {
 
   const loadPreviousPage = () => {
     if (pagination.currentPage > 1 && !loading) {
-      const previousDoc = pagination.docHistory[pagination.docHistory.length - 1];
+      const previousSnapshot =
+        pagination.docHistory[pagination.docHistory.length - 1];
       const newDocHistory = pagination.docHistory.slice(0, -1);
+      const pageSize = parseInt(String(filters.limit), 10) || 20;
 
-      setPagination(prev => ({
+      setPagination((prev) => ({
         ...prev,
         currentPage: prev.currentPage - 1,
-        lastDoc: previousDoc,
+        lastDocSnapshot: previousSnapshot ?? null,
         docHistory: newDocHistory,
-        totalLoaded: prev.totalLoaded - parseInt(filters.limit),
+        totalLoaded: Math.max(0, prev.totalLoaded - pageSize),
       }));
 
-      // Remove the last page of logs from the display
-      setLogs(prevLogs => prevLogs.slice(0, -parseInt(filters.limit)));
+      setLogs((prevLogs) => prevLogs.slice(0, -pageSize));
     }
   };
 

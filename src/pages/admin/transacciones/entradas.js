@@ -72,7 +72,7 @@ const Ingresos = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showImportModal, setShowImportModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const toast = useToast();
+  const { error: notifyError, success: notifySuccess } = useToast();
 
   // Check permissions based on user role in tenant
   const canManageTransactions = TENANT_ROLES && (tenantInfo?.role === TENANT_ROLES.ADMIN || tenantInfo?.role === TENANT_ROLES.CONTADOR);
@@ -162,11 +162,11 @@ const Ingresos = () => {
       setPaymentsMap(paymentsData);
     } catch (error) {
       console.error("Error loading transactions:", error);
-      toast.error("Error al cargar las transacciones");
+      notifyError("Error al cargar las transacciones");
     } finally {
       setLoading(false);
     }
-  }, [toast, currentDate, tenantId]);
+  }, [notifyError, currentDate, tenantId]);
 
   useEffect(() => {
     if (tenantId) {
@@ -185,7 +185,7 @@ const Ingresos = () => {
       setTransactions((prev) =>
         prev.map((t) => (t.id === transaction.id ? transaction : t))
       );
-      toast.success("Entrada actualizada exitosamente");
+      notifySuccess("Entrada actualizada exitosamente");
     } else {
       // Add new transaction to the list
       setTransactions((prev) => [transaction, ...prev]);
@@ -357,7 +357,7 @@ const Ingresos = () => {
   const exportToCSV = useCallback(() => {
     try {
       if (!tenantId) {
-        toast.error("Error: No se ha identificado el tenant");
+        notifyError("Error: No se ha identificado el tenant");
         return;
       }
 
@@ -385,14 +385,15 @@ const Ingresos = () => {
         `entradas_${monthYear.replace(" ", "_")}${tenantSlug}.csv`
       );
 
-      toast.success("Archivo CSV exportado exitosamente");
+      notifySuccess("Archivo CSV exportado exitosamente");
     } catch (error) {
       console.error("Error exporting to CSV:", error);
-      toast.error("Error al exportar el archivo CSV");
+      notifyError("Error al exportar el archivo CSV");
     }
   }, [
     tenantId,
-    toast,
+    notifyError,
+    notifySuccess,
     transactions,
     generalById,
     conceptById,
@@ -645,8 +646,8 @@ const Ingresos = () => {
                     <AdvancedDateSelector
                       currentDate={currentDate}
                       onDateChange={handleDateChange}
-                      onSuccess={toast.success}
-                      onError={toast.error}
+                      onSuccess={notifySuccess}
+                      onError={notifyError}
                       accentColor="green"
                     />
                   </div>
@@ -1050,7 +1051,7 @@ const Ingresos = () => {
           isOpen={showImportModal}
           onClose={() => setShowImportModal(false)}
           onSuccess={(message) => {
-            toast.success(message);
+            notifySuccess(message);
             loadTransactions();
           }}
           onImport={handleImportCSV}

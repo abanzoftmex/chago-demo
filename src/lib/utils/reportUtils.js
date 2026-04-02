@@ -49,10 +49,11 @@ export const calculateTreeComparison = (allTransactions, stats, filters, general
       const week = weeks[i];
       if (transactionTime >= week.startTimestamp && transactionTime <= week.endTimestamp) {
         return {
-          weekNumber: i + 1,
           weekIndex: i,
+          monthWeekOrder: i + 1,
+          isoWeekNumber: week.weekNumber,
           startDate: week.startDate,
-          endDate: week.endDate
+          endDate: week.endDate,
         };
       }
     }
@@ -96,8 +97,8 @@ export const calculateTreeComparison = (allTransactions, stats, filters, general
     const weekInfo = getWeekInfo(transactionDate);
     if (!weekInfo) return;
     
-    // Group by Week + General + Concept
-    const weekKey = weekInfo.weekNumber;
+    // Group by Week + General + Concept (monthWeekOrder = 1..n dentro del mes mostrado)
+    const weekKey = weekInfo.monthWeekOrder;
     const treeKey = `${transaction.generalId}|${transaction.conceptId}`;
     const key = `${weekKey}|${treeKey}`;
     
@@ -107,6 +108,7 @@ export const calculateTreeComparison = (allTransactions, stats, filters, general
       
       treeMap[key] = {
         weekNumber: weekKey,
+        isoWeekNumber: weekInfo.isoWeekNumber,
         weekInfo: weekInfo,
         generalId: transaction.generalId,
         generalName: general?.name || 'Sin categoría',
@@ -238,4 +240,21 @@ export const parseWeekDate = (dateValue, filters, currentDate) => {
     return new Date(currentYear, parseInt(month) - 1, parseInt(day));
   }
   return dateValue?.toDate ? dateValue.toDate() : new Date(dateValue);
+};
+
+export const buildProviderNameMap = (providers) => {
+  if (!providers?.length) return {};
+  return Object.fromEntries(providers.map((p) => [p.id, p.name]));
+};
+
+/** Resuelve nombre de proveedor desde catálogo (providerId) o campo embebido providerName. */
+export const getTransactionProviderLabel = (transaction, providerNameMap) => {
+  if (!transaction) return "Sin proveedor";
+  const fromMap =
+    transaction.providerId && providerNameMap?.[transaction.providerId];
+  if (fromMap) return fromMap;
+  const embedded =
+    typeof transaction.providerName === "string" && transaction.providerName.trim();
+  if (embedded) return transaction.providerName.trim();
+  return transaction.type === "entrada" ? "—" : "Sin proveedor";
 };

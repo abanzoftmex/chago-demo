@@ -79,7 +79,7 @@ const SolicitudesPago = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentPage, setCurrentPage] = useState(1);
   const [showImportModal, setShowImportModal] = useState(false);
-  const toast = useToast();
+  const { error: notifyError, success: notifySuccess } = useToast();
 
   // Check permissions based on user role in tenant
   const canManageTransactions = TENANT_ROLES && (tenantInfo?.role === TENANT_ROLES.ADMIN || tenantInfo?.role === TENANT_ROLES.CONTADOR);
@@ -183,11 +183,11 @@ const SolicitudesPago = () => {
       setPaymentsMap(paymentsData);
     } catch (error) {
       console.error("Error loading transactions:", error);
-      toast.error("Error al cargar las transacciones");
+      notifyError("Error al cargar las transacciones");
     } finally {
       setLoading(false);
     }
-  }, [toast, currentDate, tenantId]);
+  }, [notifyError, currentDate, tenantId]);
 
   useEffect(() => {
     if (tenantId) {
@@ -206,7 +206,7 @@ const SolicitudesPago = () => {
       setTransactions((prev) =>
         prev.map((t) => (t.id === transaction.id ? transaction : t))
       );
-      toast.success("Salida actualizada exitosamente");
+      notifySuccess("Salida actualizada exitosamente");
     } else {
       // Add new transaction to the list
       setTransactions((prev) => [transaction, ...prev]);
@@ -242,7 +242,7 @@ const SolicitudesPago = () => {
 
   const handleDeleteTransaction = async (transaction) => {
     if (!canDeleteTransactions) {
-      toast.error("No tienes permisos para eliminar transacciones");
+      notifyError("No tienes permisos para eliminar transacciones");
       return;
     }
 
@@ -256,10 +256,10 @@ const SolicitudesPago = () => {
           "Eliminación manual desde interfaz"
         );
         setTransactions((prev) => prev.filter((t) => t.id !== transaction.id));
-        toast.success("Transacción eliminada exitosamente");
+        notifySuccess("Transacción eliminada exitosamente");
       } catch (error) {
         console.error("Error deleting transaction:", error);
-        toast.error("Error al eliminar la transacción: " + error.message);
+        notifyError("Error al eliminar la transacción: " + error.message);
       }
     }
   };
@@ -516,7 +516,7 @@ const SolicitudesPago = () => {
   const exportToCSV = useCallback(() => {
     try {
       if (!tenantId) {
-        toast.error("Error: No hay información de tenant disponible");
+        notifyError("Error: No hay información de tenant disponible");
         return;
       }
 
@@ -549,14 +549,15 @@ const SolicitudesPago = () => {
       const tenantSlug = (tenantInfo?.name || "tenant").replace(/\s+/g, "_");
       const fileName = `salidas_${tenantSlug}_${monthYear}.csv`;
       triggerDownloadBlob(blob, fileName);
-      toast.success(`Archivo CSV exportado: ${fileName}`);
+      notifySuccess(`Archivo CSV exportado: ${fileName}`);
     } catch (error) {
       console.error("Error exporting CSV:", error);
-      toast.error("Error al exportar CSV: " + error.message);
+      notifyError("Error al exportar CSV: " + error.message);
     }
   }, [
     tenantId,
-    toast,
+    notifyError,
+    notifySuccess,
     filteredTransactions,
     generalById,
     conceptById,
@@ -568,7 +569,7 @@ const SolicitudesPago = () => {
 
   const handleImportCSV = () => {
     if (!tenantId) {
-      toast.error(
+      notifyError(
         "Error: No hay información de tenant disponible para importar"
       );
       return;
@@ -792,8 +793,8 @@ const SolicitudesPago = () => {
                     <AdvancedDateSelector
                       currentDate={currentDate}
                       onDateChange={handleDateChange}
-                      onSuccess={toast.success}
-                      onError={toast.error}
+                      onSuccess={notifySuccess}
+                      onError={notifyError}
                     />
                   </div>
                   <p className="text-gray-600 mt-1">
@@ -1296,7 +1297,7 @@ const SolicitudesPago = () => {
           isOpen={showImportModal}
           onClose={() => setShowImportModal(false)}
           onSuccess={(message) => {
-            toast.success(message);
+            notifySuccess(message);
             loadTransactions();
           }}
           onImport={handleProcessImportCSV}

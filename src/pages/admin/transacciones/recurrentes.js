@@ -36,7 +36,7 @@ const GastosRecurrentes = () => {
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [togglingExpense, setTogglingExpense] = useState(null);
-  const toast = useToast();
+  const { error: notifyError, success: notifySuccess } = useToast();
 
   // Check permissions
   const canManageTransactions = checkPermission("canManageTransactions");
@@ -67,11 +67,11 @@ const GastosRecurrentes = () => {
       setGenerals(generalsData);
     } catch (error) {
       console.error("Error loading data:", error);
-      toast.error("Error al cargar los datos");
+      notifyError("Error al cargar los datos");
     } finally {
       setLoading(false);
     }
-  }, [toast, tenantId]);
+  }, [notifyError, tenantId]);
 
   useEffect(() => {
     // Only load if we have tenant info
@@ -134,13 +134,13 @@ const GastosRecurrentes = () => {
       );
       
       if (newStatus) {
-        toast.success("Salida recurrente activada exitosamente");
+        notifySuccess("Salida recurrente activada exitosamente");
       } else {
-        toast.success("Salida recurrente desactivada y transacciones futuras eliminadas");
+        notifySuccess("Salida recurrente desactivada y transacciones futuras eliminadas");
       }
     } catch (error) {
       console.error("Error toggling expense:", error);
-      toast.error("Error al cambiar el estado de la salida");
+      notifyError("Error al cambiar el estado de la salida");
     } finally {
       setTogglingExpense(null);
     }
@@ -169,10 +169,10 @@ const GastosRecurrentes = () => {
     try {
       await recurringExpenseService.delete(expenseId, tenantId);
       setRecurringExpenses(prev => prev.filter(expense => expense.id !== expenseId));
-      toast.success("Salida recurrente eliminada exitosamente");
+      notifySuccess("Salida recurrente eliminada exitosamente");
     } catch (error) {
       console.error("Error deleting expense:", error);
-      toast.error("Error al eliminar la salida recurrente");
+      notifyError("Error al eliminar la salida recurrente");
     }
   };
 

@@ -1,4 +1,11 @@
-import { useState, useEffect, createContext, useContext } from 'react';
+import {
+  useState,
+  useEffect,
+  createContext,
+  useContext,
+  useCallback,
+  useMemo,
+} from "react";
 import { 
   CheckCircleIcon, 
   ExclamationTriangleIcon, 
@@ -22,40 +29,57 @@ export const useToast = () => {
 export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
 
-  const addToast = (message, type = 'info', duration = 5000) => {
-    const id = Date.now() + Math.random();
-    const toast = { id, message, type, duration };
-    
-    setToasts(prev => [...prev, toast]);
+  const removeToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
 
-    // Auto remove toast after duration
-    if (duration > 0) {
-      setTimeout(() => {
-        removeToast(id);
-      }, duration);
-    }
+  const addToast = useCallback(
+    (message, type = "info", duration = 5000) => {
+      const id = Date.now() + Math.random();
+      const toast = { id, message, type, duration };
 
-    return id;
-  };
+      setToasts((prev) => [...prev, toast]);
 
-  const removeToast = (id) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id));
-  };
+      if (duration > 0) {
+        setTimeout(() => {
+          removeToast(id);
+        }, duration);
+      }
 
-  const success = (message, duration) => addToast(message, 'success', duration);
-  const error = (message, duration) => addToast(message, 'error', duration);
-  const warning = (message, duration) => addToast(message, 'warning', duration);
-  const info = (message, duration) => addToast(message, 'info', duration);
+      return id;
+    },
+    [removeToast]
+  );
 
-  const value = {
-    toasts,
-    addToast,
-    removeToast,
-    success,
-    error,
-    warning,
-    info
-  };
+  const success = useCallback(
+    (message, duration) => addToast(message, "success", duration),
+    [addToast]
+  );
+  const error = useCallback(
+    (message, duration) => addToast(message, "error", duration),
+    [addToast]
+  );
+  const warning = useCallback(
+    (message, duration) => addToast(message, "warning", duration),
+    [addToast]
+  );
+  const info = useCallback(
+    (message, duration) => addToast(message, "info", duration),
+    [addToast]
+  );
+
+  const value = useMemo(
+    () => ({
+      toasts,
+      addToast,
+      removeToast,
+      success,
+      error,
+      warning,
+      info,
+    }),
+    [toasts, addToast, removeToast, success, error, warning, info]
+  );
 
   return (
     <ToastContext.Provider value={value}>

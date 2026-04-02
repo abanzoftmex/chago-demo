@@ -11,6 +11,7 @@ import { formatDivision } from "../../../lib/constants/divisions";
 import {
   Search,
   TrendingUp,
+  TrendingDown,
   Filter,
   Users,
   Tag,
@@ -18,6 +19,7 @@ import {
   CheckCircle,
   RefreshCw,
   ClockIcon,
+  AlertCircleIcon,
   EyeIcon,
   Layers
 } from "lucide-react";
@@ -108,7 +110,6 @@ const Historial = () => {
     { value: "", label: "Todos los tipos" },
     { value: "entrada", label: "Entradas" },
     { value: "salida", label: "Salidas" },
-    { value: "ambos", label: "Ambos" }
   ];
 
   const statusOptions = [
@@ -144,6 +145,15 @@ const Historial = () => {
 
   // Date selector state
   const [selectedDate, setSelectedDate] = useState(new Date());
+
+  const historialMonthLabel = useMemo(() => {
+    const month = selectedDate.toLocaleDateString("es-ES", { month: "long" });
+    const year = selectedDate.getFullYear();
+    const capitalized = month.charAt(0).toUpperCase() + month.slice(1);
+    return `${capitalized} ${year}`;
+  }, [selectedDate]);
+
+  const historialTitle = `Historial ${historialMonthLabel}`;
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -193,7 +203,10 @@ const Historial = () => {
 
       // Build filter object (excluding status since we need all statuses for stats)
       const statsFilters = {
-        type: filters.type || undefined,
+        type:
+          filters.type === "entrada" || filters.type === "salida"
+            ? filters.type
+            : undefined,
         conceptId: filters.conceptId || undefined,
         subconceptId: filters.subconceptId || undefined,
         providerId: filters.providerId || undefined,
@@ -237,7 +250,10 @@ const Historial = () => {
 
         // Build filter object
         const appliedFilters = {
-          type: filters.type || undefined,
+          type:
+            filters.type === "entrada" || filters.type === "salida"
+              ? filters.type
+              : undefined,
           conceptId: filters.conceptId || undefined,
           subconceptId: filters.subconceptId || undefined,
           providerId: filters.providerId || undefined,
@@ -472,19 +488,19 @@ const Historial = () => {
   const getActiveFilters = () => {
     const activeFilters = [];
     
-    if (filters.type) {
+    if (filters.type === "entrada" || filters.type === "salida") {
       activeFilters.push({
-        label: 'Tipo',
-        value: filters.type === 'entrada' ? 'Entradas' : filters.type === 'salida' ? 'Salidas' : 'Ambos',
-        icon: filters.type === 'entrada' ? TrendingUp : filters.type === 'salida' ? TrendingDown : Layers
+        label: "Tipo",
+        value: filters.type === "entrada" ? "Entradas" : "Salidas",
+        icon: filters.type === "entrada" ? TrendingUp : TrendingDown,
       });
     }
     
     if (filters.status) {
       const statusConfig = {
-        'pendiente': { label: 'Pendiente', icon: Clock },
-        'parcial': { label: 'Parcial', icon: AlertCircle },
-        'pagado': { label: 'Pagado', icon: CheckCircle }
+        pendiente: { label: "Pendiente", icon: ClockIcon },
+        parcial: { label: "Parcial", icon: AlertCircleIcon },
+        pagado: { label: "Pagado", icon: CheckCircle },
       };
       const config = statusConfig[filters.status];
       activeFilters.push({
@@ -575,7 +591,7 @@ const Historial = () => {
 
   return (
     <AdminLayout
-      title="Historial"
+      title={historialTitle}
       breadcrumbs={[
         { name: "Dashboard", href: "/admin/dashboard" },
         { name: "Transacciones", href: "/admin/transacciones/entradas" },
@@ -591,9 +607,11 @@ const Historial = () => {
                 <ClockIcon className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Historial</h1>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  {historialTitle}
+                </h1>
                 <p className="text-gray-600 mt-1">
-                  Consulta y filtra todas las transacciones
+                  Consulta y filtra las transacciones del mes seleccionado.
                 </p>
               </div>
             </div>

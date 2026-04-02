@@ -3,7 +3,11 @@ import { EyeIcon, XMarkIcon, ClockIcon, CheckCircleIcon } from "@heroicons/react
 import { useWeekDayBreakdown } from "../../lib/hooks/useWeekDayBreakdown";
 import { usePersistedDisabledRows } from "../../lib/hooks/usePersistedDisabledRows";
 import WeekDayBreakdownModal from "./WeekDayBreakdownModal";
-import { parseWeekDate } from "../../lib/utils/reportUtils";
+import {
+  parseWeekDate,
+  buildProviderNameMap,
+  getTransactionProviderLabel,
+} from "../../lib/utils/reportUtils";
 import { useAuth } from "../../context/AuthContextMultiTenant";
 
 const PAYMENT_STATUS_CONFIG = {
@@ -20,6 +24,7 @@ const WeeklyBreakdownEntradas = ({
   generals,
   concepts,
   subconcepts,
+  providers = [],
   filters,
   currentDate,
   formatCurrency
@@ -34,6 +39,7 @@ const WeeklyBreakdownEntradas = ({
   const generalMap = useMemo(() => Object.fromEntries(generals.map((g) => [g.id, g.name])), [generals]);
   const conceptMap = useMemo(() => Object.fromEntries(concepts.map((c) => [c.id, c.name])), [concepts]);
   const subconceptMap = useMemo(() => Object.fromEntries(subconcepts.map((s) => [s.id, s.name])), [subconcepts]);
+  const providerNameMap = useMemo(() => buildProviderNameMap(providers), [providers]);
 
   if (!stats || !stats.weeklyBreakdown || !stats.weeklyBreakdown.weeks) {
     return null;
@@ -273,7 +279,10 @@ const WeeklyBreakdownEntradas = ({
                                   {transaction.description || 'Sin descripción'}
                                 </td>
                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                                  {transaction.providerName || 'Sin proveedor'}
+                                  {getTransactionProviderLabel(
+                                    transaction,
+                                    providerNameMap
+                                  )}
                                 </td>
                                 <td className="px-4 py-3 whitespace-nowrap text-sm">
                                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${paymentBadge.color}`}>
