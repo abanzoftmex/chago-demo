@@ -213,7 +213,7 @@ export default function TransactionCsvImportModal({
                   </li>
                   <li><strong>General:</strong> Nombre exacto del catálogo general existente en este tenant</li>
                   <li><strong>Concepto:</strong> Nombre exacto del concepto existente en este tenant</li>
-                  <li><strong>Subconcepto:</strong> Nombre del subconcepto (opcional, dejar vacío si no aplica)</li>
+                  <li><strong>Subconcepto:</strong> Nombre exacto del subconcepto existente en este tenant</li>
                   {type === "salida" && (
                     <li><strong>Proveedor:</strong> Nombre del proveedor (opcional, dejar vacío si no aplica)</li>
                   )}
