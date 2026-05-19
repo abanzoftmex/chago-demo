@@ -3,6 +3,7 @@ import { transactionService } from "../../lib/services/transactionService";
 import ConceptSelector from "./ConceptSelector";
 import SubconceptSelector from "./SubconceptSelector";
 import ProviderSelector from "./ProviderSelector";
+import ProviderForm from "./ProviderForm";
 import ConceptModal from "./ConceptModal";
 import SubconceptModal from "./SubconceptModal";
 import GeneralModal from "./GeneralModal";
@@ -61,6 +62,7 @@ const TransactionForm = ({
   const [showConceptModal, setShowConceptModal] = useState(false);
   const [showSubconceptModal, setShowSubconceptModal] = useState(false);
   const [showGeneralModal, setShowGeneralModal] = useState(false);
+  const [showProviderModal, setShowProviderModal] = useState(false);
   const [generals, setGenerals] = useState([]);
   const [concepts, setConcepts] = useState([]);
   const [loadingGenerals, setLoadingGenerals] = useState(false);
@@ -311,9 +313,9 @@ const TransactionForm = ({
         date: new Date(year, month, day),
       };
 
-      // Add providerId and division only for salidas
+      // Add providerId for both, division only for salidas
+      transactionData.providerId = formData.providerId || "";
       if (formData.type === "salida") {
-        transactionData.providerId = formData.providerId;
         transactionData.division = formData.division;
       }
 
@@ -556,6 +558,7 @@ const TransactionForm = ({
       ...prev,
       providerId: newProvider.id,
     }));
+    setShowProviderModal(false);
     toast.success("Proveedor creado exitosamente");
   };
 
@@ -747,53 +750,47 @@ const TransactionForm = ({
           </div>
         </div>
 
-        {/* Tercera fila: Proveedor - Solo para salidas */}
-        {formData.type === "salida" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Proveedor
-              </label>
-              <ProviderSelector
-                ref={providerSelectorRef}
-                value={formData.providerId}
-                onChange={handleProviderChange}
-                onCreateNew={() =>
-                  toast.info(
-                    "Funcionalidad de crear proveedor será implementada próximamente"
-                  )
-                }
-                disabled={loading}
-              />
-              {errors.providerId && (
-                <p className="mt-1 text-sm text-red-600">{errors.providerId}</p>
-              )}
-            </div>
-
-            {/* División oculta temporalmente */}
-            {/* <div>
-              <label htmlFor="division" className="block text-sm font-medium text-gray-700 mb-2">
-                División *
-              </label>
-              <select
-                id="division"
-                name="division"
-                value={formData.division}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500"
-                disabled={loading}
-                required
-              >
-                <option value="general">General</option>
-                <option value="2da_division">2nda división profesional</option>
-                <option value="3ra_division">3ra división profesional</option>
-              </select>
-              {errors.division && (
-                <p className="mt-1 text-sm text-red-600">{errors.division}</p>
-              )}
-            </div> */}
+        {/* Tercera fila: Proveedor - Para entradas y salidas */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Proveedor
+            </label>
+            <ProviderSelector
+              ref={providerSelectorRef}
+              value={formData.providerId}
+              onChange={handleProviderChange}
+              onCreateNew={() => setShowProviderModal(true)}
+              disabled={loading}
+            />
+            {errors.providerId && (
+              <p className="mt-1 text-sm text-red-600">{errors.providerId}</p>
+            )}
           </div>
-        )}
+
+          {/* División oculta temporalmente */}
+          {/* <div>
+            <label htmlFor="division" className="block text-sm font-medium text-gray-700 mb-2">
+              División *
+            </label>
+            <select
+              id="division"
+              name="division"
+              value={formData.division}
+              onChange={handleInputChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500"
+              disabled={loading}
+              required
+            >
+              <option value="general">General</option>
+              <option value="2da_division">2nda división profesional</option>
+              <option value="3ra_division">3ra división profesional</option>
+            </select>
+            {errors.division && (
+              <p className="mt-1 text-sm text-red-600">{errors.division}</p>
+            )}
+          </div> */}
+        </div>
 
         {/* Descripción - Ancho completo */}
         <div>
@@ -947,6 +944,14 @@ const TransactionForm = ({
         onClose={() => setShowSubconceptModal(false)}
         onSuccess={handleSubconceptCreated}
         concepts={concepts.filter(c => c.type === formData.type)}
+      />
+
+      {/* Provider Modal */}
+      <ProviderForm
+        provider={null}
+        isOpen={showProviderModal}
+        onSubmit={handleProviderCreated}
+        onCancel={() => setShowProviderModal(false)}
       />
     </div>
   );

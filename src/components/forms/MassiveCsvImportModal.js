@@ -21,7 +21,7 @@ concepto,Cuotas Mensuales,Cuotas regulares de socios,ingreso,Ingresos por Cuotas
 concepto,Servicios Básicos,Electricidad agua gas internet,gasto,Gastos Operativos
 concepto,Torneos,Organización de torneos,ingreso,Ingresos por Eventos`;
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);

@@ -12,6 +12,7 @@ import { conceptService } from "../../../lib/services/conceptService";
 import { generalService } from "../../../lib/services/generalService";
 import { subconceptService } from "../../../lib/services/subconceptService";
 import { paymentService } from "../../../lib/services/paymentService";
+import { providerService } from "../../../lib/services/providerService";
 import {
   formatDateIsoLocal,
   parseTransactionCsvDate,
@@ -39,6 +40,7 @@ const ENTRADA_CSV_HEADERS = [
   "General",
   "Concepto",
   "Subconcepto",
+  "Proveedor",
   "Descripción",
   "Monto",
   "Estado",
@@ -66,6 +68,7 @@ const Ingresos = () => {
   const [concepts, setConcepts] = useState([]);
   const [generals, setGenerals] = useState([]);
   const [subconcepts, setSubconcepts] = useState([]);
+  const [providers, setProviders] = useState([]);
   const [paymentsMap, setPaymentsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -109,6 +112,24 @@ const Ingresos = () => {
     () => catalogByNameMap(subconcepts),
     [subconcepts]
   );
+  const providerById = useMemo(() => {
+    const m = new Map();
+    for (const p of providers) m.set(p.id, p);
+    return m;
+  }, [providers]);
+
+  const providerByName = useMemo(
+    () => catalogByNameMap(providers),
+    [providers]
+  );
+
+  const getProviderLabel = useCallback(
+    (transaction) => {
+      if (!transaction?.providerId) return "N/A";
+      return providerById.get(transaction.providerId)?.name ?? "N/A";
+    },
+    [providerById]
+  );
 
   const currentMonthName = useMemo(() => {
     const monthName = currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
@@ -136,18 +157,20 @@ const Ingresos = () => {
         endDate: endOfMonth
       };
 
-      const [transactionsData, conceptsData, generalsData, subconceptsData] = await Promise.all(
+      const [transactionsData, conceptsData, generalsData, subconceptsData, providersData] = await Promise.all(
         [
           transactionService?.getAll(transactionQuery, tenantId) || [],
           conceptService?.getAll(tenantId) || [],
           generalService?.getAll(tenantId) || [],
           subconceptService?.getAll(tenantId) || [],
+          providerService?.getAll(tenantId) || [],
         ]
       );
       setTransactions(transactionsData);
       setConcepts(conceptsData);
       setGenerals(generalsData);
       setSubconcepts(subconceptsData);
+      setProviders(providersData);
 
       // Cargar pagos de todas las transacciones en paralelo
       const paymentsResults = await Promise.all(
@@ -361,15 +384,19 @@ const Ingresos = () => {
         return;
       }
 
-      const csvData = transactions.map((transaction) => [
-        formatDateIsoLocal(transaction.date),
-        generalById.get(transaction.generalId)?.name ?? "N/A",
-        conceptById.get(transaction.conceptId)?.name ?? "N/A",
-        subconceptById.get(transaction.subconceptId)?.name ?? "",
-        transaction.description || "",
-        transaction.amount || 0,
-        transaction.status || "pendiente",
-      ]);
+      const csvData = transactions.map((transaction) => {
+        const prov = getProviderLabel(transaction);
+        return [
+          formatDateIsoLocal(transaction.date),
+          generalById.get(transaction.generalId)?.name ?? "N/A",
+          conceptById.get(transaction.conceptId)?.name ?? "N/A",
+          subconceptById.get(transaction.subconceptId)?.name ?? "",
+          prov === "N/A" ? "" : prov,
+          transaction.description || "",
+          transaction.amount || 0,
+          transaction.status || "pendiente",
+        ];
+      });
 
       const csvContent = rowsToCsvString([ENTRADA_CSV_HEADERS, ...csvData]);
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -398,6 +425,7 @@ const Ingresos = () => {
     generalById,
     conceptById,
     subconceptById,
+    getProviderLabel,
     currentDate,
     tenantInfo?.name,
   ]);
@@ -419,7 +447,16 @@ const Ingresos = () => {
               );
             }
 
-            const dataLines = lines.slice(1);
+            const dataLines = lines
+              .slice(1)
+              .map((line, index) => ({ line, lineNumber: index + 2 }))
+              .filter(({ line }) => {
+                const trimmed = line.trim();
+                if (!trimmed) return false;
+                const cells = splitCsvLine(trimmed);
+                return !cells.every(cell => cell === "");
+              });
+
             const importResults = {
               total: dataLines.length,
               successful: 0,
@@ -427,8 +464,7 @@ const Ingresos = () => {
             };
 
             for (let i = 0; i < dataLines.length; i++) {
-              const line = dataLines[i];
-              const lineNumber = i + 2;
+              const { line, lineNumber } = dataLines[i];
 
               try {
                 const values = splitCsvLine(line);
@@ -439,9 +475,32 @@ const Ingresos = () => {
                   );
                 }
 
-                const generalName = values[1]?.trim();
-                const conceptName = values[2]?.trim();
-                const subconceptName = values[3]?.trim();
+                const hasProviderColumn = values.length >= 8;
+
+                let generalName;
+                let conceptName;
+                let subconceptName;
+                let providerName = "";
+                let description;
+                let amount;
+                let status;
+
+                if (hasProviderColumn) {
+                  generalName = values[1]?.trim();
+                  conceptName = values[2]?.trim();
+                  subconceptName = values[3]?.trim();
+                  providerName = values[4]?.trim() || "";
+                  description = values[5]?.trim();
+                  amount = values[6];
+                  status = values[7];
+                } else {
+                  generalName = values[1]?.trim();
+                  conceptName = values[2]?.trim();
+                  subconceptName = values[3]?.trim();
+                  description = values[4]?.trim();
+                  amount = values[5];
+                  status = values[6];
+                }
 
                 const general = generalByName.get(generalName);
                 if (!general) {
@@ -468,6 +527,17 @@ const Ingresos = () => {
                   subconceptId = subconcept.id;
                 }
 
+                let providerId = null;
+                if (hasProviderColumn && providerName) {
+                  const provider = providerByName.get(providerName);
+                  if (!provider) {
+                    throw new Error(
+                      `Línea ${lineNumber}: Proveedor "${providerName}" no encontrado`
+                    );
+                  }
+                  providerId = provider.id;
+                }
+
                 const dateString = values[0]?.trim();
                 if (!dateString) {
                   throw new Error(`Línea ${lineNumber}: La fecha es requerida`);
@@ -485,9 +555,10 @@ const Ingresos = () => {
                   generalId: general.id,
                   conceptId: concept.id,
                   subconceptId,
-                  description: values[4]?.trim() || "",
-                  amount: parseFloat(values[5]) || 0,
-                  status: values[6]?.trim()?.toLowerCase() || "pendiente",
+                  providerId,
+                  description: description || "",
+                  amount: parseFloat(amount) || 0,
+                  status: status?.trim()?.toLowerCase() || "pendiente",
                   date: transactionDate,
                 };
 
@@ -524,7 +595,7 @@ const Ingresos = () => {
         reader.readAsText(file);
       });
     },
-    [generalByName, conceptByName, subconceptByName]
+    [generalByName, conceptByName, subconceptByName, providerByName]
   );
 
   const filteredTransactions = useMemo(() => {
@@ -540,6 +611,7 @@ const Ingresos = () => {
       const subconceptName = transaction.subconceptId
         ? (subconceptById.get(transaction.subconceptId)?.name ?? "")
         : "";
+      const providerName = getProviderLabel(transaction);
       const description = (transaction.description || "").toLowerCase();
       const amountStr = (transaction.amount ?? "").toString();
       const statusStr = (transaction.status ?? "").toString().toLowerCase();
@@ -547,6 +619,7 @@ const Ingresos = () => {
         generalName.toLowerCase().includes(q) ||
         conceptName.toLowerCase().includes(q) ||
         subconceptName.toLowerCase().includes(q) ||
+        providerName.toLowerCase().includes(q) ||
         description.includes(q) ||
         amountStr.includes(q) ||
         statusStr.includes(q)
@@ -558,6 +631,7 @@ const Ingresos = () => {
     generalById,
     conceptById,
     subconceptById,
+    getProviderLabel,
   ]);
 
   const sortedTransactions = useMemo(
@@ -829,6 +903,9 @@ const Ingresos = () => {
                           <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                             Concepto
                           </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                            Proveedor
+                          </th>
                           <th className="px-6 py-3 text-left text-xs font-semibold text-green-900 uppercase tracking-wider bg-green-200">
                             Monto
                           </th>
@@ -856,6 +933,9 @@ const Ingresos = () => {
                                   lastClassName="font-medium text-gray-900"
                                   midClassName="text-gray-600"
                                 />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                                {getProviderLabel(transaction)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-800 bg-green-50">
                                 {formatCurrencyMx(transaction.amount)}
@@ -911,6 +991,9 @@ const Ingresos = () => {
                                 midClassName="text-gray-600 font-normal"
                               />
                             </div>
+                            <p className="text-sm text-muted-foreground">
+                              {getProviderLabel(transaction)}
+                            </p>
                           </div>
                           <div className="text-right">
                             <p className="text-lg font-semibold text-foreground">

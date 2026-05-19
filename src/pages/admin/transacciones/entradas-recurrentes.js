@@ -20,7 +20,7 @@ import {
   PencilIcon,
 } from '@heroicons/react/24/outline';
 
-const GastosRecurrentes = () => {
+const EntradasRecurrentes = () => {
   const router = useRouter();
   const { checkPermission, tenantInfo } = useAuth();
   
@@ -54,7 +54,7 @@ const GastosRecurrentes = () => {
       }
 
       const [expensesData, conceptsData, subconceptsData, providersData, generalsData] = await Promise.all([
-        recurringExpenseService.getAll(tenantId),
+        recurringExpenseService.getAll(tenantId, { type: "entrada" }),
         conceptService.getAll(tenantId),
         subconceptService.getAll(tenantId),
         providerService.getAll(tenantId),
@@ -110,11 +110,10 @@ const GastosRecurrentes = () => {
   };
 
   const handleToggleActive = async (expenseId, currentStatus) => {
-    // Si se va a desactivar, mostrar confirmación
     if (currentStatus) {
       const confirmed = confirm(
-        "¿Estás seguro de que deseas desactivar esta salida recurrente?\n\n" +
-        "⚠️ Esto eliminará todas las transacciones futuras generadas por esta salida recurrente.\n" +
+        "¿Estás seguro de que deseas desactivar esta entrada recurrente?\n\n" +
+        "⚠️ Esto eliminará todas las transacciones futuras generadas por esta entrada recurrente.\n" +
         "Las transacciones del mes actual y anteriores se mantendrán."
       );
       
@@ -135,13 +134,13 @@ const GastosRecurrentes = () => {
       );
       
       if (newStatus) {
-        notifySuccess("Salida recurrente activada exitosamente");
+        notifySuccess("Entrada recurrente activada exitosamente");
       } else {
-        notifySuccess("Salida recurrente desactivada y transacciones futuras eliminadas");
+        notifySuccess("Entrada recurrente desactivada y transacciones futuras eliminadas");
       }
     } catch (error) {
-      console.error("Error toggling expense:", error);
-      notifyError("Error al cambiar el estado de la salida");
+      console.error("Error toggling recurring entry:", error);
+      notifyError("Error al cambiar el estado de la entrada");
     } finally {
       setTogglingExpense(null);
     }
@@ -152,28 +151,18 @@ const GastosRecurrentes = () => {
     setShowDetailsModal(true);
   };
 
-  const handleCloseDetailsModal = () => {
-    setShowDetailsModal(false);
-    setSelectedExpense(null);
-  };
-
-  const handleShowDetails = (expense) => {
-    setSelectedExpense(expense);
-    setShowDetailsModal(true);
-  };
-
   const handleDelete = async (expenseId) => {
-    if (!confirm("¿Estás seguro de que deseas eliminar esta salida recurrente?")) {
+    if (!confirm("¿Estás seguro de que deseas eliminar esta entrada recurrente?")) {
       return;
     }
 
     try {
       await recurringExpenseService.delete(expenseId, tenantId);
       setRecurringExpenses(prev => prev.filter(expense => expense.id !== expenseId));
-      notifySuccess("Salida recurrente eliminada exitosamente");
+      notifySuccess("Entrada recurrente eliminada exitosamente");
     } catch (error) {
-      console.error("Error deleting expense:", error);
-      notifyError("Error al eliminar la salida recurrente");
+      console.error("Error deleting recurring entry:", error);
+      notifyError("Error al eliminar la entrada recurrente");
     }
   };
 
@@ -203,25 +192,25 @@ const GastosRecurrentes = () => {
   return (
     <ProtectedRoute>
       <AdminLayout
-        title="Salidas Recurrentes"
+        title="Entradas Recurrentes"
         breadcrumbs={[
           { name: "Dashboard", href: "/admin/dashboard" },
           { name: "Transacciones" },
-          { name: "Salidas Recurrentes" },
+          { name: "Entradas Recurrentes" },
         ]}
       >
         <div className="space-y-6">
           {/* Header */}
-          <div className="bg-gradient-to-r from-rose-50 to-pink-50 rounded-xl p-6 border border-rose-200">
+          <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl p-6 border border-emerald-200">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
               <div className="flex items-center space-x-4">
-                <div className="p-3 bg-rose-400 rounded-xl shadow-lg">
+                <div className="p-3 bg-emerald-500 rounded-xl shadow-lg">
                   <ArrowPathIcon className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Salidas Recurrentes</h1>
+                  <h1 className="text-2xl font-bold text-gray-900">Entradas Recurrentes</h1>
                   <p className="text-gray-600 mt-1">
-                    Gestiona las salidas que se generan automáticamente según la frecuencia configurada
+                    Gestiona las entradas que se generan automáticamente según la frecuencia configurada
                   </p>
                   <div className="flex items-center mt-2 text-sm text-gray-500">
                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -234,30 +223,29 @@ const GastosRecurrentes = () => {
               {canManageTransactions && (
                 <div className="flex flex-col sm:flex-row gap-3">
                   <button
-                    onClick={() => router.push('/admin/transacciones/recurrentes/nuevo')}
-                    className="px-6 py-3 bg-rose-400 text-white rounded-xl hover:bg-rose-500 focus:ring-4 focus:ring-rose-400/20 focus:ring-offset-2 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl font-medium"
-                  ><PlusIcon className="h-4 w-4 mr-1.5" />
-                    Nueva Salida Recurrente
+                    onClick={() => router.push('/admin/transacciones/entradas-recurrentes/nuevo')}
+                    className="px-6 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 focus:ring-4 focus:ring-emerald-400/20 focus:ring-offset-2 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl font-medium"
+                  >
+                    <PlusIcon className="h-4 w-4 mr-1.5" />
+                    Nueva Entrada Recurrente
                   </button>
                 </div>
               )}
             </div>
           </div>
 
-
-
           {/* Search and Filters */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
             <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-rose-400 rounded-lg">
+                  <div className="p-2 bg-emerald-500 rounded-lg">
                     <ArrowPathIcon className="h-4 w-4 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Lista de Salidas Recurrentes</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Lista de Entradas Recurrentes</h3>
                     <p className="text-sm text-gray-600">
-                      {filteredExpenses.length} salidas configuradas
+                      {filteredExpenses.length} entradas configuradas
                     </p>
                   </div>
                 </div>
@@ -277,7 +265,7 @@ const GastosRecurrentes = () => {
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         placeholder="Buscar por concepto, proveedor, descripción..."
-                        className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent text-sm"
+                        className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
                       />
                       <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -292,12 +280,12 @@ const GastosRecurrentes = () => {
               <div className="p-12 text-center">
                 <div className="max-w-sm mx-auto">
                   <div className="relative">
-                    <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200 border-t-rose-400 mx-auto"></div>
+                    <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200 border-t-emerald-500 mx-auto"></div>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-8 h-8 bg-rose-400 rounded-full opacity-20"></div>
+                      <div className="w-8 h-8 bg-emerald-500 rounded-full opacity-20"></div>
                     </div>
                   </div>
-                  <p className="text-gray-600 mt-4 font-medium">Cargando salidas recurrentes...</p>
+                  <p className="text-gray-600 mt-4 font-medium">Cargando entradas recurrentes...</p>
                   <p className="text-gray-500 text-sm mt-1">Por favor espera un momento</p>
                 </div>
               </div>
@@ -309,18 +297,16 @@ const GastosRecurrentes = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No hay salidas recurrentes</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No hay entradas recurrentes</h3>
                   <p className="text-gray-600 mb-6">
-                    Crea tu primera salida recurrente con la frecuencia que necesites: diaria, semanal, quincenal o mensual
+                    Crea tu primera entrada recurrente con la frecuencia que necesites: diaria, semanal, quincenal o mensual
                   </p>
                   <button
-                    onClick={() => router.push('/admin/transacciones/recurrentes/nuevo')}
-                    className="inline-flex items-center px-6 py-3 bg-rose-400 text-white rounded-xl hover:bg-rose-500 focus:ring-4 focus:ring-rose-400/20 transition-all duration-200 font-medium shadow-lg"
+                    onClick={() => router.push('/admin/transacciones/entradas-recurrentes/nuevo')}
+                    className="inline-flex items-center px-6 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 focus:ring-4 focus:ring-emerald-400/20 transition-all duration-200 font-medium shadow-lg"
                   >
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Crear primera salida recurrente
+                    <PlusIcon className="w-5 h-5 mr-2" />
+                    Crear primera entrada recurrente
                   </button>
                 </div>
               </div>
@@ -336,7 +322,6 @@ const GastosRecurrentes = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Proveedor</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Frecuencia</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Monto</th>
-                        {/* <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">División</th> */}
                         <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Acciones</th>
                       </tr>
                     </thead>
@@ -350,6 +335,7 @@ const GastosRecurrentes = () => {
                                 onChange={() => handleToggleActive(expense.id, expense.isActive)}
                                 loading={togglingExpense === expense.id}
                                 size="sm"
+                                color="emerald"
                                 disabled={!canManageTransactions}
                               />
                               <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
@@ -394,24 +380,21 @@ const GastosRecurrentes = () => {
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
                             {formatCurrency(expense.amount)}
                           </td>
-                          {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
-                            <span className="capitalize">{expense.division?.replace('_', ' ')}</span>
-                          </td> */}
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex items-center space-x-2">
                               <button
                                 onClick={() => handleViewDetails(expense)}
                                 title="Ver detalles de recurrente"
-                                className="bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-800 py-1.5 px-2.5 rounded-md transition-colors"
+                                className="bg-blue-100 hover:bg-blue-200 text-blue-600 hover:text-blue-800 py-1.5 px-2.5 rounded-md transition-colors"
                               >
-                                 <EyeIcon className="h-4 w-4" />
+                                <EyeIcon className="h-4 w-4" />
                               </button>
                               {canManageTransactions && (
                                 <>
                                   <button
-                                    onClick={() => router.push(`/admin/transacciones/recurrentes/editar/${expense.id}`)}
+                                    onClick={() => router.push(`/admin/transacciones/entradas-recurrentes/editar/${expense.id}`)}
                                     title="Editar recurrente"
-                                    className="bg-blue-100 hover:bg-blue-200 text-blue-600 hover:text-blue-800 py-1.5 px-2.5 rounded-md transition-colors"
+                                    className="bg-emerald-100 hover:bg-emerald-200 text-emerald-600 hover:text-emerald-800 py-1.5 px-2.5 rounded-md transition-colors"
                                   >
                                     <PencilIcon className="h-4 w-4" />
                                   </button>
@@ -447,7 +430,7 @@ const GastosRecurrentes = () => {
                               }`}>
                                 {expense.isActive ? 'Activo' : 'Inactivo'}
                               </span>
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-rose-100 text-rose-600">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-600">
                                 Recurrente
                               </span>
                               <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
@@ -469,6 +452,7 @@ const GastosRecurrentes = () => {
                               onChange={() => handleToggleActive(expense.id, expense.isActive)}
                               loading={togglingExpense === expense.id}
                               size="sm"
+                              color="emerald"
                               disabled={!canManageTransactions}
                             />
                           </div>
@@ -493,24 +477,21 @@ const GastosRecurrentes = () => {
                           <p className="text-sm font-medium text-foreground">
                             {formatCurrency(expense.amount)}
                           </p>
-                          {/* <p className="text-xs text-muted-foreground capitalize">
-                            {expense.division?.replace('_', ' ')}
-                          </p> */}
                         </div>
                       </div>
                       <div className="flex justify-end items-center mt-3 pt-3 border-t border-gray-100">
                         <div className="flex items-center space-x-2">
                           <button
                             onClick={() => handleViewDetails(expense)}
-                            className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors"
+                            className="bg-blue-100 hover:bg-blue-200 text-blue-600 hover:text-blue-800 py-1.5 px-2.5 rounded-md transition-colors"
                           >
                              <EyeIcon className="h-4 w-4" />
                           </button>
                           {canManageTransactions && (
                             <>
                               <button
-                                onClick={() => router.push(`/admin/transacciones/recurrentes/editar/${expense.id}`)}
-                                className="bg-blue-100 hover:bg-blue-200 text-blue-600 hover:text-blue-800 py-1.5 px-2.5 rounded-md transition-colors"
+                                onClick={() => router.push(`/admin/transacciones/entradas-recurrentes/editar/${expense.id}`)}
+                                className="bg-emerald-100 hover:bg-emerald-200 text-emerald-600 hover:text-emerald-800 py-1.5 px-2.5 rounded-md transition-colors"
                               >
                                 <PencilIcon className="h-4 w-4" />
                               </button>
@@ -535,6 +516,7 @@ const GastosRecurrentes = () => {
         {/* Details Modal */}
         {selectedExpense && (
           <RecurringExpenseDetailsModal
+            type="entrada"
             expense={selectedExpense}
             isOpen={showDetailsModal}
             onClose={() => {
@@ -551,4 +533,4 @@ const GastosRecurrentes = () => {
   );
 };
 
-export default GastosRecurrentes;
+export default EntradasRecurrentes;

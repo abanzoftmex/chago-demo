@@ -45,6 +45,7 @@ export const recurringExpenseService = {
       if (!tenantId) throw new Error('Tenant ID es requerido');
       const docRef = await addDoc(getCollection(tenantId), {
         ...expenseData,
+        type: expenseData.type || "salida",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         isActive: expenseData.isActive !== undefined ? expenseData.isActive : true,
@@ -55,10 +56,10 @@ export const recurringExpenseService = {
         frequency: expenseData.frequency || 'monthly', // Default to monthly for backward compatibility
       });
 
-      return { id: docRef.id, ...expenseData };
+      return { id: docRef.id, ...expenseData, type: expenseData.type || "salida" };
     } catch (error) {
       console.error("Error creating recurring expense:", error);
-      throw new Error("Error al crear el gasto recurrente");
+      throw new Error("Error al crear la transacción recurrente");
     }
   },
 
@@ -81,7 +82,11 @@ export const recurringExpenseService = {
         expenses.push({ id: doc.id, ...doc.data() });
       });
 
-      return expenses;
+      // Filter by type in-memory to support older documents without breaking queries
+      return expenses.filter(e => {
+        const itemType = e.type || "salida";
+        return filters.type ? itemType === filters.type : true;
+      });
     } catch (error) {
       console.error("Error getting recurring expenses:", error);
       // Retornar array vacío en lugar de error
@@ -101,7 +106,7 @@ export const recurringExpenseService = {
       return { id, ...updateData };
     } catch (error) {
       console.error("Error updating recurring expense:", error);
-      throw new Error("Error al actualizar el gasto recurrente");
+      throw new Error("Error al actualizar la transacción recurrente");
     }
   },
 
@@ -113,7 +118,7 @@ export const recurringExpenseService = {
       return true;
     } catch (error) {
       console.error("Error deleting recurring expense:", error);
-      throw new Error("Error al eliminar el gasto recurrente");
+      throw new Error("Error al eliminar la transacción recurrente");
     }
   },
 
@@ -128,7 +133,7 @@ export const recurringExpenseService = {
       const todayKey = this.formatDateKey(today);
       const generatedTransactions = [];
 
-      console.log(`Checking recurring expenses for date: ${todayKey}`);
+      console.log(`Checking recurring transactions for date: ${todayKey}`);
 
       for (const expense of activeExpenses) {
         // Initialize generatedDates array if it doesn't exist (for backward compatibility)
@@ -138,7 +143,7 @@ export const recurringExpenseService = {
 
         // Skip if start date is in the future
         if (startDate && startDate > today) {
-          console.log(`Skipping expense ${expense.id} - start date is in the future`);
+          console.log(`Skipping recurring item ${expense.id} - start date is in the future`);
           continue;
         }
 
@@ -148,7 +153,7 @@ export const recurringExpenseService = {
         if (shouldGenerate) {
           // Create the transaction for today
           const transactionData = {
-            type: "salida",
+            type: expense.type || "salida",
             generalId: expense.generalId,
             conceptId: expense.conceptId,
             subconceptId: expense.subconceptId,
@@ -390,20 +395,21 @@ export const recurringExpenseService = {
     try {
       const allExpenses = await this.getAll(tenantId);
       const expensesToMigrate = allExpenses.filter(expense =>
-        !expense.generatedMonths && !expense.generatedDates && !expense.frequency
+        !expense.generatedMonths || !expense.generatedDates || !expense.frequency || !expense.type
       );
 
       console.log(`Found ${expensesToMigrate.length} recurring expenses to migrate`);
 
       for (const expense of expensesToMigrate) {
         const updateData = {
-          generatedMonths: [],
-          generatedDates: [],
-          frequency: 'monthly' // Default to monthly for backward compatibility
+          generatedMonths: expense.generatedMonths || [],
+          generatedDates: expense.generatedDates || [],
+          frequency: expense.frequency || 'monthly', // Default to monthly for backward compatibility
+          type: expense.type || 'salida'
         };
 
         // If lastGenerated exists, we can infer some generated months
-        if (expense.lastGenerated) {
+        if (expense.lastGenerated && updateData.generatedMonths.length === 0) {
           const lastGeneratedDate = expense.lastGenerated.toDate();
           const monthKey = `${lastGeneratedDate.getFullYear()}-${String(lastGeneratedDate.getMonth()).padStart(2, '0')}`;
           const dateKey = this.formatDateKey(lastGeneratedDate);
@@ -413,7 +419,7 @@ export const recurringExpenseService = {
 
         // Update the expense with the new fields
         await this.update(expense.id, updateData, tenantId);
-        console.log(`Migrated recurring expense ${expense.id} with frequency: ${updateData.frequency}, dates: ${updateData.generatedDates.join(', ')}`);
+        console.log(`Migrated recurring expense ${expense.id} with frequency: ${updateData.frequency}, type: ${updateData.type}`);
       }
 
       console.log(`Migration completed for ${expensesToMigrate.length} recurring expenses`);

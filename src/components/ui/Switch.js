@@ -5,7 +5,8 @@ const Switch = ({
   size = 'md', 
   label,
   description,
-  loading = false 
+  loading = false,
+  color = 'rose'
 }) => {
   const sizeClasses = {
     sm: {
@@ -37,9 +38,9 @@ const Switch = ({
           className={`
             relative inline-flex flex-shrink-0 border-2 border-transparent rounded-full cursor-pointer 
             transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 
-            focus:ring-rose-500 ${currentSize.switch}
+            ${color === 'emerald' ? 'focus:ring-emerald-500' : 'focus:ring-rose-500'} ${currentSize.switch}
             ${enabled 
-              ? 'bg-rose-600' 
+              ? color === 'emerald' ? 'bg-emerald-600' : 'bg-rose-600' 
               : 'bg-gray-200'
             }
             ${disabled || loading ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-md'}

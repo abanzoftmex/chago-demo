@@ -594,7 +594,16 @@ const SolicitudesPago = () => {
               );
             }
 
-            const dataLines = lines.slice(1);
+            const dataLines = lines
+              .slice(1)
+              .map((line, index) => ({ line, lineNumber: index + 2 }))
+              .filter(({ line }) => {
+                const trimmed = line.trim();
+                if (!trimmed) return false;
+                const cells = splitCsvLine(trimmed);
+                return !cells.every(cell => cell === "");
+              });
+
             const importResults = {
               total: dataLines.length,
               successful: 0,
@@ -602,8 +611,7 @@ const SolicitudesPago = () => {
             };
 
             for (let i = 0; i < dataLines.length; i++) {
-              const line = dataLines[i];
-              const lineNumber = i + 2;
+              const { line, lineNumber } = dataLines[i];
 
               try {
                 const values = splitCsvLine(line);

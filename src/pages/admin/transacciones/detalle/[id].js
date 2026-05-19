@@ -626,7 +626,7 @@ const TransactionDetail = () => {
                   <div className="text-sm font-medium">{subconcept?.name || "No especificado"}</div>
                 </div>
               </div>
-              {transaction.type === "salida" && provider && (
+              {provider && (
                 <div className="flex items-start space-x-3">
                   <Building className="w-4 h-4 text-primary mt-0.5" />
                   <div>

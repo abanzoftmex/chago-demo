@@ -3,7 +3,7 @@ import { recurringExpenseService } from "../../lib/services/recurringExpenseServ
 import { useToast } from "../ui/Toast";
 import { useAuth } from "../../context/AuthContextMultiTenant";
 
-const RecurringExpenseDetailsModal = ({ expense, isOpen, onClose, conceptName, subconceptName, providerName }) => {
+const RecurringExpenseDetailsModal = ({ type = "salida", expense, isOpen, onClose, conceptName, subconceptName, providerName }) => {
   const { tenantInfo } = useAuth();
   const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
   const [monthsHistory, setMonthsHistory] = useState([]);
@@ -11,6 +11,8 @@ const RecurringExpenseDetailsModal = ({ expense, isOpen, onClose, conceptName, s
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('history'); // 'history' or 'transactions'
   const toast = useToast();
+
+  const isEntrada = type === "entrada";
 
   useEffect(() => {
     if (isOpen && expense && tenantId) {
@@ -64,16 +66,22 @@ const RecurringExpenseDetailsModal = ({ expense, isOpen, onClose, conceptName, s
 
         <div className="z-50 relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
           {/* Header */}
-          <div className="bg-gradient-to-r from-rose-50 to-pink-50 px-6 py-4 border-b border-rose-200">
+          <div className={`bg-gradient-to-r ${
+            isEntrada 
+              ? "from-emerald-50 to-teal-50 border-emerald-200" 
+              : "from-rose-50 to-pink-50 border-rose-200"
+          } px-6 py-4 border-b`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="p-2 bg-rose-400 rounded-lg">
+                <div className={`p-2 ${isEntrada ? "bg-emerald-500" : "bg-rose-400"} rounded-lg`}>
                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Detalles del Gasto Recurrente</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {isEntrada ? "Detalles del Ingreso Recurrente" : "Detalles del Gasto Recurrente"}
+                  </h3>
                   <p className="text-sm text-gray-600">
                     {conceptName} - {subconceptName}
                   </p>
@@ -132,7 +140,7 @@ const RecurringExpenseDetailsModal = ({ expense, isOpen, onClose, conceptName, s
               <button
                 onClick={() => setActiveTab('history')}
                 className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'history'
-                    ? 'border-rose-500 text-rose-600'
+                    ? isEntrada ? 'border-emerald-500 text-emerald-600' : 'border-rose-500 text-rose-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
               >
@@ -141,7 +149,7 @@ const RecurringExpenseDetailsModal = ({ expense, isOpen, onClose, conceptName, s
               <button
                 onClick={() => setActiveTab('transactions')}
                 className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'transactions'
-                    ? 'border-rose-500 text-rose-600'
+                    ? isEntrada ? 'border-emerald-500 text-emerald-600' : 'border-rose-500 text-rose-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
               >
@@ -154,7 +162,9 @@ const RecurringExpenseDetailsModal = ({ expense, isOpen, onClose, conceptName, s
           <div className="px-6 py-4 max-h-96 overflow-y-auto">
             {loading ? (
               <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-rose-600 mx-auto"></div>
+                <div className={`animate-spin rounded-full h-8 w-8 border-2 border-gray-300 ${
+                  isEntrada ? "border-t-emerald-600" : "border-t-rose-600"
+                } mx-auto`}></div>
                 <p className="text-gray-600 mt-2">Cargando detalles...</p>
               </div>
             ) : (
@@ -172,8 +182,8 @@ const RecurringExpenseDetailsModal = ({ expense, isOpen, onClose, conceptName, s
                       monthsHistory.map((month, index) => (
                         <div key={month.monthKey} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                           <div className="flex items-center space-x-3">
-                            <div className="p-2 bg-rose-100 rounded-lg">
-                              <svg className="w-4 h-4 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div className={`p-2 ${isEntrada ? "bg-emerald-100" : "bg-rose-100"} rounded-lg`}>
+                              <svg className={`w-4 h-4 ${isEntrada ? "text-emerald-600" : "text-rose-600"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                               </svg>
                             </div>

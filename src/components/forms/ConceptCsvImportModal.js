@@ -46,7 +46,7 @@ export default function ConceptCsvImportModal({ isOpen, onClose, onSuccess }) {
     csvContent += '"Cuotas Mensuales","Ingresos por Ventas","Cobro de cuotas de socios"\n';
     csvContent += '"Mantenimiento Césped","Mantenimiento","Cuidado y mantenimiento del campo"';
     
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);

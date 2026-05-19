@@ -191,6 +191,24 @@ const Sidebar = ({
                 </div>
               )}
 
+            {/* Entradas Recurrentes Section */}
+            {!collapsed && checkPermission("canManageTransactions") && (
+              <div className="space-y-1">
+                <button
+                  onClick={() => handleNavigation("/admin/transacciones/entradas-recurrentes")}
+                  className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/entradas-recurrentes"
+                    ? "bg-[#5a5e68] text-[#ededed]"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                    }`}
+                >
+                  <svg className="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span className="ml-3">Entradas Recurrentes</span>
+                </button>
+              </div>
+            )}
+
             {/* Salidas Recurrentes Section */}
             {!collapsed && checkPermission("canManageTransactions") && (
               <div className="space-y-1">
@@ -563,6 +581,24 @@ const Sidebar = ({
                   )}
                 </div>
               )}
+
+            {/* Entradas Recurrentes Section - Mobile */}
+            {checkPermission("canManageTransactions") && (
+              <div className="space-y-1">
+                <button
+                  onClick={() => handleNavigation("/admin/transacciones/entradas-recurrentes")}
+                  className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/entradas-recurrentes"
+                    ? "bg-[#5a5e68] text-[#ededed]"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                    }`}
+                >
+                  <svg className="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span className="ml-3">Entradas Recurrentes</span>
+                </button>
+              </div>
+            )}
 
             {/* Salidas Recurrentes Section - Mobile */}
             {checkPermission("canManageTransactions") && (

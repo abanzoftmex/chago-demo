@@ -18,13 +18,13 @@ export default function TransactionCsvImportModal({
     let csvContent;
     
     if (type === "entrada") {
-      const headers = 'Fecha,General,Concepto,Subconcepto,Descripción,Monto,Estado';
+      const headers = 'Fecha,General,Concepto,Subconcepto,Descripcion,Monto,Estado';
       const example1 = '"2024-03-01","Ingresos por Cuotas","Cuotas Mensuales","","Cuota marzo 2024",1500.00,pendiente';
       const example2 = '"2024-03-02","Ingresos por Eventos","Torneos","Torneo de Primavera","Inscripciones torneo",2000.00,pagado';
       csvContent = `${headers}\n${example1}\n${example2}`;
     } else {
       const headers =
-        "Fecha,General,Concepto,Subconcepto,Proveedor,Descripción,Monto,Estado,Notas";
+        "Fecha,General,Concepto,Subconcepto,Proveedor,Descripcion,Monto,Estado,Notas";
       const example1 =
         '"2024-03-01","Gastos Operativos","Servicios Básicos","Electricidad","CFE","Recibo CFE marzo",800.50,pendiente,""';
       const example2 =
@@ -32,7 +32,7 @@ export default function TransactionCsvImportModal({
       csvContent = `${headers}\n${example1}\n${example2}`;
     }
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
@@ -199,8 +199,8 @@ export default function TransactionCsvImportModal({
                 <div className="bg-gray-50 p-4 rounded-md mb-4">
                   <code className="text-sm">
                     {type === "entrada"
-                      ? "Fecha,General,Concepto,Subconcepto,Descripción,Monto,Estado"
-                      : "Fecha,General,Concepto,Subconcepto,Proveedor,Descripción,Monto,Estado,Notas"}
+                      ? "Fecha,General,Concepto,Subconcepto,Descripcion,Monto,Estado"
+                      : "Fecha,General,Concepto,Subconcepto,Proveedor,Descripcion,Monto,Estado,Notas"}
                   </code>
                 </div>
                 
@@ -217,7 +217,7 @@ export default function TransactionCsvImportModal({
                   {type === "salida" && (
                     <li><strong>Proveedor:</strong> Nombre del proveedor (opcional, dejar vacío si no aplica)</li>
                   )}
-                  <li><strong>Descripción:</strong> Descripción de la transacción (opcional)</li>
+                  <li><strong>Descripcion:</strong> Descripción de la transacción (opcional)</li>
                   <li><strong>Monto:</strong> Cantidad numérica sin símbolos (ej: 1250.50)</li>
                   <li><strong>Estado:</strong> pendiente, parcial o pagado</li>
                   {type === "salida" && (

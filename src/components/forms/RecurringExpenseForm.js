@@ -20,13 +20,18 @@ const FREQUENCIES = {
   monthly: { label: "Mensual (día 1)", value: "monthly" }
 };
 
-const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
+const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, className = "" }) => {
   const { user, tenantInfo } = useAuth();
   const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
   const toast = useToast();
   const conceptSelectorRef = useRef();
   const subconceptSelectorRef = useRef();
   const providerSelectorRef = useRef();
+
+  const isEntrada = type === "entrada";
+  const focusRingClass = isEntrada
+    ? "focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+    : "focus:ring-2 focus:ring-rose-500 focus:border-rose-500";
 
   const [formData, setFormData] = useState({
     generalId: "",
@@ -44,6 +49,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
   const [generals, setGenerals] = useState([]);
   const [concepts, setConcepts] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingExpense, setLoadingExpense] = useState(false);
   const [loadingGenerals, setLoadingGenerals] = useState(false);
   const [generalsError, setGeneralsError] = useState(null);
   const [errors, setErrors] = useState({});
@@ -61,8 +67,8 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
         setLoadingGenerals(true);
         setGeneralsError(null);
         const allGenerals = await generalService.getAll(tenantId);
-        // Filter salidas and ambos for recurring expenses
-        const filtered = allGenerals.filter(g => g.type === "salida" || g.type === "ambos");
+        // Filter based on type
+        const filtered = allGenerals.filter(g => g.type === type || g.type === "ambos");
         setGenerals(filtered);
       } catch (err) {
         setGeneralsError(err.message);
@@ -71,7 +77,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
       }
     };
     loadGenerals();
-  }, [tenantId]);
+  }, [tenantId, type]);
 
   // Load concepts for SubconceptModal
   useEffect(() => {
@@ -79,13 +85,52 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
     const loadConcepts = async () => {
       try {
         const allConcepts = await conceptService.getAll(tenantId);
-        setConcepts(allConcepts.filter(c => c.type === "salida" || c.type === "ambos"));
+        setConcepts(allConcepts.filter(c => c.type === type || c.type === "ambos"));
       } catch (err) {
         console.error('Error loading concepts:', err);
       }
     };
     loadConcepts();
-  }, [tenantId]);
+  }, [tenantId, type]);
+
+  // Load existing recurring transaction if in edit mode
+  useEffect(() => {
+    if (!tenantId || !expenseId) return;
+    const loadExpense = async () => {
+      try {
+        setLoadingExpense(true);
+        const expense = await recurringExpenseService.getById(expenseId, tenantId);
+        if (expense) {
+          let dateStr = new Date().toISOString().split("T")[0];
+          if (expense.startDate) {
+            const dateObj = expense.startDate.toDate ? expense.startDate.toDate() : new Date(expense.startDate);
+            if (!isNaN(dateObj.getTime())) {
+              dateStr = dateObj.toISOString().split("T")[0];
+            }
+          }
+
+          setFormData({
+            generalId: expense.generalId || "",
+            conceptId: expense.conceptId || "",
+            subconceptId: expense.subconceptId || "",
+            description: expense.description || "",
+            amount: expense.amount !== undefined ? String(expense.amount) : "",
+            providerId: expense.providerId || "",
+            division: expense.division || "general",
+            frequency: expense.frequency || "monthly",
+            startDate: dateStr,
+            isActive: expense.isActive !== undefined ? expense.isActive : true
+          });
+        }
+      } catch (err) {
+        console.error("Error loading recurring transaction:", err);
+        toast.error("Error al cargar la información del recurrente");
+      } finally {
+        setLoadingExpense(false);
+      }
+    };
+    loadExpense();
+  }, [tenantId, expenseId, toast]);
 
   const formatNumberWithCommas = (value) => {
     if (!value) return '';
@@ -217,7 +262,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
 
       // Prepare data for submission
       const recurringData = {
-        type: "salida", // Always expense for recurring
+        type: type,
         generalId: formData.generalId,
         conceptId: formData.conceptId,
         subconceptId: formData.subconceptId,
@@ -228,33 +273,38 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
         frequency: formData.frequency,
         startDate: new Date(formData.startDate),
         isActive: formData.isActive,
-        generatedDates: [], // Track specific dates when transactions were generated
-        lastGenerated: null
       };
 
-      const result = await recurringExpenseService.create(recurringData, tenantId);
-      
-      toast.success("Salida recurrente creada exitosamente");
-      
-      // Reset form
-      setFormData({
-        generalId: "",
-        conceptId: "",
-        subconceptId: "",
-        description: "",
-        amount: "",
-        providerId: "",
-        division: "general",
-        frequency: "monthly",
-        startDate: new Date().toISOString().split("T")[0],
-        isActive: true
-      });
+      let result;
+      if (expenseId) {
+        result = await recurringExpenseService.update(expenseId, recurringData, tenantId);
+        toast.success(`${isEntrada ? "Entrada" : "Salida"} recurrente actualizada exitosamente`);
+      } else {
+        recurringData.generatedDates = [];
+        recurringData.lastGenerated = null;
+        result = await recurringExpenseService.create(recurringData, tenantId);
+        toast.success(`${isEntrada ? "Entrada" : "Salida"} recurrente creada exitosamente`);
+        
+        // Reset form (only on create)
+        setFormData({
+          generalId: "",
+          conceptId: "",
+          subconceptId: "",
+          description: "",
+          amount: "",
+          providerId: "",
+          division: "general",
+          frequency: "monthly",
+          startDate: new Date().toISOString().split("T")[0],
+          isActive: true
+        });
+      }
 
       onSuccess && onSuccess(result);
 
     } catch (error) {
-      console.error("Error creating recurring expense:", error);
-      toast.error(error.message || "Error al crear la salida recurrente");
+      console.error("Error saving recurring transaction:", error);
+      toast.error(error.message || `Error al guardar la ${isEntrada ? "entrada" : "salida"} recurrente`);
       setErrors({ submit: error.message });
     } finally {
       setLoading(false);
@@ -268,7 +318,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
         setLoadingGenerals(true);
         setGeneralsError(null);
         const allGenerals = await generalService.getAll(tenantId);
-        const filtered = allGenerals.filter(g => g.type === "salida" || g.type === "ambos");
+        const filtered = allGenerals.filter(g => g.type === type || g.type === "ambos");
         setGenerals(filtered);
       } catch (err) {
         setGeneralsError(err.message);
@@ -311,6 +361,17 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
     return descriptions[frequency] || "";
   };
 
+  if (loadingExpense) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 space-y-4">
+        <div className={`animate-spin rounded-full h-12 w-12 border-4 border-gray-200 ${
+          isEntrada ? "border-t-emerald-600" : "border-t-rose-500"
+        }`}></div>
+        <p className="text-gray-500 font-medium">Cargando información del recurrente...</p>
+      </div>
+    );
+  }
+
   return (
     <div className={className}>
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -321,17 +382,29 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
         )}
 
         {/* Header */}
-        <div className="bg-gradient-to-r from-rose-50 to-orange-50 border border-rose-200 rounded-lg p-4">
+        <div className={`bg-gradient-to-r ${
+          isEntrada 
+            ? "from-emerald-50 to-teal-50 border-emerald-200" 
+            : "from-rose-50 to-orange-50 border-rose-200"
+        } border rounded-lg p-4`}>
           <div className="flex items-center space-x-3">
-            <div className="p-2 bg-rose-500 rounded-lg">
+            <div className={`p-2 ${isEntrada ? "bg-emerald-600" : "bg-rose-500"} rounded-lg`}>
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Nueva Salida Recurrente</h3>
+              <h3 className="text-lg font-semibold text-gray-900">
+                {expenseId 
+                  ? isEntrada ? "Editar Entrada Recurrente" : "Editar Salida Recurrente"
+                  : isEntrada ? "Nueva Entrada Recurrente" : "Nueva Salida Recurrente"
+                }
+              </h3>
               <p className="text-sm text-gray-600">
-                Configura una salida que se generará automáticamente según la frecuencia seleccionada
+                {expenseId
+                  ? `Modifica los detalles de la ${isEntrada ? "entrada" : "salida"} recurrente`
+                  : `Configura una ${isEntrada ? "entrada" : "salida"} que se generará automáticamente según la frecuencia seleccionada`
+                }
               </p>
             </div>
           </div>
@@ -362,17 +435,17 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
                     setFormData(prev => ({ ...prev, generalId: selectedValue, conceptId: '', subconceptId: '' }));
                   }
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 ${focusRingClass}`}
                 disabled={loading}
                 required
               >
                 <option value="">Selecciona una categoría general</option>
                 {generals.map(g => (
                   <option key={g.id} value={g.id}>
-                    {g.name} ({g.type === 'salida' ? 'Salida' : 'Ambos'})
+                    {g.name} ({g.type === 'salida' ? 'Salida' : g.type === 'entrada' ? 'Entrada' : 'Ambos'})
                   </option>
                 ))}
-                <option value="CREATE_NEW" className="font-semibold text-rose-600">
+                <option value="CREATE_NEW" className={`font-semibold ${isEntrada ? "text-emerald-600" : "text-rose-600"}`}>
                   + Agregar nuevo general
                 </option>
               </select>
@@ -386,7 +459,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
             <label className="block text-sm font-medium text-gray-700 mb-2">Concepto *</label>
             <ConceptSelector
               ref={conceptSelectorRef}
-              type="salida"
+              type={type}
               generalId={formData.generalId}
               value={formData.conceptId}
               onChange={handleConceptChange}
@@ -431,7 +504,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
               name="frequency"
               value={formData.frequency}
               onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
+              className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 ${focusRingClass}`}
               disabled={loading}
               required
             >
@@ -456,7 +529,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
               name="startDate"
               value={formData.startDate}
               onChange={handleInputChange}
-              className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-rose-500 focus:border-rose-500 ${
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${focusRingClass} ${
                 errors.startDate ? "border-red-300" : "border-gray-300"
               }`}
               disabled={loading}
@@ -482,7 +555,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
                 value={formData.amount ? formatNumberWithCommas(formData.amount) : ''}
                 onChange={handleInputChange}
                 inputMode="decimal"
-                className={`w-full pl-8 pr-3 py-2 border rounded-md focus:ring-2 focus:ring-rose-500 focus:border-rose-500 ${
+                className={`w-full pl-8 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${focusRingClass} ${
                   errors.amount ? "border-red-300" : "border-gray-300"
                 }`}
                 placeholder="0.00"
@@ -517,29 +590,6 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
               <p className="mt-1 text-sm text-red-600">{errors.providerId}</p>
             )}
           </div>
-
-          {/* División oculta temporalmente */}
-          {/* <div>
-            <label htmlFor="division" className="block text-sm font-medium text-gray-700 mb-2">
-              División *
-            </label>
-            <select
-              id="division"
-              name="division"
-              value={formData.division}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
-              disabled={loading}
-              required
-            >
-              <option value="general">General</option>
-              <option value="2da_division">2nda división profesional</option>
-              <option value="3ra_division">3ra división profesional</option>
-            </select>
-            {errors.division && (
-              <p className="mt-1 text-sm text-red-600">{errors.division}</p>
-            )}
-          </div> */}
         </div>
 
         {/* Descripción - Ancho completo */}
@@ -553,10 +603,10 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
             value={formData.description}
             onChange={handleInputChange}
             rows={3}
-            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-rose-500 focus:border-rose-500 ${
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${focusRingClass} ${
               errors.description ? "border-red-300" : "border-gray-300"
             }`}
-            placeholder="Describe la salida recurrente..."
+            placeholder={`Describe la ${isEntrada ? "entrada" : "salida"} recurrente...`}
             disabled={loading}
           />
           {errors.description && (
@@ -588,9 +638,18 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
           <button
             type="submit"
             disabled={loading}
-            className="bg-rose-500 hover:bg-rose-600 text-white px-6 py-2 rounded-md font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`${
+              isEntrada 
+                ? "bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-500" 
+                : "bg-rose-500 hover:bg-rose-600 focus:ring-rose-500"
+            } text-white px-6 py-2 rounded-md font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
           >
-            {loading ? "Creando..." : "Crear Salida Recurrente"}
+            {loading 
+              ? expenseId ? "Guardando..." : "Creando..." 
+              : expenseId 
+                ? isEntrada ? "Actualizar Entrada Recurrente" : "Actualizar Salida Recurrente" 
+                : isEntrada ? "Crear Entrada Recurrente" : "Crear Salida Recurrente"
+            }
           </button>
         </div>
       </form>
@@ -598,7 +657,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
       {/* Modals */}
       {showGeneralModal && (
         <GeneralModal
-          type="salida"
+          type={type}
           isOpen={showGeneralModal}
           onClose={() => setShowGeneralModal(false)}
           onSuccess={handleGeneralCreated}
@@ -607,7 +666,7 @@ const RecurringExpenseForm = ({ onSuccess, className = "" }) => {
 
       {showConceptModal && (
         <ConceptModal
-          type="salida"
+          type={type}
           isOpen={showConceptModal}
           onClose={() => setShowConceptModal(false)}
           onSuccess={handleConceptCreated}
