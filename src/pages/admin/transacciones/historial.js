@@ -35,6 +35,20 @@ const formatDateForInput = (date) => {
   return `${year}-${month}-${day}`;
 };
 
+const parseInputDateAsLocalStart = (dateString) => {
+  if (!dateString) return null;
+  const [year, month, day] = dateString.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day, 0, 0, 0, 0);
+};
+
+const parseInputDateAsLocalEnd = (dateString) => {
+  if (!dateString) return null;
+  const [year, month, day] = dateString.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day, 23, 59, 59, 999);
+};
+
 const currentMonthRange = () => {
   const now = new Date();
   return {
@@ -197,9 +211,10 @@ const Historial = () => {
     try {
       if (!filters.startDate || !filters.endDate) return;
 
-      const startDate = new Date(filters.startDate);
-      const endDate = new Date(filters.endDate);
-      endDate.setHours(23, 59, 59, 999); // End of day
+      const startDate = parseInputDateAsLocalStart(filters.startDate);
+      const endDate = parseInputDateAsLocalEnd(filters.endDate);
+
+      if (!startDate || !endDate) return;
 
       // Build filter object (excluding status since we need all statuses for stats)
       const statsFilters = {
@@ -263,9 +278,14 @@ const Historial = () => {
         };
 
         if (filters.startDate && filters.endDate) {
-          const startDate = new Date(filters.startDate);
-          const endDate = new Date(filters.endDate);
-          endDate.setHours(23, 59, 59, 999);
+          const startDate = parseInputDateAsLocalStart(filters.startDate);
+          const endDate = parseInputDateAsLocalEnd(filters.endDate);
+
+          if (!startDate || !endDate) {
+            setTransactions([]);
+            setTotalItems(0);
+            return;
+          }
 
           transactionsData = await transactionService.getByDateRange(
             startDate,
