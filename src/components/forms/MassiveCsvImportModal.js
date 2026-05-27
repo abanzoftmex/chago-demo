@@ -227,12 +227,7 @@ concepto,Torneos,Organización de torneos,ingreso,Ingresos por Eventos`;
                 </svg>
               </div>
               <div className="ml-3">
-                <h3 className="text-xl font-bold text-white">
-                  ⚽ Importación Masiva - Santiago FC
-                </h3>
-                <p className="text-orange-100 text-sm mt-1">
-                  Gestiona los catálogos del club de forma eficiente
-                </p>
+                <h3 className="text-xl font-bold text-white">Importador</h3>
               </div>
             </div>
             <button
