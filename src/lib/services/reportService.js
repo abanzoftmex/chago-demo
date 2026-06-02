@@ -703,6 +703,12 @@ export const reportService = {
           // Pero usar fechas ajustadas para filtrar transacciones
           const filterStart = currentWeekStart < firstDay ? firstDay : currentWeekStart;
           const filterEnd = weekEnd > lastDay ? lastDay : weekEnd;
+
+          // Ensure week boundaries include full day range in local time.
+          const filterStartAtDayStart = new Date(filterStart);
+          filterStartAtDayStart.setHours(0, 0, 0, 0);
+          const filterEndAtDayEnd = new Date(filterEnd);
+          filterEndAtDayEnd.setHours(23, 59, 59, 999);
           
           // Calcular el número de semana ISO 8601
           const weekNumber = this.getWeekNumber(currentWeekStart);
@@ -713,8 +719,8 @@ export const reportService = {
             startDate: currentWeekStart.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
             endDate: weekEnd.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
             // Usar timestamps ajustados para filtrar transacciones solo del mes
-            startTimestamp: filterStart.getTime(),
-            endTimestamp: filterEnd.getTime()
+            startTimestamp: filterStartAtDayStart.getTime(),
+            endTimestamp: filterEndAtDayEnd.getTime()
           });
         }
 

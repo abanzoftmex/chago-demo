@@ -34,8 +34,38 @@ export const calculateTreeComparison = (allTransactions, stats, filters, general
   const today = new Date();
   today.setHours(23, 59, 59, 999);
 
-  const startDate = filters.startDate ? new Date(filters.startDate) : null;
-  const endDate = filters.endDate ? new Date(filters.endDate) : null;
+  const parseFilterDate = (value, endOfDay = false) => {
+    if (!value) return null;
+
+    if (value instanceof Date) {
+      const parsed = new Date(value);
+      if (endOfDay) {
+        parsed.setHours(23, 59, 59, 999);
+      } else {
+        parsed.setHours(0, 0, 0, 0);
+      }
+      return parsed;
+    }
+
+    // Parse YYYY-MM-DD as local date to avoid UTC offset shifting the day.
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const [year, month, day] = value.split('-').map(Number);
+      return endOfDay
+        ? new Date(year, month - 1, day, 23, 59, 59, 999)
+        : new Date(year, month - 1, day, 0, 0, 0, 0);
+    }
+
+    const parsed = new Date(value);
+    if (endOfDay) {
+      parsed.setHours(23, 59, 59, 999);
+    } else {
+      parsed.setHours(0, 0, 0, 0);
+    }
+    return parsed;
+  };
+
+  const startDate = parseFilterDate(filters.startDate, false);
+  const endDate = parseFilterDate(filters.endDate, true);
 
   // Use same weeks already calculated in stats.weeklyBreakdown
   const weeks = stats.weeklyBreakdown.weeks || [];
