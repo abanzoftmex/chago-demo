@@ -51,7 +51,6 @@ const LoginPage = () => {
       <div className="w-full lg:w-1/2 flex flex-col justify-center py-8 lg:py-12 px-4 sm:px-6 lg:px-20 xl:px-24 lg:order-1 bg-white">
         <div className="mx-auto w-full max-w-sm lg:w-96">
           <div>
-            <img src="/logo_abanzoft.png" alt="Logo" className="max-w-70 w-auto h-auto object-contain mb-8" />
             <h1 className="text-3xl font-semibold tracking-tight mb-2">Bienvenido</h1>
             <p className="text-gray-500">Ingresa tus datos para continuar.</p>
           </div>
