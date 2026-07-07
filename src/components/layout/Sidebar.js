@@ -22,7 +22,7 @@ import {
 } from "@heroicons/react/24/outline";
 
 /** En false oculta el ítem Reportes del menú (la página sigue en /admin/reportes). */
-const SHOW_REPORTES_IN_NAV = false;
+const SHOW_REPORTES_IN_NAV = true;
 
 const Sidebar = ({
   isOpen,
