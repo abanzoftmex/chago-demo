@@ -23,7 +23,7 @@ import {
   triggerDownloadBlob,
   catalogByNameMap,
 } from "../../../lib/catalogs/catalogosHelpers";
-import ConceptHierarchyBreadcrumb from "../../../components/transactions/ConceptHierarchyBreadcrumb";
+import ConceptHierarchyStacked from "../../../components/transactions/ConceptHierarchyStacked";
 import {
   PlusIcon,
   ArrowTrendingDownIcon,
@@ -1008,25 +1008,28 @@ const SolicitudesPago = () => {
                     <table className="w-full">
                       <thead className="bg-muted">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                             Fecha
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                            Descripción
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                             Concepto
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                             Proveedor
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-semibold text-red-900 uppercase tracking-wider bg-red-200">
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-red-900 uppercase tracking-wider bg-red-200">
                             Monto
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                             Estado
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                             Tipo
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                             Acciones
                           </th>
                         </tr>
@@ -1037,26 +1040,27 @@ const SolicitudesPago = () => {
                               key={transaction.id}
                               className="hover:bg-muted/50"
                             >
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                              <td className="px-4 py-3 whitespace-nowrap text-xs text-foreground">
                                 {formatDate(transaction.date)}
                               </td>
-                              <td className="px-6 py-4 text-sm text-foreground">
-                                <ConceptHierarchyBreadcrumb
+                              <td className="px-4 py-3 text-xs text-foreground max-w-[220px] break-words">
+                                {transaction.description || "—"}
+                              </td>
+                              <td className="px-4 py-3 text-xs text-foreground">
+                                <ConceptHierarchyStacked
                                   levels={getConceptHierarchy(transaction)}
-                                  lastClassName="font-medium text-gray-900"
-                                  midClassName="text-gray-600"
                                 />
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                              <td className="px-4 py-3 whitespace-nowrap text-xs text-foreground">
                                 {getProviderLabel(transaction)}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-800 bg-red-50">
+                              <td className="px-4 py-3 whitespace-nowrap text-xs font-semibold text-red-800 bg-red-50">
                                 {formatCurrencyMx(transaction.amount)}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
+                              <td className="px-4 py-3 whitespace-nowrap">
                                 {getStatusBadge(transaction.status, transaction)}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
+                              <td className="px-4 py-3 whitespace-nowrap">
                                 {transaction.isRecurring ? (
                                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-rose-400 text-white border border-blue-200">
                                     <ArrowPathIcon className="h-4 w-4 mr-1" />
@@ -1069,7 +1073,7 @@ const SolicitudesPago = () => {
                                   </span>
                                 )}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <td className="px-4 py-3 whitespace-nowrap text-xs font-medium">
                                 <div className="flex items-center space-x-3">
                                   {canManageTransactions && (
                                     <button
@@ -1127,14 +1131,17 @@ const SolicitudesPago = () => {
                               {getInitialExpenseBadge(transaction)}
                               {getStatusBadge(transaction.status, transaction)}
                             </div>
-                            <div className="text-sm font-medium text-foreground mb-1">
-                              <ConceptHierarchyBreadcrumb
+                            {transaction.description && (
+                              <p className="text-xs text-foreground mb-1 break-words">
+                                {transaction.description}
+                              </p>
+                            )}
+                            <div className="mb-1">
+                              <ConceptHierarchyStacked
                                 levels={getConceptHierarchy(transaction)}
-                                lastClassName="font-semibold"
-                                midClassName="text-gray-600 font-normal"
                               />
                             </div>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-xs text-muted-foreground">
                               {getProviderLabel(transaction)}
                             </p>
                           </div>
@@ -1142,7 +1149,7 @@ const SolicitudesPago = () => {
                             <p className="text-lg font-semibold text-foreground">
                               {formatCurrencyMx(transaction.amount)}
                             </p>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-xs text-muted-foreground">
                               {formatDate(transaction.date)}
                             </p>
                           </div>

@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import Select from "react-select";
 import { useAuth } from "../../../context/AuthContextMultiTenant";
+import ConceptHierarchyStacked from "../../../components/transactions/ConceptHierarchyStacked";
 
 const ITEMS_PER_PAGE = 20;
 
@@ -480,21 +481,25 @@ const Historial = () => {
     return subconcept ? subconcept.name : "N/A";
   };
 
-  // Función para mostrar el árbol completo: General / Concepto / Subconcepto (subconcepto en negritas)
+  // Muestra la jerarquía en dos filas:
+  //   Fila 1: Subconcepto (negrita) — Fila 2: General / Concepto (normal)
   const getTreeDisplay = (transaction) => {
     const generalName = getGeneralName(transaction.generalId, transaction);
     const conceptName = getConceptName(transaction.conceptId, transaction);
     const subconceptName = getSubconceptName(transaction.subconceptId, transaction);
-    
+
+    // Ordenado de más general a más específico; se descartan los "N/A" o vacíos.
+    const levels = [generalName, conceptName, subconceptName].filter(
+      (name) => name && name !== "N/A"
+    );
+
     // Verificar si el general es de tipo "ambos"
     const general = generals.find((g) => g.id === transaction.generalId);
     const isAmboTree = general?.type === "ambos";
-    
+
     return (
       <div>
-        <div className="text-sm text-foreground">
-          {generalName} / {conceptName} / <strong>{subconceptName}</strong>
-        </div>
+        <ConceptHierarchyStacked levels={levels} />
         {isAmboTree && (
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 mt-1">
             Árbol Mixto
@@ -896,28 +901,31 @@ const Historial = () => {
                 <table className="w-full">
                   <thead className="bg-muted">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Fecha
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Tipo
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Descripción
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Concepto
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Proveedor
                       </th>
-                      {/* <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      {/* <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         División
                       </th> */}
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Monto
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Estado
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Acciones
                       </th>
                     </tr>
@@ -925,10 +933,10 @@ const Historial = () => {
                   <tbody className="bg-background divide-y divide-border">
                     {transactions.map((transaction) => (
                       <tr key={transaction.id} className="hover:bg-muted/50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                        <td className="px-4 py-3 whitespace-nowrap text-xs text-foreground">
                           {formatDate(transaction.date)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                               transaction.type === "entrada"
@@ -945,16 +953,19 @@ const Historial = () => {
                               : "Ambos"}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-foreground">
+                        <td className="px-4 py-3 text-xs text-foreground max-w-[220px] break-words">
+                          {transaction.description || "—"}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-foreground">
                           {getTreeDisplay(transaction)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                        <td className="px-4 py-3 whitespace-nowrap text-xs text-foreground">
                           {getProviderName(transaction.providerId, transaction)}
                         </td>
-                        {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                        {/* <td className="px-4 py-3 whitespace-nowrap text-xs text-foreground">
                           {transaction.type === 'salida' ? formatDivision(transaction.division) : '-'}
                         </td> */}
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <td className="px-4 py-3 whitespace-nowrap text-xs">
                           <div className="flex flex-col gap-0.5">
                             <span className="font-semibold text-gray-900">{formatCurrency(transaction.amount)}</span>
                             {(transaction.status === "parcial" || transaction.status === "pagado") && getPaidAmount(transaction) > 0 && (
@@ -969,10 +980,10 @@ const Historial = () => {
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           {getStatusBadge(transaction.status)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <td className="px-4 py-3 whitespace-nowrap text-xs font-medium">
                           <button
                             onClick={() => handleViewDetails(transaction.id)}
                             className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors cursor-pointer"
@@ -1011,10 +1022,15 @@ const Historial = () => {
                           </span>
                           {getStatusBadge(transaction.status)}
                         </div>
+                        {transaction.description && (
+                          <p className="text-xs text-foreground mb-1 break-words">
+                            {transaction.description}
+                          </p>
+                        )}
                         <div className="mb-2">
                           {getTreeDisplay(transaction)}
                         </div>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           {getProviderName(transaction.providerId, transaction)}
                         </p>
                         {/* {transaction.type === 'salida' && transaction.division && (
@@ -1027,7 +1043,7 @@ const Historial = () => {
                         <p className="text-lg font-semibold text-foreground">
                           {formatCurrency(transaction.amount)}
                         </p>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           {formatDate(transaction.date)}
                         </p>
                       </div>
