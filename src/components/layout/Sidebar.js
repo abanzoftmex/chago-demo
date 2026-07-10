@@ -82,9 +82,9 @@ const Sidebar = ({
         className={`hidden lg:flex lg:flex-shrink-0 transition-all duration-300 ${collapsed ? "lg:w-16" : "lg:w-64"
           }`}
       >
-        <div className="flex flex-col w-full bg-white border-r border-gray-200">
+        <div className="flex flex-col w-full h-screen overflow-hidden bg-white border-r border-gray-200">
           {/* Logo */}
-          <div className="flex items-center justify-center mb-4 mt-4 px-2">
+          <div className="flex items-center justify-center mb-4 mt-4 px-2 flex-shrink-0">
             {logoLoading ? (
               <div className={`rounded-2xl shadow-md bg-gray-100 animate-pulse ${collapsed ? 'w-10 h-10' : 'w-[120px] h-[60px]'}`} />
             ) : logoUrl ? (
@@ -101,7 +101,7 @@ const Sidebar = ({
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-3 py-6 space-y-2">
+          <nav className="flex-1 min-h-0 overflow-y-auto px-3 py-6 space-y-2">
             {/* 1. Dashboard */}
             <button
               onClick={() => handleNavigation("/admin/dashboard")}
@@ -478,7 +478,7 @@ const Sidebar = ({
       >
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-center px-4 py-6 border-b border-gray-200 relative">
+          <div className="flex items-center justify-center px-4 py-6 border-b border-gray-200 relative flex-shrink-0">
             {logoLoading ? (
               <div className="w-[120px] h-[60px] rounded-2xl shadow-md bg-gray-100 animate-pulse" />
             ) : logoUrl ? (
@@ -497,7 +497,7 @@ const Sidebar = ({
           </div>
 
           {/* Mobile Navigation */}
-          <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto">
+          <nav className="flex-1 min-h-0 px-3 py-6 space-y-2 overflow-y-auto">
             {/* 1. Dashboard */}
             <button
               onClick={() => handleNavigation("/admin/dashboard")}

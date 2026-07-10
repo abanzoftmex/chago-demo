@@ -3,7 +3,8 @@
     "allow": [
       "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\('firebase:', \\(p.dependencies||{}\\).firebase || \\(p.devDependencies||{}\\).firebase\\); console.log\\('next:', \\(p.dependencies||{}\\).next\\); console.log\\('react:', \\(p.dependencies||{}\\).react\\)\")",
       "Bash(grep -v \"lockfile\\\\|Consider removing\\\\|package-lock\\\\|^\\\\s*\\\\*\\\\|^$\")",
-      "Bash(node -e \"const h=require\\('@heroicons/react/24/outline'\\); console.log\\('ArrowPathIcon:', typeof h.ArrowPathIcon\\)\")"
+      "Bash(node -e \"const h=require\\('@heroicons/react/24/outline'\\); console.log\\('ArrowPathIcon:', typeof h.ArrowPathIcon\\)\")",
+      "Bash(grep -v \"lockfile\\\\|Consider removing\\\\|package-lock\\\\|^\\\\s*\\\\*\\\\|^$\\\\|no-img-element\\\\|img>\")"
     ]
   }
 }
