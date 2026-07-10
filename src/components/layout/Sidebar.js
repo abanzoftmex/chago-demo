@@ -19,6 +19,7 @@ import {
   SparklesIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 
 /** En false oculta el ítem Reportes del menú (la página sigue en /admin/reportes). */
@@ -101,7 +102,7 @@ const Sidebar = ({
 
           {/* Navigation */}
           <nav className="flex-1 px-3 py-6 space-y-2">
-            {/* Dashboard */}
+            {/* 1. Dashboard */}
             <button
               onClick={() => handleNavigation("/admin/dashboard")}
               className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/dashboard"
@@ -113,125 +114,12 @@ const Sidebar = ({
               {!collapsed && <span className="ml-3">Dashboard</span>}
             </button>
 
-            {/* Transacciones Section */}
-            {!collapsed &&
-              (checkPermission("canViewEntradas") ||
-                checkPermission("canViewSalidas") ||
-                checkPermission("canViewHistorial")) && (
-                <div className="space-y-1">
-                  <button
-                    onClick={() => handleSectionClick('transacciones')}
-                    className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <div className="flex items-center">
-                      <DocumentTextIcon className="h-5 w-5 flex-shrink-0" />
-                      <span className="ml-3">Transacciones</span>
-                    </div>
-                    {expandedSections.transacciones ? (
-                      <ChevronDownIcon className="h-4 w-4" />
-                    ) : (
-                      <ChevronRightIcon className="h-4 w-4" />
-                    )}
-                  </button>
-
-                  {/* Submenú de Transacciones */}
-                  {expandedSections.transacciones && (
-                    <div className="space-y-1 transition-all duration-300 ease-in-out">
-                      {/* Ingresos - Solo si tiene permiso */}
-                      {checkPermission("canViewEntradas") && (
-                        <button
-                          onClick={() =>
-                            handleNavigation("/admin/transacciones/entradas")
-                          }
-                          className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/entradas"
-                            ? "bg-[#5a5e68] text-[#ededed]"
-                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                            }`}
-                        >
-                          <PlusIcon className="h-5 w-5 flex-shrink-0" />
-                          <span className="ml-3">Entrada</span>
-                        </button>
-                      )}
-
-                      {/* Solicitudes de Pago - Solo si tiene permiso */}
-                      {checkPermission("canViewSalidas") && (
-                        <button
-                          onClick={() =>
-                            handleNavigation("/admin/transacciones/salidas")
-                          }
-                          className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/salidas"
-                            ? "bg-[#5a5e68] text-[#ededed]"
-                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                            }`}
-                        >
-                          <MinusIcon className="h-5 w-5 flex-shrink-0" />
-                          <span className="ml-3">Salida</span>
-                        </button>
-                      )}
-
-                      {/* Historial - Solo si tiene permiso */}
-                      {checkPermission("canViewHistorial") && (
-                        <button
-                          onClick={() =>
-                            handleNavigation("/admin/transacciones/historial")
-                          }
-                          className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/historial"
-                            ? "bg-[#5a5e68] text-[#ededed]"
-                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                            }`}
-                        >
-                          <ClockIcon className="h-5 w-5 flex-shrink-0" />
-                          <span className="ml-3">Historial</span>
-                        </button>
-                      )}
-
-
-                    </div>
-                  )}
-                </div>
-              )}
-
-            {/* Entradas Recurrentes Section */}
-            {!collapsed && checkPermission("canManageTransactions") && (
-              <div className="space-y-1">
-                <button
-                  onClick={() => handleNavigation("/admin/transacciones/entradas-recurrentes")}
-                  className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/entradas-recurrentes"
-                    ? "bg-[#5a5e68] text-[#ededed]"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                    }`}
-                >
-                  <svg className="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  <span className="ml-3">Entradas Recurrentes</span>
-                </button>
-              </div>
-            )}
-
-            {/* Salidas Recurrentes Section */}
-            {!collapsed && checkPermission("canManageTransactions") && (
-              <div className="space-y-1">
-                <button
-                  onClick={() => handleNavigation("/admin/transacciones/recurrentes")}
-                  className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/recurrentes"
-                    ? "bg-[#5a5e68] text-[#ededed]"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                    }`}
-                >
-                  <svg className="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  <span className="ml-3">Salidas Recurrentes</span>
-                </button>
-              </div>
-            )}
-
-            {/* Catalogos Section */}
+            {/* 2. Catálogos Section (incluye Gestión de Catálogos) */}
             {!collapsed &&
               (checkPermission("canManageProviders") ||
                 checkPermission("canManageConcepts") ||
-                checkPermission("canManageDescriptions")) && (
+                checkPermission("canManageDescriptions") ||
+                checkPermission("canManageSettings")) && (
                 <div className="space-y-1">
                   <button
                     onClick={() => handleSectionClick('catalogos')}
@@ -314,12 +202,137 @@ const Sidebar = ({
                           <span className="ml-3">Subconceptos</span>
                         </button>
                       )}
+
+                      {/* Gestión de Catálogos - Solo Admin */}
+                      {checkPermission("canManageSettings") && (
+                        <button
+                          onClick={() =>
+                            handleNavigation("/admin/configuracion/catalogos")
+                          }
+                          className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/configuracion/catalogos"
+                            ? "bg-[#5a5e68] text-[#ededed]"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                            }`}
+                        >
+                          <CogIcon className="h-5 w-5 flex-shrink-0" />
+                          <span className="ml-3">Gestión de Catálogos</span>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
               )}
 
-            {/* Reportes - Solo Admin (oculto temporalmente: SHOW_REPORTES_IN_NAV) */}
+            {/* 3. Transacciones Section (incluye Recurrentes) */}
+            {!collapsed &&
+              (checkPermission("canViewEntradas") ||
+                checkPermission("canViewSalidas") ||
+                checkPermission("canViewHistorial") ||
+                checkPermission("canManageTransactions")) && (
+                <div className="space-y-1">
+                  <button
+                    onClick={() => handleSectionClick('transacciones')}
+                    className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <div className="flex items-center">
+                      <DocumentTextIcon className="h-5 w-5 flex-shrink-0" />
+                      <span className="ml-3">Transacciones</span>
+                    </div>
+                    {expandedSections.transacciones ? (
+                      <ChevronDownIcon className="h-4 w-4" />
+                    ) : (
+                      <ChevronRightIcon className="h-4 w-4" />
+                    )}
+                  </button>
+
+                  {/* Submenú de Transacciones */}
+                  {expandedSections.transacciones && (
+                    <div className="space-y-1 transition-all duration-300 ease-in-out">
+                      {/* Ingresos - Solo si tiene permiso */}
+                      {checkPermission("canViewEntradas") && (
+                        <button
+                          onClick={() =>
+                            handleNavigation("/admin/transacciones/entradas")
+                          }
+                          className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/entradas"
+                            ? "bg-[#5a5e68] text-[#ededed]"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                            }`}
+                        >
+                          <PlusIcon className="h-5 w-5 flex-shrink-0" />
+                          <span className="ml-3">Entradas</span>
+                        </button>
+                      )}
+
+                      {/* Solicitudes de Pago - Solo si tiene permiso */}
+                      {checkPermission("canViewSalidas") && (
+                        <button
+                          onClick={() =>
+                            handleNavigation("/admin/transacciones/salidas")
+                          }
+                          className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/salidas"
+                            ? "bg-[#5a5e68] text-[#ededed]"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                            }`}
+                        >
+                          <MinusIcon className="h-5 w-5 flex-shrink-0" />
+                          <span className="ml-3">Salidas</span>
+                        </button>
+                      )}
+
+                      {/* Historial - Solo si tiene permiso */}
+                      {checkPermission("canViewHistorial") && (
+                        <button
+                          onClick={() =>
+                            handleNavigation("/admin/transacciones/historial")
+                          }
+                          className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/historial"
+                            ? "bg-[#5a5e68] text-[#ededed]"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                            }`}
+                        >
+                          <ClockIcon className="h-5 w-5 flex-shrink-0" />
+                          <span className="ml-3">Historial</span>
+                        </button>
+                      )}
+
+                      {/* Entradas Recurrentes - Solo si puede gestionar */}
+                      {checkPermission("canManageTransactions") && (
+                        <button
+                          onClick={() =>
+                            handleNavigation("/admin/transacciones/entradas-recurrentes")
+                          }
+                          className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/entradas-recurrentes"
+                            ? "bg-[#5a5e68] text-[#ededed]"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                            }`}
+                        >
+                          <ArrowPathIcon className="h-5 w-5 flex-shrink-0" />
+                          <span className="ml-3">Entradas Recurrentes</span>
+                        </button>
+                      )}
+
+                      {/* Salidas Recurrentes - Solo si puede gestionar */}
+                      {checkPermission("canManageTransactions") && (
+                        <button
+                          onClick={() =>
+                            handleNavigation("/admin/transacciones/recurrentes")
+                          }
+                          className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/recurrentes"
+                            ? "bg-[#5a5e68] text-[#ededed]"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                            }`}
+                        >
+                          <ArrowPathIcon className="h-5 w-5 flex-shrink-0" />
+                          <span className="ml-3">Salidas Recurrentes</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+            {/* 4. Reportes - Solo Admin (oculto temporalmente: SHOW_REPORTES_IN_NAV) */}
             {SHOW_REPORTES_IN_NAV && checkPermission("canViewReports") && (
               <button
                 onClick={() => handleNavigation("/admin/reportes")}
@@ -333,7 +346,7 @@ const Sidebar = ({
               </button>
             )}
 
-            {/* Análisis con IA - Solo Administrativo */}
+            {/* 5. Análisis con IA - Solo Administrativo */}
             {checkPermission("canViewAnalisisIA") && (
               <button
                 onClick={() => handleNavigation("/admin/analisis-ia")}
@@ -347,7 +360,7 @@ const Sidebar = ({
               </button>
             )}
 
-            {/* Configuración Section - Solo Admin */}
+            {/* 6. Configuración Section - Solo Admin */}
             {checkPermission("canManageSettings") &&
               (!collapsed ? (
                 <div className="space-y-1">
@@ -407,20 +420,6 @@ const Sidebar = ({
                           }`}
                       >
                         <span className="ml-3">Registros de actividad</span>
-                      </button>
-                      <button
-                        onClick={() =>
-                          handleNavigation(
-                            "/admin/configuracion/catalogos"
-                          )
-                        }
-                        className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname ===
-                          "/admin/configuracion/catalogos"
-                          ? "bg-[#5a5e68] text-[#ededed]"
-                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                          }`}
-                      >
-                        <span className="ml-3">Gestión de Catálogos</span>
                       </button>
                       {/* Dev Tools - Only in development */}
                       {process.env.NODE_ENV === 'development' && (
@@ -499,7 +498,7 @@ const Sidebar = ({
 
           {/* Mobile Navigation */}
           <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto">
-            {/* Same navigation items as desktop */}
+            {/* 1. Dashboard */}
             <button
               onClick={() => handleNavigation("/admin/dashboard")}
               className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/dashboard"
@@ -511,116 +510,11 @@ const Sidebar = ({
               <span className="ml-3">Dashboard</span>
             </button>
 
-            {(checkPermission("canViewEntradas") ||
-              checkPermission("canViewSalidas") ||
-              checkPermission("canViewHistorial")) && (
-                <div className="space-y-1">
-                  <button
-                    onClick={() => handleSectionClick('transacciones')}
-                    className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <div className="flex items-center">
-                      <DocumentTextIcon className="h-5 w-5 flex-shrink-0" />
-                      <span className="ml-3">Transacciones</span>
-                    </div>
-                    {expandedSections.transacciones ? (
-                      <ChevronDownIcon className="h-4 w-4" />
-                    ) : (
-                      <ChevronRightIcon className="h-4 w-4" />
-                    )}
-                  </button>
-
-                  {/* Submenú de Transacciones */}
-                  {expandedSections.transacciones && (
-                    <div className="space-y-1 transition-all duration-300 ease-in-out">
-                      {checkPermission("canViewEntradas") && (
-                        <button
-                          onClick={() =>
-                            handleNavigation("/admin/transacciones/entradas")
-                          }
-                          className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/entradas"
-                            ? "bg-[#5a5e68] text-[#ededed]"
-                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                            }`}
-                        >
-                          <PlusIcon className="h-5 w-5 flex-shrink-0" />
-                          <span className="ml-3">Entradas</span>
-                        </button>
-                      )}
-
-                      {checkPermission("canViewSalidas") && (
-                        <button
-                          onClick={() =>
-                            handleNavigation("/admin/transacciones/salidas")
-                          }
-                          className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/salidas"
-                            ? "bg-[#5a5e68] text-[#ededed]"
-                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                            }`}
-                        >
-                          <MinusIcon className="h-5 w-5 flex-shrink-0" />
-                          <span className="ml-3">Salida</span>
-                        </button>
-                      )}
-
-                      {checkPermission("canViewHistorial") && (
-                        <button
-                          onClick={() =>
-                            handleNavigation("/admin/transacciones/historial")
-                          }
-                          className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/historial"
-                            ? "bg-[#5a5e68] text-[#ededed]"
-                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                            }`}
-                        >
-                          <ClockIcon className="h-5 w-5 flex-shrink-0" />
-                          <span className="ml-3">Historial</span>
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-            {/* Entradas Recurrentes Section - Mobile */}
-            {checkPermission("canManageTransactions") && (
-              <div className="space-y-1">
-                <button
-                  onClick={() => handleNavigation("/admin/transacciones/entradas-recurrentes")}
-                  className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/entradas-recurrentes"
-                    ? "bg-[#5a5e68] text-[#ededed]"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                    }`}
-                >
-                  <svg className="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  <span className="ml-3">Entradas Recurrentes</span>
-                </button>
-              </div>
-            )}
-
-            {/* Salidas Recurrentes Section - Mobile */}
-            {checkPermission("canManageTransactions") && (
-              <div className="space-y-1">
-                <button
-                  onClick={() => handleNavigation("/admin/transacciones/recurrentes")}
-                  className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/recurrentes"
-                    ? "bg-[#5a5e68] text-[#ededed]"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                    }`}
-                >
-                  <svg className="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  <span className="ml-3">Salidas Recurrentes</span>
-                </button>
-              </div>
-            )}
-
+            {/* 2. Catálogos Section (incluye Gestión de Catálogos) */}
             {(checkPermission("canManageProviders") ||
               checkPermission("canManageConcepts") ||
-              checkPermission("canManageDescriptions")) && (
+              checkPermission("canManageDescriptions") ||
+              checkPermission("canManageSettings")) && (
                 <div className="space-y-1">
                   <button
                     onClick={() => handleSectionClick('catalogos')}
@@ -699,11 +593,132 @@ const Sidebar = ({
                           <span className="ml-3">Subconceptos</span>
                         </button>
                       )}
+
+                      {checkPermission("canManageSettings") && (
+                        <button
+                          onClick={() =>
+                            handleNavigation("/admin/configuracion/catalogos")
+                          }
+                          className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/configuracion/catalogos"
+                            ? "bg-[#5a5e68] text-[#ededed]"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                            }`}
+                        >
+                          <CogIcon className="h-5 w-5 flex-shrink-0" />
+                          <span className="ml-3">Gestión de Catálogos</span>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
               )}
 
+            {/* 3. Transacciones Section (incluye Recurrentes) */}
+            {(checkPermission("canViewEntradas") ||
+              checkPermission("canViewSalidas") ||
+              checkPermission("canViewHistorial") ||
+              checkPermission("canManageTransactions")) && (
+                <div className="space-y-1">
+                  <button
+                    onClick={() => handleSectionClick('transacciones')}
+                    className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <div className="flex items-center">
+                      <DocumentTextIcon className="h-5 w-5 flex-shrink-0" />
+                      <span className="ml-3">Transacciones</span>
+                    </div>
+                    {expandedSections.transacciones ? (
+                      <ChevronDownIcon className="h-4 w-4" />
+                    ) : (
+                      <ChevronRightIcon className="h-4 w-4" />
+                    )}
+                  </button>
+
+                  {/* Submenú de Transacciones */}
+                  {expandedSections.transacciones && (
+                    <div className="space-y-1 transition-all duration-300 ease-in-out">
+                      {checkPermission("canViewEntradas") && (
+                        <button
+                          onClick={() =>
+                            handleNavigation("/admin/transacciones/entradas")
+                          }
+                          className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/entradas"
+                            ? "bg-[#5a5e68] text-[#ededed]"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                            }`}
+                        >
+                          <PlusIcon className="h-5 w-5 flex-shrink-0" />
+                          <span className="ml-3">Entradas</span>
+                        </button>
+                      )}
+
+                      {checkPermission("canViewSalidas") && (
+                        <button
+                          onClick={() =>
+                            handleNavigation("/admin/transacciones/salidas")
+                          }
+                          className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/salidas"
+                            ? "bg-[#5a5e68] text-[#ededed]"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                            }`}
+                        >
+                          <MinusIcon className="h-5 w-5 flex-shrink-0" />
+                          <span className="ml-3">Salidas</span>
+                        </button>
+                      )}
+
+                      {checkPermission("canViewHistorial") && (
+                        <button
+                          onClick={() =>
+                            handleNavigation("/admin/transacciones/historial")
+                          }
+                          className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/historial"
+                            ? "bg-[#5a5e68] text-[#ededed]"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                            }`}
+                        >
+                          <ClockIcon className="h-5 w-5 flex-shrink-0" />
+                          <span className="ml-3">Historial</span>
+                        </button>
+                      )}
+
+                      {/* Entradas Recurrentes - Solo si puede gestionar */}
+                      {checkPermission("canManageTransactions") && (
+                        <button
+                          onClick={() =>
+                            handleNavigation("/admin/transacciones/entradas-recurrentes")
+                          }
+                          className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/entradas-recurrentes"
+                            ? "bg-[#5a5e68] text-[#ededed]"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                            }`}
+                        >
+                          <ArrowPathIcon className="h-5 w-5 flex-shrink-0" />
+                          <span className="ml-3">Entradas Recurrentes</span>
+                        </button>
+                      )}
+
+                      {/* Salidas Recurrentes - Solo si puede gestionar */}
+                      {checkPermission("canManageTransactions") && (
+                        <button
+                          onClick={() =>
+                            handleNavigation("/admin/transacciones/recurrentes")
+                          }
+                          className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname === "/admin/transacciones/recurrentes"
+                            ? "bg-[#5a5e68] text-[#ededed]"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                            }`}
+                        >
+                          <ArrowPathIcon className="h-5 w-5 flex-shrink-0" />
+                          <span className="ml-3">Salidas Recurrentes</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+            {/* 4. Reportes */}
             {SHOW_REPORTES_IN_NAV && checkPermission("canViewReports") && (
               <button
                 onClick={() => handleNavigation("/admin/reportes")}
@@ -717,7 +732,7 @@ const Sidebar = ({
               </button>
             )}
 
-            {/* Análisis con IA (mobile) - Admin y Viewer */}
+            {/* 5. Análisis con IA (mobile) - Admin y Viewer */}
             {(checkPermission("canViewReports") || checkPermission("canViewEntradas")) && (
               <button
                 onClick={() => handleNavigation("/admin/analisis-ia")}
@@ -731,7 +746,7 @@ const Sidebar = ({
               </button>
             )}
 
-            {/* Configuración Section (mobile) - Solo Admin */}
+            {/* 6. Configuración Section (mobile) - Solo Admin */}
             {checkPermission("canManageSettings") && (
               <div className="space-y-1">
                 <button
@@ -790,20 +805,6 @@ const Sidebar = ({
                         }`}
                     >
                       <span className="ml-3">Registros de actividad</span>
-                    </button>
-                    <button
-                      onClick={() =>
-                        handleNavigation(
-                          "/admin/configuracion/catalogos"
-                        )
-                      }
-                      className={`w-full flex items-center px-3 py-2 pl-10 text-sm font-medium rounded-lg transition-colors ${router.pathname ===
-                        "/admin/configuracion/catalogos"
-                        ? "bg-[#5a5e68] text-[#ededed]"
-                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                        }`}
-                    >
-                      <span className="ml-3">Gestión de Catálogos</span>
                     </button>
                     {/* Dev Tools - Only in development */}
                     {process.env.NODE_ENV === 'development' && (

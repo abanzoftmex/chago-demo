@@ -138,14 +138,29 @@ export const reportService = {
 
 
       } else {
-        transactions = await transactionService.getAll({
-          type: filters.type,
-          providerId: filters.providerId,
-          generalId: filters.generalId,
-          conceptId: filters.conceptId,
-          subconceptId: filters.subconceptId,
-          division: filters.division
-        }, tenantId);
+        const cache = options.allTransactionsCache;
+        if (cache != null) {
+          // Sin rango de fechas: filtrar la caché en memoria por igualdad,
+          // evitando otra lectura completa de la colección.
+          transactions = cache.filter((t) => {
+            if (filters.type && t.type !== filters.type) return false;
+            if (filters.providerId && t.providerId !== filters.providerId) return false;
+            if (filters.generalId && t.generalId !== filters.generalId) return false;
+            if (filters.conceptId && t.conceptId !== filters.conceptId) return false;
+            if (filters.subconceptId && t.subconceptId !== filters.subconceptId) return false;
+            if (filters.division && t.division !== filters.division) return false;
+            return true;
+          });
+        } else {
+          transactions = await transactionService.getAll({
+            type: filters.type,
+            providerId: filters.providerId,
+            generalId: filters.generalId,
+            conceptId: filters.conceptId,
+            subconceptId: filters.subconceptId,
+            division: filters.division
+          }, tenantId);
+        }
       }
 
       return transactions;

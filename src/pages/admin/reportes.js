@@ -52,8 +52,6 @@ const Reportes = () => {
   const [allTransactions, setAllTransactions] = useState([]); // Todas las transacciones sin filtro de fecha
   const [stats, setStats] = useState(null);
   const [generals, setGenerals] = useState([]);
-  const [showCarryoverPanel, setShowCarryoverPanel] = useState(false);
-  const [carryoverTransactions, setCarryoverTransactions] = useState([]);
   const [carryoverInfo, setCarryoverInfo] = useState(null);
   const [carryoverStatus, setCarryoverStatus] = useState({
     executed: false,
@@ -253,9 +251,19 @@ const Reportes = () => {
         }
       }
 
+      // Una sola lectura de la colección; se reutiliza como caché en ambas
+      // llamadas para evitar múltiples lecturas completas (período + arrastre).
+      const allTransactionsCache = await transactionService.getAll(
+        {},
+        tenantInfo?.id
+      );
+
       // Cargar transacciones filtradas por período
-      const transactionsData =
-        await reportService.getFilteredTransactions(filterData, tenantInfo?.id);
+      const transactionsData = await reportService.getFilteredTransactions(
+        filterData,
+        tenantInfo?.id,
+        { allTransactionsCache }
+      );
       const statsData = await reportService.generateReportStats(
         transactionsData,
         filterData,
@@ -263,11 +271,15 @@ const Reportes = () => {
       );
 
       // Cargar TODAS las transacciones (sin filtro de fecha) para calcular arrastre
-      const allTransactionsData = await reportService.getFilteredTransactions({
-        ...filterData,
-        startDate: null,
-        endDate: null
-      }, tenantInfo?.id);
+      const allTransactionsData = await reportService.getFilteredTransactions(
+        {
+          ...filterData,
+          startDate: null,
+          endDate: null,
+        },
+        tenantInfo?.id,
+        { allTransactionsCache }
+      );
 
       // Enriquecer allTransactions con nombre de proveedor
       const enrichedAllTransactions = allTransactionsData.map(transaction => {
@@ -292,72 +304,12 @@ const Reportes = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.startDate, filters.endDate, filters.type, filters.generalId, filters.conceptId, filters.subconceptId, filters.division, providers]);
 
-  const loadCarryoverTransactions = async () => {
-    try {
-      // Get ALL pending transactions but filter by month like the backend
-      const allTransactions = await transactionService.getAll({
-        type: 'salida',
-        status: 'pendiente'
-      });
-
-      // Filter pending transactions to only include those up to the report month
-      const reportEndDate = new Date(filters.endDate);
-      const reportYear = reportEndDate.getFullYear();
-      const reportMonth = reportEndDate.getMonth(); // 0-based
-
-      const pendingFromPrevious = allTransactions.filter(transaction => {
-        if (transaction.status !== 'pendiente') return false;
-
-        const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
-        const transactionYear = transactionDate.getFullYear();
-        const transactionMonth = transactionDate.getMonth();
-
-        // Only include pending transactions up to the report month
-        return (transactionYear < reportYear) ||
-          (transactionYear === reportYear && transactionMonth <= reportMonth);
-      });
-
-      // console.log('Frontend - Filtrado de gastos pendientes:', {
-      //   reportMonth: `${reportYear}-${String(reportMonth + 1).padStart(2, '0')}`,
-      //   totalPendingInSystem: allTransactions.length,
-      //   pendingUntilReportMonth: pendingFromPrevious.length,
-      //   filteredOut: allTransactions.length - pendingFromPrevious.length
-      // });
-
-      // Get reference data for display
-      if (!tenantId) {
-        console.error("No tenant ID available");
-        return;
-      }
-
-      const [conceptsData, providersData, generalsData] = await Promise.all([
-        conceptService.getAll(tenantId),
-        providerService.getAll(tenantId),
-        generalService.getAll(tenantId)
-      ]);
-
-      // Enrich transactions with reference data
-      const enrichedTransactions = pendingFromPrevious.map(transaction => ({
-        ...transaction,
-        conceptName: conceptsData.find(c => c.id === transaction.conceptId)?.name || 'Sin concepto',
-        providerName: providersData.find(p => p.id === transaction.providerId)?.name || 'Sin proveedor',
-        generalName: generalsData.find(g => g.id === transaction.generalId)?.name || 'Sin categoría'
-      }));
-
-      setCarryoverTransactions(enrichedTransactions);
-      setShowCarryoverPanel(true);
-    } catch (err) {
-      console.error("Error loading carryover transactions:", err);
-      error("Error al cargar transacciones de arrastre");
-    }
-  };
-
   const loadPendingSalidasTransactions = async () => {
     try {
       // Get all transactions from the current period
       const allTransactions = await transactionService.getAll({
         type: 'salida'
-      });
+      }, tenantId);
 
       // Filter by date range and status (pendiente or parcial)
       const startDate = new Date(filters.startDate);
@@ -611,32 +563,30 @@ const Reportes = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
+          {/* Primera fila: Rango de fechas + Tipo */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Date Range */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                Fecha Inicio
+                Rango de Fechas
               </label>
-              <input
-                type="date"
-                value={filters.startDate}
-                onChange={(e) =>
-                  handleFilterChange("startDate", e.target.value)
-                }
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">
-                Fecha Fin
-              </label>
-              <input
-                type="date"
-                value={filters.endDate}
-                onChange={(e) => handleFilterChange("endDate", e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={filters.startDate}
+                  onChange={(e) =>
+                    handleFilterChange("startDate", e.target.value)
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <span className="text-muted-foreground shrink-0">—</span>
+                <input
+                  type="date"
+                  value={filters.endDate}
+                  onChange={(e) => handleFilterChange("endDate", e.target.value)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
             </div>
 
             {/* Type Filter */}
@@ -654,7 +604,10 @@ const Reportes = () => {
                 <option value="salida">Salida</option>
               </select>
             </div>
+          </div>
 
+          {/* Segunda fila: General → Concepto → Subconcepto */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
             {/* General Filter */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
@@ -720,27 +673,6 @@ const Reportes = () => {
                 ))}
               </select>
             </div>
-
-            {/* Division Filter - OCULTO POR AHORA */}
-            {/* <div>
-              <label className="block text-sm font-medium text-foreground mb-1">
-                División
-              </label>
-              <select
-                value={filters.division}
-                onChange={(e) =>
-                  handleFilterChange("division", e.target.value)
-                }
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-              >
-                <option value="">Todas</option>
-                {DIVISIONS.map((division) => (
-                  <option key={division.value} value={division.value}>
-                    {division.label}
-                  </option>
-                ))}
-              </select>
-            </div> */}
           </div>
 
           <div className="flex justify-between items-center mt-4">
@@ -749,7 +681,7 @@ const Reportes = () => {
               disabled={loading}
               variant="primary"
               size="md"
-              className="inline-flex items-center"
+              className="inline-flex items-center !bg-[#38425b] hover:!bg-[#2f3749] focus:!ring-[#38425b]"
             >
               {loading ? "Generando..." : "Generar Reporte"}
             </Button>
@@ -2395,91 +2327,6 @@ const Reportes = () => {
               <div className="text-xs text-gray-600 text-center">
                 Mostrando <strong>{selectedWeekDetail.transactions.length}</strong> transacciones de la semana {selectedWeekDetail.weekNumber}
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showCarryoverPanel && (
-        <div className="fixed inset-0 z-50 overflow-hidden">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-xs" onClick={() => setShowCarryoverPanel(false)} />
-          <div className="absolute right-0 top-0 h-full w-96 max-w-full bg-background shadow-xl">
-            <div className="flex h-full flex-col">
-              {/* Header */}
-              <div className="px-6 py-4 border-b border-border">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-foreground">
-                    Salidas pendientes por cubrirse
-                  </h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowCarryoverPanel(false)}
-                  >
-                    <XMarkIcon className="h-5 w-5" />
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Todas las salidas con estado pendiente
-                </p>
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 overflow-y-auto px-6 py-4">
-                {carryoverTransactions.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">
-                    No hay salidas pendientes en el sistema
-                  </p>
-                ) : (
-                  <div className="space-y-4">
-                    {carryoverTransactions.map((transaction) => (
-                      <div
-                        key={transaction.id}
-                        className="border border-border rounded-lg p-4 bg-red-50"
-                      >
-                        <div className="flex justify-between items-start mb-2">
-                          <h4 className="font-medium text-foreground">
-                            {transaction.conceptName}
-                          </h4>
-                          <span className="text-lg font-bold text-red-600">
-                            {formatCurrency(transaction.amount)}
-                          </span>
-                        </div>
-
-                        <div className="space-y-1 text-sm text-muted-foreground">
-                          <p><strong>Proveedor:</strong> {transaction.providerName}</p>
-                          <p><strong>Categoría:</strong> {transaction.generalName}</p>
-                          <p><strong>Fecha:</strong> {
-                            transaction.date?.toDate ?
-                              transaction.date.toDate().toLocaleDateString('es-ES') :
-                              new Date(transaction.date).toLocaleDateString('es-ES')
-                          }</p>
-                          {transaction.description && (
-                            <p><strong>Descripción:</strong> {transaction.description}</p>
-                          )}
-                          <p><strong>Saldo pendiente:</strong> {formatCurrency(transaction.balance || transaction.amount)}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Footer */}
-              {carryoverTransactions.length > 0 && (
-                <div className="px-6 py-4 border-t border-border bg-muted">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">
-                      Total de {carryoverTransactions.length} transacciones
-                    </span>
-                    <span className="font-bold text-red-600">
-                      {formatCurrency(
-                        carryoverTransactions.reduce((sum, t) => sum + (t.balance || t.amount), 0)
-                      )}
-                    </span>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>

@@ -79,155 +79,109 @@ export const transactionService = {
   },
 
   // Get all transactions with optional filters
+  //
+  // Para NO requerir índices compuestos, a Firestore solo se le envía el
+  // ordenamiento (createdAt) o, si hay rango de fechas, el filtro de fecha con su
+  // orderBy (mismo campo). TODOS los filtros de igualdad (type, generalId,
+  // conceptId, etc.) se aplican en cliente. Combinar where de igualdad con
+  // orderBy en otro campo exige un índice compuesto por cada combinación, que es
+  // justo lo que rompía aquí (generalId + type + orderBy createdAt). Misma
+  // estrategia que getByDateRange / getStatsByDateRange.
   async getAll(filters = {}, tenantId = null) {
     try {
       const collectionPath = getTransactionsCollection(tenantId);
+
+      const hasEqualityFilter = Boolean(
+        filters.type ||
+          filters.providerId ||
+          filters.generalId ||
+          filters.conceptId ||
+          filters.subconceptId ||
+          filters.status ||
+          filters.excludeStatus ||
+          filters.division
+      );
+
       let q = collection(db, collectionPath);
 
-      // Apply filters
-      if (filters.type) {
-        q = query(q, where("type", "==", filters.type));
-      }
-
-      if (filters.providerId) {
-        q = query(q, where("providerId", "==", filters.providerId));
-      }
-
-      if (filters.generalId) {
-        q = query(q, where("generalId", "==", filters.generalId));
-      }
-
-      if (filters.conceptId) {
-        q = query(q, where("conceptId", "==", filters.conceptId));
-      }
-
-      if (filters.subconceptId) {
-        q = query(q, where("subconceptId", "==", filters.subconceptId));
-      }
-
-      if (filters.status) {
-        q = query(q, where("status", "==", filters.status));
-      }
-
-      if (filters.excludeStatus) {
-        q = query(q, where("status", "!=", filters.excludeStatus));
-      }
-
-      if (filters.division) {
-        q = query(q, where("division", "==", filters.division));
-      }
-
-      // Handle date filtering - need to combine both conditions properly
       if (filters.startDate && filters.endDate) {
-        // Use date range filtering with proper ordering
-        q = query(q, where("date", ">=", filters.startDate), where("date", "<=", filters.endDate));
-        q = query(q, orderBy("date", "desc"));
+        // Rango de fechas: el where y el orderBy son sobre el mismo campo (date),
+        // así que no requiere índice compuesto.
+        q = query(
+          q,
+          where("date", ">=", filters.startDate),
+          where("date", "<=", filters.endDate),
+          orderBy("date", "desc")
+        );
       } else {
-        // Apply ordering by createdAt when no date filters
         q = query(q, orderBy("createdAt", "desc"));
       }
 
-      // Apply pagination after ordering
-      if (filters.limit) {
-        q = query(q, limit(filters.limit));
-      }
-
-      if (filters.startAfter) {
-        q = query(q, startAfter(filters.startAfter));
+      // El límite/cursor en Firestore solo es seguro cuando NO hay filtros de
+      // igualdad; si los hay, el recorte se hace en cliente tras filtrar para no
+      // truncar resultados válidos.
+      if (!hasEqualityFilter) {
+        if (filters.limit) {
+          q = query(q, limit(filters.limit));
+        }
+        if (filters.startAfter) {
+          q = query(q, startAfter(filters.startAfter));
+        }
       }
 
       const querySnapshot = await getDocs(q);
       let transactions = [];
-
-      querySnapshot.forEach((doc) => {
-        transactions.push({ id: doc.id, ...doc.data() });
+      querySnapshot.forEach((docSnap) => {
+        transactions.push({ id: docSnap.id, ...docSnap.data() });
       });
+
+      // Filtros de igualdad en cliente (equivalentes a los where removidos).
+      if (filters.type) {
+        transactions = transactions.filter((t) => t.type === filters.type);
+      }
+      if (filters.providerId) {
+        transactions = transactions.filter(
+          (t) => t.providerId === filters.providerId
+        );
+      }
+      if (filters.generalId) {
+        transactions = transactions.filter(
+          (t) => t.generalId === filters.generalId
+        );
+      }
+      if (filters.conceptId) {
+        transactions = transactions.filter(
+          (t) => t.conceptId === filters.conceptId
+        );
+      }
+      if (filters.subconceptId) {
+        transactions = transactions.filter(
+          (t) => t.subconceptId === filters.subconceptId
+        );
+      }
+      if (filters.status) {
+        transactions = transactions.filter((t) => t.status === filters.status);
+      }
+      if (filters.excludeStatus) {
+        transactions = transactions.filter(
+          (t) => t.status !== filters.excludeStatus
+        );
+      }
+      if (filters.division) {
+        transactions = transactions.filter(
+          (t) => t.division === filters.division
+        );
+      }
+
+      // Recorte por límite en cliente cuando hubo filtros de igualdad.
+      if (filters.limit && hasEqualityFilter) {
+        transactions = transactions.slice(0, filters.limit);
+      }
 
       return transactions;
     } catch (error) {
       console.error("Error getting transactions:", error);
-      // Sin índice compuesto (p. ej. generalId + type + orderBy createdAt), Firestore falla.
-      // Leemos la colección y aplicamos filtros en cliente (mismos resultados; más lecturas si hay muchos docs).
-      try {
-        const collectionPath = getTransactionsCollection(tenantId);
-        const fallbackSnapshot = await getDocs(collection(db, collectionPath));
-        let fallbackTransactions = [];
-        fallbackSnapshot.forEach((docSnap) => {
-          fallbackTransactions.push({ id: docSnap.id, ...docSnap.data() });
-        });
-
-        if (filters.type) {
-          fallbackTransactions = fallbackTransactions.filter(
-            (t) => t.type === filters.type
-          );
-        }
-        if (filters.providerId) {
-          fallbackTransactions = fallbackTransactions.filter(
-            (t) => t.providerId === filters.providerId
-          );
-        }
-        if (filters.generalId) {
-          fallbackTransactions = fallbackTransactions.filter(
-            (t) => t.generalId === filters.generalId
-          );
-        }
-        if (filters.conceptId) {
-          fallbackTransactions = fallbackTransactions.filter(
-            (t) => t.conceptId === filters.conceptId
-          );
-        }
-        if (filters.subconceptId) {
-          fallbackTransactions = fallbackTransactions.filter(
-            (t) => t.subconceptId === filters.subconceptId
-          );
-        }
-        if (filters.status) {
-          fallbackTransactions = fallbackTransactions.filter(
-            (t) => t.status === filters.status
-          );
-        }
-        if (filters.excludeStatus) {
-          fallbackTransactions = fallbackTransactions.filter(
-            (t) => t.status !== filters.excludeStatus
-          );
-        }
-        if (filters.division) {
-          fallbackTransactions = fallbackTransactions.filter(
-            (t) => t.division === filters.division
-          );
-        }
-        if (filters.startDate && filters.endDate) {
-          fallbackTransactions = fallbackTransactions.filter((transaction) => {
-            if (!transaction.date) return false;
-            const transactionDate = transaction.date.toDate
-              ? transaction.date.toDate()
-              : new Date(transaction.date);
-            return (
-              transactionDate >= filters.startDate &&
-              transactionDate <= filters.endDate
-            );
-          });
-        }
-
-        fallbackTransactions.sort((a, b) => {
-          const da = a.createdAt?.toDate
-            ? a.createdAt.toDate()
-            : new Date(a.createdAt || 0);
-          const db = b.createdAt?.toDate
-            ? b.createdAt.toDate()
-            : new Date(b.createdAt || 0);
-          return db.getTime() - da.getTime();
-        });
-
-        if (filters.limit) {
-          fallbackTransactions = fallbackTransactions.slice(0, filters.limit);
-        }
-
-        return fallbackTransactions;
-      } catch (fallbackError) {
-        console.error("Fallback query also failed:", fallbackError);
-        throw new Error("Error al obtener las transacciones");
-      }
+      throw new Error("Error al obtener las transacciones");
     }
   },
 
