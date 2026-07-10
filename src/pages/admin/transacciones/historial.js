@@ -310,9 +310,16 @@ const Historial = () => {
               (p) => p.id === transaction.providerId
             );
             const general = generals.find((g) => g.id === transaction.generalId);
+            const subconcept = subconcepts.find(
+              (s) => s.id === transaction.subconceptId
+            );
 
             return (
+              (transaction.description &&
+                transaction.description.toLowerCase().includes(searchLower)) ||
               (concept && concept.name.toLowerCase().includes(searchLower)) ||
+              (subconcept &&
+                subconcept.name.toLowerCase().includes(searchLower)) ||
               (provider && provider.name.toLowerCase().includes(searchLower)) ||
               (general && general.name.toLowerCase().includes(searchLower)) ||
               transaction.amount.toString().includes(searchLower)
@@ -332,7 +339,7 @@ const Historial = () => {
     };
 
     loadTransactions();
-  }, [filters, currentPage, concepts, providers, generals, initialDataLoaded, tenantId]);
+  }, [filters, currentPage, concepts, subconcepts, providers, generals, initialDataLoaded, tenantId]);
 
   // Load statistics when date or non-status filters change
   useEffect(() => {
