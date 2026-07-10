@@ -156,7 +156,10 @@ export const reportService = {
   },
 
   // Generar estadísticas del reporte con balance de arrastre mejorado
-  async generateReportStats(transactions, filters = {}, tenantId) {
+  // options.referenceData: si se pasan los catálogos ya cargados
+  // ({ concepts, providers, descriptions, generals, subconcepts }), se evita
+  // volver a consultarlos en Firestore (p. ej. el dashboard ya los cargó).
+  async generateReportStats(transactions, filters = {}, tenantId, options = {}) {
     try {
       // console.log(`🔍 generateReportStats: filters recibidos:`, filters);
 
@@ -236,14 +239,23 @@ export const reportService = {
         }
       }
 
-      // Get reference data
-      const [concepts, providers, descriptions, generals, subconcepts] = await Promise.all([
-        conceptService.getAll(tenantId),
-        providerService.getAll(tenantId),
-        descriptionService.getAll(tenantId),
-        generalService.getAll(tenantId),
-        subconceptService.getAll(tenantId)
-      ]);
+      // Get reference data (reutiliza catálogos precargados si se pasan por options)
+      const refData = options.referenceData;
+      const [concepts, providers, descriptions, generals, subconcepts] = refData
+        ? [
+            refData.concepts || [],
+            refData.providers || [],
+            refData.descriptions || [],
+            refData.generals || [],
+            refData.subconcepts || [],
+          ]
+        : await Promise.all([
+            conceptService.getAll(tenantId),
+            providerService.getAll(tenantId),
+            descriptionService.getAll(tenantId),
+            generalService.getAll(tenantId),
+            subconceptService.getAll(tenantId)
+          ]);
 
       const conceptMap = {};
       concepts.forEach(concept => {

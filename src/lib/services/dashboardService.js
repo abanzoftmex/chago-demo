@@ -1,7 +1,100 @@
 import { transactionService } from './transactionService';
 import { conceptService } from './conceptService';
 
+// Normaliza el campo date (Firestore Timestamp | Date | string) a un Date válido, o null.
+const toJsDate = (value) => {
+  if (!value) return null;
+  const d = value.toDate ? value.toDate() : new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+};
+
 export const dashboardService = {
+  // Igual que getMonthSummary pero calculado en memoria desde un arreglo ya cargado
+  // (p. ej. el getAll del dashboard), sin volver a consultar Firestore.
+  buildMonthSummary(transactions, startDate, endDate) {
+    const startMs = startDate.getTime();
+    const endMs = endDate.getTime();
+    const summary = {
+      entradas: 0,
+      salidas: 0,
+      balance: 0,
+      totalTransactions: 0,
+      entradasCount: 0,
+      salidasCount: 0,
+    };
+
+    (transactions || []).forEach((transaction) => {
+      const d = toJsDate(transaction.date);
+      if (!d) return;
+      const ms = d.getTime();
+      if (ms < startMs || ms > endMs) return;
+
+      summary.totalTransactions++;
+      if (transaction.type === 'entrada') {
+        summary.entradas += transaction.amount || 0;
+        summary.entradasCount++;
+      } else if (transaction.type === 'salida') {
+        summary.salidas += transaction.amount || 0;
+        summary.salidasCount++;
+      }
+    });
+
+    summary.balance = summary.entradas - summary.salidas;
+    return summary;
+  },
+
+  // Igual que getMonthlyTrends (últimos 6 meses) pero en memoria desde un arreglo
+  // ya cargado, evitando 6 consultas secuenciales a Firestore.
+  buildMonthlyTrends(transactions, referenceDate = new Date()) {
+    const trends = [];
+
+    for (let i = 5; i >= 0; i--) {
+      const monthDate = new Date(
+        referenceDate.getFullYear(),
+        referenceDate.getMonth() - i,
+        1
+      );
+      const startOfMonth = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+      const endOfMonth = new Date(
+        monthDate.getFullYear(),
+        monthDate.getMonth() + 1,
+        0,
+        23,
+        59,
+        59
+      );
+      const startMs = startOfMonth.getTime();
+      const endMs = endOfMonth.getTime();
+
+      const monthData = {
+        month: monthDate.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' }),
+        entradas: 0,
+        salidas: 0,
+        balance: 0,
+        transactionCount: 0,
+      };
+
+      (transactions || []).forEach((transaction) => {
+        const d = toJsDate(transaction.date);
+        if (!d) return;
+        const ms = d.getTime();
+        if (ms < startMs || ms > endMs) return;
+
+        monthData.transactionCount++;
+        if (transaction.type === 'entrada') {
+          monthData.entradas += transaction.amount || 0;
+        } else if (transaction.type === 'salida') {
+          monthData.salidas += transaction.amount || 0;
+        }
+      });
+
+      monthData.balance = monthData.entradas - monthData.salidas;
+      trends.push(monthData);
+    }
+
+    return trends;
+  },
+
   // Get current month summary
   async getCurrentMonthSummary(tenantId) {
     try {

@@ -12,6 +12,7 @@ import { transactionService } from "../../lib/services/transactionService";
 import { conceptService } from "../../lib/services/conceptService";
 import { subconceptService } from "../../lib/services/subconceptService";
 import { providerService } from "../../lib/services/providerService";
+import { descriptionService } from "../../lib/services/descriptionService";
 import { recurringExpenseService } from "../../lib/services/recurringExpenseService";
 import {
   reportService,
@@ -22,6 +23,17 @@ import WeeklyBreakdownCombined from "../../components/reports/WeeklyBreakdownCom
 import WeeklyBreakdownEntradas from "../../components/reports/WeeklyBreakdownEntradas";
 import WeeklyBreakdownSalidas from "../../components/reports/WeeklyBreakdownSalidas";
 import { formatCurrency, formatCurrencyWithBadge, calculateTreeComparison } from "../../lib/utils/reportUtils";
+
+// Red de seguridad: si una consulta a Firestore se cuelga (típico en Safari con
+// WebChannel), esto garantiza que la promesa se resuelva/rechace y el spinner no
+// quede infinito. Rechaza a los `ms` milisegundos si `promise` no terminó antes.
+function withTimeout(promise, ms, message) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+}
 
 function groupTransactionsByDay(transactions, currentDate) {
   const year = currentDate.getFullYear();
@@ -147,57 +159,97 @@ const Dashboard = () => {
         division: null,
       };
 
-      const [
-        summaryData,
-        trendsData,
-        allTransactionsComplete,
-        allConcepts,
-        generalsData,
-        subconceptsData,
-        providersData,
-      ] = await Promise.all([
-        dashboardService.getMonthSummary(startOfMonth, endOfMonth, tenantId),
-        dashboardService.getMonthlyTrends(tenantId),
-        transactionService.getAll({}, tenantId),
-        conceptService.getAll(tenantId),
-        generalService.getAll(tenantId),
-        subconceptService.getAll(tenantId),
-        providerService.getAll(tenantId),
-      ]);
+      // Todo el trabajo de red se calcula desde UN solo getAll de transacciones.
+      // El resumen del mes y las tendencias (últimos 6 meses) se derivan en memoria
+      // en lugar de disparar 1 + 6 consultas adicionales a Firestore.
+      const fetchDashboard = async () => {
+        const [
+          allTransactionsComplete,
+          allConcepts,
+          generalsData,
+          subconceptsData,
+          providersData,
+          descriptionsData,
+        ] = await Promise.all([
+          transactionService.getAll({}, tenantId),
+          conceptService.getAll(tenantId),
+          generalService.getAll(tenantId),
+          subconceptService.getAll(tenantId),
+          providerService.getAll(tenantId),
+          descriptionService.getAll(tenantId),
+        ]);
 
-      const transactionsForReport = await reportService.getFilteredTransactions(
-        filterData,
-        tenantId,
-        { allTransactionsCache: allTransactionsComplete }
+        const summaryData = dashboardService.buildMonthSummary(
+          allTransactionsComplete,
+          startOfMonth,
+          endOfMonth
+        );
+        const trendsData = dashboardService.buildMonthlyTrends(
+          allTransactionsComplete,
+          new Date()
+        );
+
+        const transactionsForReport =
+          await reportService.getFilteredTransactions(filterData, tenantId, {
+            allTransactionsCache: allTransactionsComplete,
+          });
+
+        const statsData = await reportService.generateReportStats(
+          transactionsForReport,
+          filterData,
+          tenantId,
+          {
+            referenceData: {
+              concepts: allConcepts,
+              providers: providersData,
+              descriptions: descriptionsData,
+              generals: generalsData,
+              subconcepts: subconceptsData,
+            },
+          }
+        );
+
+        const monthTxForChart = filterTransactionsByDateRange(
+          allTransactionsComplete,
+          startOfMonth,
+          endOfMonth,
+          {}
+        );
+        const dailyTransactions = groupTransactionsByDay(
+          monthTxForChart,
+          currentDate
+        );
+
+        return {
+          allTransactionsComplete,
+          allConcepts,
+          generalsData,
+          subconceptsData,
+          providersData,
+          summaryData,
+          trendsData,
+          transactionsForReport,
+          statsData,
+          dailyTransactions,
+        };
+      };
+
+      const result = await withTimeout(
+        fetchDashboard(),
+        20000,
+        "La carga del dashboard tardó demasiado. Verifica tu conexión e intenta de nuevo."
       );
 
-      const statsData = await reportService.generateReportStats(
-        transactionsForReport,
-        filterData,
-        tenantId
-      );
-
-      const monthTxForChart = filterTransactionsByDateRange(
-        allTransactionsComplete,
-        startOfMonth,
-        endOfMonth,
-        {}
-      );
-      const dailyTransactions = groupTransactionsByDay(
-        monthTxForChart,
-        currentDate
-      );
-
-      setGenerals(generalsData);
-      setConcepts(allConcepts);
-      setSubconcepts(subconceptsData);
-      setProviders(providersData || []);
-      setStats(statsData);
-      setTransactionsReport(transactionsForReport);
-      setAllTransactionsReport(allTransactionsComplete);
-      setSummary(summaryData);
-      setDailyData(dailyTransactions);
-      setMonthlyTrends(trendsData);
+      setGenerals(result.generalsData);
+      setConcepts(result.allConcepts);
+      setSubconcepts(result.subconceptsData);
+      setProviders(result.providersData || []);
+      setStats(result.statsData);
+      setTransactionsReport(result.transactionsForReport);
+      setAllTransactionsReport(result.allTransactionsComplete);
+      setSummary(result.summaryData);
+      setDailyData(result.dailyTransactions);
+      setMonthlyTrends(result.trendsData);
     } catch (err) {
       console.error("Error loading dashboard data:", err);
       error("Error al cargar los datos del dashboard");

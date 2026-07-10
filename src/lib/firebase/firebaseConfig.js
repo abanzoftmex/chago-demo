@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore, getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -17,7 +17,23 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 // Initialize Firebase services
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// Firestore usa WebChannel (streaming) por defecto, que en Safari (ITP, VPNs,
+// proxies o ciertas redes) a veces no logra establecer la conexión y se cuelga
+// indefinidamente en getDocs -> el dashboard se queda en "Cargando..." para siempre.
+// Auto-detectar long polling hace que caiga a HTTP normal cuando el streaming falla.
+// initializeFirestore solo puede llamarse una vez por app; en HMR se reusa la instancia.
+function initDb(firebaseApp) {
+  try {
+    return initializeFirestore(firebaseApp, {
+      experimentalAutoDetectLongPolling: true,
+    });
+  } catch {
+    return getFirestore(firebaseApp);
+  }
+}
+
+export const db = initDb(app);
 export const storage = getStorage(app);
 
 export default app;
