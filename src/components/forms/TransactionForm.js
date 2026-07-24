@@ -936,6 +936,7 @@ const TransactionForm = ({
         onSuccess={handleConceptCreated}
         type={formData.type}
         generals={generals}
+        defaultGeneralId={formData.generalId}
       />
 
       {/* Subconcept Modal */}
@@ -943,7 +944,8 @@ const TransactionForm = ({
         isOpen={showSubconceptModal}
         onClose={() => setShowSubconceptModal(false)}
         onSuccess={handleSubconceptCreated}
-        concepts={concepts.filter(c => c.type === formData.type)}
+        concepts={concepts.filter(c => c.type === formData.type || c.type === 'ambos')}
+        defaultConceptId={formData.conceptId}
       />
 
       {/* Provider Modal */}

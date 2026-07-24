@@ -8,6 +8,7 @@ const SubconceptModal = ({
   onSuccess,
   initialData = null,
   concepts = [],
+  defaultConceptId = "",
 }) => {
   const { tenantInfo } = useAuth();
   
@@ -22,13 +23,21 @@ const SubconceptModal = ({
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
-    if (isOpen && initialData) {
+    if (!isOpen) return;
+    if (initialData) {
       setFormData({
         name: initialData.name || '',
         conceptId: initialData.conceptId || ''
       });
+    } else {
+      // Modo creación: preseleccionar el Concepto que ya viene del formulario de
+      // transacción (defaultConceptId) para agilizar el alta; el usuario puede cambiarlo.
+      setFormData({
+        name: '',
+        conceptId: defaultConceptId || ''
+      });
     }
-  }, [isOpen, initialData]);
+  }, [isOpen, initialData, defaultConceptId]);
 
   // Obtener el concepto seleccionado para mostrar información
   const selectedConcept = concepts.find(c => c.id === formData.conceptId);

@@ -1,6 +1,12 @@
 @import "tailwindcss";
 
 :root {
+  /* La app usa únicamente tema claro. Declarar color-scheme evita que los
+     navegadores (Edge/Chrome en Windows con modo oscuro del SO) pinten los
+     controles nativos —en especial el popup de los <select>— con fondo oscuro,
+     lo que dejaba las <option> con texto oscuro sobre fondo oscuro (invisibles). */
+  color-scheme: light;
+
   --background: #ffffff;
   --foreground: #171717;
   --primary: #dc2626;
@@ -12,6 +18,18 @@
   --border: #e2e8f0;
   --input: #ffffff;
   --ring: #dc2626;
+}
+
+/* Respaldo explícito para Windows/Edge: garantiza que las opciones de los
+   <select> siempre sean legibles (texto oscuro sobre fondo blanco) sin depender
+   del tema del sistema operativo. */
+select {
+  color-scheme: light;
+}
+
+select option {
+  background-color: #ffffff;
+  color: var(--foreground);
 }
 
 @theme inline {

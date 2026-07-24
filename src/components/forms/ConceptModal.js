@@ -9,6 +9,7 @@ const ConceptModal = ({
   type,
   initialData = null,
   generals = [],
+  defaultGeneralId = "",
 }) => {
   const { tenantInfo } = useAuth();
   
@@ -35,15 +36,18 @@ const ConceptModal = ({
           generalId: initialData.generalId || "",
         });
       } else {
-        // Modo creación: valores por defecto
+        // Modo creación: preseleccionar el General que ya viene del formulario de
+        // transacción (defaultGeneralId) para agilizar el alta; el usuario puede
+        // cambiarlo. Se hereda el tipo del General preseleccionado.
+        const preGeneral = generals.find((g) => g.id === defaultGeneralId);
         setFormData({
           name: "",
-          type: type || "entrada",
-          generalId: "",
+          type: preGeneral?.type || type || "entrada",
+          generalId: defaultGeneralId || "",
         });
       }
     }
-  }, [isOpen, initialData, type, generals]);
+  }, [isOpen, initialData, type, generals, defaultGeneralId]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
