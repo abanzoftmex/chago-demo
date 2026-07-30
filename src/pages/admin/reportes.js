@@ -39,6 +39,40 @@ import {
   ArrowDownIcon,
   QuestionMarkCircleIcon,
 } from "@heroicons/react/24/outline";
+import Select from "react-select";
+
+// Estilos de react-select para que los filtros de General/Concepto/Subconcepto
+// (con búsqueda integrada) se vean consistentes con el resto del formulario.
+const selectStyles = {
+  control: (provided, state) => ({
+    ...provided,
+    minHeight: "42px",
+    fontSize: "14px",
+    borderColor: state.isFocused ? "#3B82F6" : "#D1D5DB",
+    boxShadow: state.isFocused ? "0 0 0 2px #3B82F660" : "none",
+    "&:hover": {
+      borderColor: "#3B82F6",
+    },
+  }),
+  valueContainer: (provided) => ({
+    ...provided,
+    padding: "0 8px",
+  }),
+  input: (provided) => ({
+    ...provided,
+    margin: "0px",
+  }),
+  menu: (provided) => ({
+    ...provided,
+    zIndex: 20,
+    fontSize: "14px",
+  }),
+  option: (provided) => ({
+    ...provided,
+    fontSize: "14px",
+    padding: "10px 14px",
+  }),
+};
 
 const Reportes = () => {
   const { success, error } = useToast();
@@ -613,21 +647,31 @@ const Reportes = () => {
               <label className="block text-sm font-medium text-foreground mb-1">
                 General
               </label>
-              <select
-                value={filters.generalId}
-                onChange={(e) =>
-                  handleFilterChange("generalId", e.target.value)
-                }
-                disabled={!filters.type}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-              >
-                <option value="">{!filters.type ? 'Selecciona un tipo primero' : 'Todos'}</option>
-                {getFilteredGenerals().map((general) => (
-                  <option key={general.id} value={general.id}>
-                    {general.name}
-                  </option>
-                ))}
-              </select>
+              {(() => {
+                const options = getFilteredGenerals().map((g) => ({
+                  value: g.id,
+                  label: g.name,
+                }));
+                return (
+                  <Select
+                    value={
+                      options.find((o) => o.value === filters.generalId) || null
+                    }
+                    onChange={(opt) =>
+                      handleFilterChange("generalId", opt?.value || "")
+                    }
+                    options={options}
+                    styles={selectStyles}
+                    isDisabled={!filters.type}
+                    isClearable
+                    isSearchable
+                    placeholder={
+                      !filters.type ? "Selecciona un tipo primero" : "Todos"
+                    }
+                    noOptionsMessage={() => "Sin resultados"}
+                  />
+                );
+              })()}
             </div>
 
             {/* Concept Filter */}
@@ -635,21 +679,33 @@ const Reportes = () => {
               <label className="block text-sm font-medium text-foreground mb-1">
                 Concepto
               </label>
-              <select
-                value={filters.conceptId}
-                onChange={(e) =>
-                  handleFilterChange("conceptId", e.target.value)
-                }
-                disabled={!filters.generalId}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-              >
-                <option value="">{!filters.generalId ? 'Selecciona un general primero' : 'Todos'}</option>
-                {getFilteredConcepts().map((concept) => (
-                  <option key={concept.id} value={concept.id}>
-                    {concept.name}
-                  </option>
-                ))}
-              </select>
+              {(() => {
+                const options = getFilteredConcepts().map((c) => ({
+                  value: c.id,
+                  label: c.name,
+                }));
+                return (
+                  <Select
+                    value={
+                      options.find((o) => o.value === filters.conceptId) || null
+                    }
+                    onChange={(opt) =>
+                      handleFilterChange("conceptId", opt?.value || "")
+                    }
+                    options={options}
+                    styles={selectStyles}
+                    isDisabled={!filters.generalId}
+                    isClearable
+                    isSearchable
+                    placeholder={
+                      !filters.generalId
+                        ? "Selecciona un general primero"
+                        : "Todos"
+                    }
+                    noOptionsMessage={() => "Sin resultados"}
+                  />
+                );
+              })()}
             </div>
 
             {/* Subconcept Filter */}
@@ -657,21 +713,34 @@ const Reportes = () => {
               <label className="block text-sm font-medium text-foreground mb-1">
                 Sub-concepto
               </label>
-              <select
-                value={filters.subconceptId}
-                onChange={(e) =>
-                  handleFilterChange("subconceptId", e.target.value)
-                }
-                disabled={!filters.conceptId}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-              >
-                <option value="">{!filters.conceptId ? 'Selecciona un concepto primero' : 'Todos'}</option>
-                {getFilteredSubconcepts().map((subconcept) => (
-                  <option key={subconcept.id} value={subconcept.id}>
-                    {subconcept.name}
-                  </option>
-                ))}
-              </select>
+              {(() => {
+                const options = getFilteredSubconcepts().map((s) => ({
+                  value: s.id,
+                  label: s.name,
+                }));
+                return (
+                  <Select
+                    value={
+                      options.find((o) => o.value === filters.subconceptId) ||
+                      null
+                    }
+                    onChange={(opt) =>
+                      handleFilterChange("subconceptId", opt?.value || "")
+                    }
+                    options={options}
+                    styles={selectStyles}
+                    isDisabled={!filters.conceptId}
+                    isClearable
+                    isSearchable
+                    placeholder={
+                      !filters.conceptId
+                        ? "Selecciona un concepto primero"
+                        : "Todos"
+                    }
+                    noOptionsMessage={() => "Sin resultados"}
+                  />
+                );
+              })()}
             </div>
           </div>
 
