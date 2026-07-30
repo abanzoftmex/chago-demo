@@ -19,6 +19,10 @@ const breadcrumbs = [
   { label: "Generales", href: "/admin/catalogos/generales" },
 ];
 
+// Importar/Exportar está centralizado en "Gestión de Catálogos".
+// Se oculta el botón aquí para no duplicar el flujo (poner en true para reactivarlo).
+const SHOW_CATALOG_IMPORT = false;
+
 export default function GeneralesPage() {
   const { user, userRole, loading: authLoading, tenantInfo } = useAuth();
   const router = useRouter();
@@ -142,13 +146,15 @@ export default function GeneralesPage() {
           </div>
           <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row gap-2">
 
-            <button
-              onClick={() => setIsMassiveImportModalOpen(true)}
-              className="inline-flex items-center px-4 py-2 border border-orange-300 rounded-md shadow-sm text-sm font-medium text-orange-700 bg-orange-50 hover:bg-orange-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-            >
-              <ArrowUpOnSquareIcon className="h-5 w-5 mr-1.5" />
-              Importar CSV
-            </button>
+            {SHOW_CATALOG_IMPORT && (
+              <button
+                onClick={() => setIsMassiveImportModalOpen(true)}
+                className="inline-flex items-center px-4 py-2 border border-orange-300 rounded-md shadow-sm text-sm font-medium text-orange-700 bg-orange-50 hover:bg-orange-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+              >
+                <ArrowUpOnSquareIcon className="h-5 w-5 mr-1.5" />
+                Importar CSV
+              </button>
+            )}
             <button
               onClick={handleCreateGeneral}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"

@@ -14,6 +14,10 @@ import {
   ArrowUpOnSquareIcon
 } from '@heroicons/react/24/outline';
 
+// Importar/Exportar está centralizado en "Gestión de Catálogos".
+// Se oculta el botón aquí para no duplicar el flujo (poner en true para reactivarlo).
+const SHOW_CATALOG_IMPORT = false;
+
 const Proveedores = () => {
   const [providers, setProviders] = useState([]);
   const [filteredProviders, setFilteredProviders] = useState([]);
@@ -175,13 +179,15 @@ const Proveedores = () => {
             </div>
             
             <div className="flex space-x-3">
-              <button
-                onClick={() => setIsCsvModalOpen(true)}
-                className="inline-flex items-center px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-              >
-                <ArrowUpOnSquareIcon className="h-5 w-5 mr-1.5" />
-                Importar CSV
-              </button>
+              {SHOW_CATALOG_IMPORT && (
+                <button
+                  onClick={() => setIsCsvModalOpen(true)}
+                  className="inline-flex items-center px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                >
+                  <ArrowUpOnSquareIcon className="h-5 w-5 mr-1.5" />
+                  Importar CSV
+                </button>
+              )}
               <button
                 onClick={handleCreateProvider}
                 className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
