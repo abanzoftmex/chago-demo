@@ -361,4 +361,36 @@ src/
 - **Analytics avanzados**: Dashboards por tenant y global
 - **Backup automático**: Respaldos programados por tenant
 
+## 💾 Respaldos y Limpieza de Datos por Tenant
+
+Disponible desde la pestaña **Respaldos** de `/admin/multi-tenant-setup`, desde las acciones de la tabla del **Directorio** (Detalles / Actualizar / Respaldos / Limpiar) y desde la página de detalle **`/admin/tenants/[tenantId]`** (todas protegidas por la sesión de setup):
+
+- **Página de detalle por tenant**: `/admin/tenants/{tenantId}` muestra información general, usuarios (members), conteo de documentos por colección y los respaldos del tenant, con todas las acciones disponibles.
+- **Crear copia de seguridad**: exporta el documento raíz del tenant y todas sus subcolecciones a un JSON con metadatos en la colección raíz `tenantBackups` de Firestore.
+- **Almacenamiento del JSON**: se guarda en Firebase Storage (`tenant-backups/{tenantId}/{backupId}.json`). El bucket se detecta automáticamente (`FIREBASE_STORAGE_BUCKET`, `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`, `{projectId}.firebasestorage.app`, `{projectId}.appspot.com`); si ninguno existe, el respaldo se guarda en Firestore por chunks (`tenantBackups/{backupId}/chunks`), sin requerir Storage.
+- **Limpiar datos del tenant**: elimina todas las subcolecciones **excepto `members` (usuarios)**; el documento raíz del tenant se conserva. Antes del borrado se crea siempre un respaldo automático (tipo `pre-wipe`). Requiere escribir el nombre de la empresa para confirmar.
+- **Restaurar un respaldo**: reemplaza los datos actuales por los del respaldo, conservando los usuarios actuales. Antes de restaurar se crea un respaldo del estado actual (tipo `pre-restore`).
+- **Descargar / eliminar respaldos**: cada respaldo puede descargarse como archivo JSON o eliminarse por completo (Storage, chunks y metadatos).
+
+### Archivos involucrados
+
+```
+src/
+├── lib/server/tenantBackupService.js          # Exportación, limpieza, restauración
+├── pages/api/admin/tenant-backups/
+│   ├── index.js                               # GET lista, POST crea, DELETE elimina
+│   ├── wipe.js                                # POST limpieza (con respaldo previo)
+│   ├── restore.js                             # POST restauración (con respaldo previo)
+│   └── download.js                            # GET descarga del JSON
+├── pages/api/admin/tenant-details.js          # GET detalle del tenant (info, members, conteos)
+├── pages/admin/tenants/[tenantId].js          # Página de detalle por tenant
+├── components/admin/setupShared.js            # UI compartida (modal de confirmación, helpers)
+└── components/admin/MultiTenantSetup.js       # Pestañas y acciones del directorio
+```
+
+Notas:
+- Los Timestamps, GeoPoints, referencias y bytes de Firestore se serializan con marcadores `__type` para restaurarse con su tipo original.
+- Todas las operaciones usan el Admin SDK en el servidor; no requieren cambios en `firestore.rules`.
+- Cada operación queda registrada en el `activityLog` del tenant.
+
 ¡El sistema está listo para escalar como SaaS multi-tenant! 🎉

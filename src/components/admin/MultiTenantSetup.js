@@ -5,14 +5,28 @@
  */
 
 import React, { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useAuth } from "../../context/AuthContextMultiTenant";
 import { db } from "../../lib/firebase/firebaseConfig";
 import { collection, getDocs } from "firebase/firestore";
 import { createNewTenant } from "../../lib/helpers/migrationHelper";
+import {
+  BackupConfirmModal,
+  backupTypeLabels,
+  buttonBaseClassName,
+  cardClassName,
+  formatBytes,
+  formatCreatedAt,
+  formatDateTime,
+  getTenantInitials,
+  inputClassName,
+  Spinner,
+} from "./setupShared";
 
 const tabs = [
   { id: "crear", label: "Nuevo tenant", caption: "Provisiona una nueva cuenta" },
   { id: "tenants", label: "Directorio", caption: "Consulta y actualiza tenants" },
+  { id: "respaldos", label: "Respaldos", caption: "Copias de seguridad y limpieza" },
 ];
 
 const metricCards = [
@@ -33,62 +47,10 @@ const metricCards = [
   },
 ];
 
-const cardClassName =
-  "rounded-[28px] border border-white/70 bg-white/80 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur-xl";
-
-const inputClassName =
-  "w-full rounded-2xl border border-slate-200/80 bg-white/90 px-4 py-3 text-sm text-slate-900 outline-none transition duration-200 placeholder:text-slate-400 focus:border-slate-900 focus:ring-4 focus:ring-slate-900/5";
-
-const buttonBaseClassName =
-  "inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium transition duration-200 focus:outline-none focus:ring-4 focus:ring-slate-900/10 disabled:cursor-not-allowed disabled:opacity-50";
-
-const formatCreatedAt = (date) => {
-  if (!date) return "Sin fecha";
-
-  return new Intl.DateTimeFormat("es-MX", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
-};
-
 const getMessageTone = (message) => {
   if (!message) return null;
   return message.startsWith("OK:") ? "success" : "error";
 };
-
-const getTenantInitials = (name) =>
-  (name || "Tenant")
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() || "")
-    .join("");
-
-const Spinner = ({ light = false, size = "h-4 w-4" }) => (
-  <svg
-    className={`animate-spin ${size} ${light ? "text-white" : "text-slate-500"}`}
-    viewBox="0 0 24 24"
-    fill="none"
-    aria-hidden="true"
-  >
-    <circle
-      cx="12"
-      cy="12"
-      r="10"
-      stroke="currentColor"
-      strokeWidth="4"
-      className="opacity-20"
-    />
-    <path
-      d="M22 12a10 10 0 0 0-10-10"
-      stroke="currentColor"
-      strokeWidth="4"
-      strokeLinecap="round"
-      className="opacity-90"
-    />
-  </svg>
-);
 
 const TenantEditModal = ({ tenant, onClose, onSave, saving }) => {
   const [formData, setFormData] = useState({
@@ -246,6 +208,12 @@ const MultiTenantSetup = () => {
     nombreEmpresa: "",
   });
 
+  const [selectedTenantId, setSelectedTenantId] = useState("");
+  const [backups, setBackups] = useState([]);
+  const [backupsLoading, setBackupsLoading] = useState(false);
+  const [backupWorking, setBackupWorking] = useState(false);
+  const [backupConfirm, setBackupConfirm] = useState(null);
+
   useEffect(() => {
     const checkSession = async () => {
       setSessionChecking(true);
@@ -269,6 +237,19 @@ const MultiTenantSetup = () => {
       loadTenants();
     }
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (tenants.length > 0 && !tenants.some((tenant) => tenant.id === selectedTenantId)) {
+      setSelectedTenantId(tenants[0].id);
+    }
+  }, [tenants, selectedTenantId]);
+
+  useEffect(() => {
+    if (isAuthenticated && activeTab === "respaldos" && selectedTenantId) {
+      loadBackups(selectedTenantId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, activeTab, selectedTenantId]);
 
   const metrics = useMemo(() => {
     const now = Date.now();
@@ -461,6 +442,317 @@ const MultiTenantSetup = () => {
       setSavingTenant(false);
     }
   };
+
+  const selectedTenant = tenants.find((tenant) => tenant.id === selectedTenantId) || null;
+
+  const handleBackupApiError = (response, data) => {
+    if (response.status === 401) {
+      setIsAuthenticated(false);
+      return "La sesión de configuración expiró.";
+    }
+    return data?.message || "Error inesperado en la operación de respaldo.";
+  };
+
+  const loadBackups = async (tenantId) => {
+    setBackupsLoading(true);
+    try {
+      const response = await fetch(
+        `/api/admin/tenant-backups?tenantId=${encodeURIComponent(tenantId)}`
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage(`ERROR: ${handleBackupApiError(response, data)}`);
+        setBackups([]);
+        return;
+      }
+
+      setBackups(data.backups || []);
+    } catch (error) {
+      console.error("Error cargando respaldos:", error);
+      setMessage(`ERROR: Error cargando respaldos: ${error.message}`);
+    } finally {
+      setBackupsLoading(false);
+    }
+  };
+
+  const handleCreateBackup = async () => {
+    if (!selectedTenant) return;
+
+    setBackupWorking(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/tenant-backups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenantId: selectedTenant.id }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage(`ERROR: ${handleBackupApiError(response, data)}`);
+        return;
+      }
+
+      setMessage(
+        `OK: Copia de seguridad creada para ${selectedTenant.nombreEmpresa}.\nDocumentos respaldados: ${data.backup.totalDocs}\nTamaño: ${formatBytes(data.backup.sizeBytes)}`
+      );
+      await loadBackups(selectedTenant.id);
+    } catch (error) {
+      setMessage(`ERROR: Error de conexión al crear el respaldo: ${error.message}`);
+    } finally {
+      setBackupWorking(false);
+    }
+  };
+
+  const handleBackupConfirm = async (confirmName) => {
+    const targetTenant = backupConfirm?.tenant;
+    if (!backupConfirm || !targetTenant) return { error: "Operación inválida." };
+
+    setBackupWorking(true);
+
+    try {
+      let response;
+
+      if (backupConfirm.mode === "wipe") {
+        response = await fetch("/api/admin/tenant-backups/wipe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tenantId: targetTenant.id, confirmName }),
+        });
+      } else if (backupConfirm.mode === "restore") {
+        response = await fetch("/api/admin/tenant-backups/restore", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ backupId: backupConfirm.backup.id, confirmName }),
+        });
+      } else {
+        response = await fetch("/api/admin/tenant-backups", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ backupId: backupConfirm.backup.id }),
+        });
+      }
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return { error: handleBackupApiError(response, data) };
+      }
+
+      if (backupConfirm.mode === "wipe") {
+        setMessage(
+          `OK: Datos de ${targetTenant.nombreEmpresa} eliminados.\nDocumentos eliminados: ${data.deletedDocs}\nCopia de seguridad previa: ${data.backup.backupId} (${data.backup.totalDocs} documentos)\nLos usuarios se conservaron.`
+        );
+      } else if (backupConfirm.mode === "restore") {
+        setMessage(
+          `OK: Respaldo restaurado en ${targetTenant.nombreEmpresa}.\nDocumentos restaurados: ${data.restoredDocs}\nCopia del estado previo: ${data.safetyBackup.backupId}\nLos usuarios actuales se conservaron.`
+        );
+      } else {
+        setMessage("OK: Respaldo eliminado correctamente.");
+      }
+
+      setBackupConfirm(null);
+      if (targetTenant.id === selectedTenantId) {
+        await loadBackups(targetTenant.id);
+      }
+      return { success: true };
+    } catch (error) {
+      return { error: `Error de conexión: ${error.message}` };
+    } finally {
+      setBackupWorking(false);
+    }
+  };
+
+  const renderBackupsTab = () => (
+    <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+      <section className={`${cardClassName} overflow-hidden`}>
+        <div className="border-b border-slate-200/80 px-6 py-6 sm:px-8">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Respaldos</p>
+              <h3 className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-slate-950">
+                Copias de seguridad
+              </h3>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
+                Cada respaldo guarda un JSON completo del tenant en Firebase (datos y
+                usuarios). Al restaurar se reemplazan los datos, conservando los usuarios
+                actuales.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <select
+                value={selectedTenantId}
+                onChange={(event) => setSelectedTenantId(event.target.value)}
+                className={`${inputClassName} sm:w-64`}
+              >
+                {tenants.length === 0 && <option value="">Sin tenants</option>}
+                {tenants.map((tenant) => (
+                  <option key={tenant.id} value={tenant.id}>
+                    {tenant.nombreEmpresa}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleCreateBackup}
+                disabled={backupWorking || !selectedTenant}
+                className={`${buttonBaseClassName} bg-slate-950 text-white shadow-[0_16px_30px_rgba(15,23,42,0.18)] hover:bg-slate-800`}
+              >
+                {backupWorking && !backupConfirm ? (
+                  <>
+                    <Spinner light />
+                    Creando respaldo
+                  </>
+                ) : (
+                  "Crear copia de seguridad"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {backupsLoading && (
+          <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+            <Spinner size="h-8 w-8" />
+            <p className="mt-4 text-sm text-slate-500">Cargando respaldos...</p>
+          </div>
+        )}
+
+        {!backupsLoading && backups.length === 0 && (
+          <div className="px-6 py-16 text-center sm:px-8">
+            <h4 className="text-xl font-semibold tracking-[-0.04em] text-slate-950">
+              Sin respaldos para este tenant
+            </h4>
+            <p className="mt-3 text-sm leading-6 text-slate-500">
+              Crea la primera copia de seguridad para poder restaurar o limpiar con
+              tranquilidad.
+            </p>
+          </div>
+        )}
+
+        {!backupsLoading && backups.length > 0 && (
+          <div className="divide-y divide-slate-200/80">
+            {backups.map((backup) => {
+              const typeInfo = backupTypeLabels[backup.type] || {
+                label: backup.type || "—",
+                className: "bg-slate-100 text-slate-600",
+              };
+
+              return (
+                <div
+                  key={backup.id}
+                  className="flex flex-col gap-4 px-6 py-5 sm:px-8 lg:flex-row lg:items-center lg:justify-between"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <p className="font-medium text-slate-950">
+                        {formatDateTime(backup.createdAt)}
+                      </p>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-medium uppercase tracking-[0.14em] ${typeInfo.className}`}
+                      >
+                        {typeInfo.label}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-slate-500">
+                      {backup.totalDocs ?? "—"} documentos · {formatBytes(backup.sizeBytes)}
+                    </p>
+                    {backup.note && (
+                      <p className="mt-1 text-xs text-slate-400">{backup.note}</p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() =>
+                        setBackupConfirm({ mode: "restore", backup, tenant: selectedTenant })
+                      }
+                      disabled={backupWorking}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      Restaurar
+                    </button>
+                    <a
+                      href={`/api/admin/tenant-backups/download?backupId=${backup.id}`}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                    >
+                      Descargar
+                    </a>
+                    <button
+                      onClick={() =>
+                        setBackupConfirm({ mode: "delete", backup, tenant: selectedTenant })
+                      }
+                      disabled={backupWorking}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-white px-3 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-6">
+        <div className={`${cardClassName} p-6`}>
+          <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Como funciona</p>
+          <h4 className="mt-3 text-xl font-semibold tracking-[-0.04em] text-slate-950">
+            Respaldos y restauración
+          </h4>
+          <div className="mt-5 space-y-4">
+            {[
+              "El respaldo exporta todas las colecciones del tenant a un JSON guardado en Firebase Storage.",
+              "Antes de limpiar o restaurar se crea siempre un respaldo automático del estado actual.",
+              "Los usuarios del tenant nunca se eliminan ni se sobrescriben.",
+              "Puedes descargar cualquier respaldo como archivo JSON.",
+            ].map((item) => (
+              <div key={item} className="flex items-start gap-3">
+                <div className="mt-1 flex h-5 w-5 items-center justify-center rounded-full bg-slate-950 text-white">
+                  <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path
+                      d="M5 12.5l4 4L19 7.5"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+                <p className="text-sm leading-6 text-slate-600">{item}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className={`${cardClassName} border-rose-200/70 p-6`}>
+          <p className="text-xs uppercase tracking-[0.22em] text-rose-400">Zona de riesgo</p>
+          <h4 className="mt-3 text-xl font-semibold tracking-[-0.04em] text-slate-950">
+            Limpiar datos del tenant
+          </h4>
+          <p className="mt-3 text-sm leading-6 text-slate-500">
+            Elimina todos los datos de{" "}
+            <span className="font-medium text-slate-900">
+              {selectedTenant?.nombreEmpresa || "el tenant seleccionado"}
+            </span>{" "}
+            dejando únicamente los usuarios. Antes del borrado se genera una copia de
+            seguridad automática en Firebase.
+          </p>
+          <button
+            onClick={() => setBackupConfirm({ mode: "wipe", tenant: selectedTenant })}
+            disabled={backupWorking || !selectedTenant}
+            className={`${buttonBaseClassName} mt-6 w-full bg-rose-600 text-white shadow-[0_16px_30px_rgba(190,18,60,0.25)] hover:bg-rose-500`}
+          >
+            Limpiar datos del tenant
+          </button>
+        </div>
+      </section>
+    </div>
+  );
 
   const renderAccessScreen = () => (
     <div className="relative min-h-screen overflow-hidden bg-[#f5f1ea] px-4 py-10 text-slate-900">
@@ -789,22 +1081,70 @@ const MultiTenantSetup = () => {
     </div>
   );
 
+  const smallActionClassName =
+    "inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50";
+
   const renderTenantActions = (tenant) => (
-    <button
-      onClick={() => setEditingTenant(tenant)}
-      className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-    >
-      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path
-          d="M4 20h4l10.5-10.5a2.121 2.121 0 10-3-3L5.5 17v3z"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-      Actualizar
-    </button>
+    <div className="flex flex-wrap items-center gap-2">
+      <Link href={`/admin/tenants/${tenant.id}`} className={smallActionClassName}>
+        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinejoin="round"
+          />
+          <circle cx="12" cy="12" r="2.75" stroke="currentColor" strokeWidth="1.8" />
+        </svg>
+        Detalles
+      </Link>
+      <button onClick={() => setEditingTenant(tenant)} className={smallActionClassName}>
+        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M4 20h4l10.5-10.5a2.121 2.121 0 10-3-3L5.5 17v3z"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        Actualizar
+      </button>
+      <button
+        onClick={() => {
+          setSelectedTenantId(tenant.id);
+          setActiveTab("respaldos");
+        }}
+        className={smallActionClassName}
+      >
+        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M12 3v10m0 0l-3.5-3.5M12 13l3.5-3.5M4.5 16.5v2A2.5 2.5 0 007 21h10a2.5 2.5 0 002.5-2.5v-2"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        Respaldos
+      </button>
+      <button
+        onClick={() => setBackupConfirm({ mode: "wipe", tenant })}
+        disabled={backupWorking}
+        className="inline-flex items-center gap-1.5 rounded-2xl border border-rose-200 bg-white px-3 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+      >
+        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M4 7h16M10 11v6M14 11v6M6 7l1 13a1.5 1.5 0 001.5 1.4h7A1.5 1.5 0 0017 20l1-13M9 7V4.5A1.5 1.5 0 0110.5 3h3A1.5 1.5 0 0115 4.5V7"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        Limpiar
+      </button>
+    </div>
   );
 
   const renderTenantsTab = () => (
@@ -817,8 +1157,8 @@ const MultiTenantSetup = () => {
               Tenants registrados
             </h3>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
-              Ahora puedes abrir cada tenant y actualizar empresa, nombre del admin y correo
-              del administrador desde aqui.
+              Abre el detalle de cada tenant, actualiza sus datos, gestiona sus respaldos o
+              limpia su informacion directamente desde el directorio.
             </p>
           </div>
 
@@ -889,7 +1229,12 @@ const MultiTenantSetup = () => {
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <h4 className="truncate text-lg font-semibold text-slate-950">
-                          {tenant.nombreEmpresa}
+                          <Link
+                            href={`/admin/tenants/${tenant.id}`}
+                            className="transition hover:text-slate-600"
+                          >
+                            {tenant.nombreEmpresa}
+                          </Link>
                         </h4>
                         <p className="mt-1 text-sm text-slate-500">{tenant.adminName}</p>
                       </div>
@@ -935,7 +1280,12 @@ const MultiTenantSetup = () => {
                           {getTenantInitials(tenant.nombreEmpresa)}
                         </div>
                         <div>
-                          <p className="font-medium text-slate-950">{tenant.nombreEmpresa}</p>
+                          <Link
+                            href={`/admin/tenants/${tenant.id}`}
+                            className="font-medium text-slate-950 transition hover:text-slate-600"
+                          >
+                            {tenant.nombreEmpresa}
+                          </Link>
                           <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">
                             Empresa
                           </p>
@@ -1086,6 +1436,7 @@ const MultiTenantSetup = () => {
           <main className="pb-8">
             {activeTab === "crear" && renderCreateTab()}
             {activeTab === "tenants" && renderTenantsTab()}
+            {activeTab === "respaldos" && renderBackupsTab()}
           </main>
 
           <footer className="px-1 pb-6 pt-2 text-sm text-slate-500">
@@ -1101,6 +1452,17 @@ const MultiTenantSetup = () => {
           onClose={() => setEditingTenant(null)}
           onSave={handleTenantUpdate}
           saving={savingTenant}
+        />
+      )}
+
+      {backupConfirm?.tenant && (
+        <BackupConfirmModal
+          mode={backupConfirm.mode}
+          tenant={backupConfirm.tenant}
+          backup={backupConfirm.backup || null}
+          onClose={() => setBackupConfirm(null)}
+          onConfirm={handleBackupConfirm}
+          working={backupWorking}
         />
       )}
     </>
