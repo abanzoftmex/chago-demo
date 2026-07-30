@@ -14,6 +14,17 @@ import {
   PlusIcon,
 } from '@heroicons/react/24/outline';
 
+// Red de seguridad: si una consulta a Firestore se cuelga (típico en Safari con
+// WebChannel), garantiza que la promesa se resuelva/rechace y no quede el spinner
+// infinito. Rechaza a los `ms` milisegundos si `promise` no terminó antes.
+function withTimeout(promise, ms, message) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+}
+
 export default function SubconceptosPage() {
   const { user, userRole, loading: authLoading, tenantInfo } = useAuth();
   const router = useRouter();
@@ -59,27 +70,16 @@ export default function SubconceptosPage() {
         return;
       }
 
-      // Load both subconcepts and concepts
-      const [subconceptsData, conceptsData, generalsData] = await Promise.all([
-        subconceptService.getAll(tenantId),
-        conceptService.getAll(tenantId),
-        generalService.getAll(tenantId)
-      ]);
-
-      console.log('📊 Datos cargados en subconceptos:', {
-        subconcepts: subconceptsData.length,
-        concepts: conceptsData.length,
-        generals: generalsData.length
-      });
-      
-      // Debug: mostrar los primeros 3 subconceptos
-      if (subconceptsData.length > 0) {
-        console.log('🔍 Primeros subconceptos:', subconceptsData.slice(0, 3).map(s => ({
-          id: s.id,
-          name: s.name,
-          conceptId: s.conceptId
-        })));
-      }
+      // Load both subconcepts and concepts (con timeout de seguridad para Safari)
+      const [subconceptsData, conceptsData, generalsData] = await withTimeout(
+        Promise.all([
+          subconceptService.getAll(tenantId),
+          conceptService.getAll(tenantId),
+          generalService.getAll(tenantId),
+        ]),
+        20000,
+        "La carga de subconceptos tardó demasiado. Verifica tu conexión e intenta de nuevo."
+      );
 
       setSubconcepts(subconceptsData);
       setConcepts(conceptsData);
@@ -122,11 +122,15 @@ export default function SubconceptosPage() {
     await loadData(); // Reload the list
   };
 
-  const filteredSubconcepts = subconcepts.filter((subconcept) => {
-    const matchesConceptFilter = filterConcept === "all" || subconcept.conceptId === filterConcept;
-    const matchesSearch = subconcept.name.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesConceptFilter && matchesSearch;
-  });
+  const filteredSubconcepts = useMemo(() => {
+    const term = searchTerm.toLowerCase();
+    return subconcepts.filter((subconcept) => {
+      const matchesConceptFilter =
+        filterConcept === "all" || subconcept.conceptId === filterConcept;
+      const matchesSearch = subconcept.name.toLowerCase().includes(term);
+      return matchesConceptFilter && matchesSearch;
+    });
+  }, [subconcepts, filterConcept, searchTerm]);
 
   const totalPages = Math.ceil(filteredSubconcepts.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;

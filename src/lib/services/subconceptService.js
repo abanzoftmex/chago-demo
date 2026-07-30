@@ -91,27 +91,37 @@ export const subconceptService = {
   },
 
   // Get all subconcepts
+  //
+  // Se lee la colección SIN where/orderBy en Firestore para no requerir un índice
+  // compuesto (isActive + conceptId + name) y evitar que el servidor ordene todo
+  // el dataset. El filtro de activos y el orden (conceptId, luego name) se hacen
+  // en cliente: es más rápido y robusto, sobre todo en Safari (WebChannel).
   async getAll(tenantId) {
     try {
       if (!tenantId) {
         throw new Error('Tenant ID es requerido');
       }
-      
-      const q = query(
-        collection(db, getSubconceptsCollection(tenantId)),
-        where('isActive', '==', true),
-        orderBy('conceptId', 'asc'),
-        orderBy('name', 'asc')
-      );
-      
+
+      const q = query(collection(db, getSubconceptsCollection(tenantId)));
+
       const querySnapshot = await getDocs(q);
       const subconcepts = [];
-      
+
       querySnapshot.forEach((doc) => {
         subconcepts.push({ id: doc.id, ...doc.data() });
       });
-      
-      return subconcepts;
+
+      // Solo activos (los que no tienen el campo se consideran activos).
+      const activos = subconcepts.filter((s) => s.isActive !== false);
+
+      // Orden en cliente: por conceptId y luego por nombre.
+      activos.sort((a, b) => {
+        const byConcept = (a.conceptId || '').localeCompare(b.conceptId || '');
+        if (byConcept !== 0) return byConcept;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+
+      return activos;
     } catch (error) {
       console.error('Error getting subconcepts:', error);
       throw new Error('Error al obtener los subconceptos');
