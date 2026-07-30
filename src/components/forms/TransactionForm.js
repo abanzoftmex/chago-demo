@@ -960,6 +960,7 @@ const TransactionForm = ({
         onClose={() => setShowSubconceptModal(false)}
         onSuccess={handleSubconceptCreated}
         concepts={concepts.filter(c => c.type === formData.type || c.type === 'ambos')}
+        generals={generals}
         defaultConceptId={formData.conceptId}
       />
 

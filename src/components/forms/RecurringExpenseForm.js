@@ -680,6 +680,7 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
           onClose={() => setShowSubconceptModal(false)}
           onSuccess={handleSubconceptCreated}
           concepts={concepts}
+          generals={generals}
         />
       )}
     </div>

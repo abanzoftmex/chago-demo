@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
+import Select from "react-select";
 import { conceptService } from "../../lib/services/conceptService";
 import { useAuth } from "../../context/AuthContextMultiTenant";
+import { treeSelectStyles, menuPortalTarget } from "./treeSelectStyles";
 
 const ConceptModal = ({
   isOpen,
@@ -204,23 +206,42 @@ const ConceptModal = ({
             >
               Categoría General *
             </label>
-            <select
-              id="generalId"
-              name="generalId"
-              value={formData.generalId}
-              onChange={handleInputChange}
-              disabled={loading}
-              className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500 ${
-                errors.generalId ? "border-red-300" : "border-gray-300"
-              }`}
-            >
-              <option value="">Selecciona una categoría general</option>
-              {generals.map((general) => (
-                <option key={general.id} value={general.id}>
-                  {general.name}
-                </option>
-              ))}
-            </select>
+            {(() => {
+              const options = generals.map((g) => ({
+                value: g.id,
+                label: g.name,
+              }));
+              return (
+                <Select
+                  inputId="generalId"
+                  value={
+                    options.find((o) => o.value === formData.generalId) || null
+                  }
+                  onChange={(opt) => {
+                    const gid = opt?.value || "";
+                    const selectedGeneral = generals.find((g) => g.id === gid);
+                    setFormData((prev) => ({
+                      ...prev,
+                      generalId: gid,
+                      // Heredar el tipo del General seleccionado (igual que el select nativo)
+                      ...(selectedGeneral ? { type: selectedGeneral.type } : {}),
+                    }));
+                    if (errors.generalId) {
+                      setErrors((prev) => ({ ...prev, generalId: null }));
+                    }
+                  }}
+                  options={options}
+                  styles={treeSelectStyles}
+                  isSearchable
+                  isClearable
+                  isDisabled={loading}
+                  placeholder="Selecciona una categoría general"
+                  noOptionsMessage={() => "Sin resultados"}
+                  menuPortalTarget={menuPortalTarget}
+                  menuPosition="fixed"
+                />
+              );
+            })()}
             {errors.generalId && (
               <p className="mt-1 text-sm text-red-600">{errors.generalId}</p>
             )}

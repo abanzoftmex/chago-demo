@@ -437,6 +437,7 @@ export default function SubconceptosPage() {
         onSuccess={handleModalSuccess}
         initialData={editingSubconcept}
         concepts={concepts}
+        generals={generals}
       />
 
       <ConfirmDialog

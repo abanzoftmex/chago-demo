@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
+import Select from 'react-select';
 import { subconceptService } from '../../lib/services/subconceptService';
 import { useAuth } from "../../context/AuthContextMultiTenant";
+import { treeSelectStyles, menuPortalTarget } from "./treeSelectStyles";
 
 const SubconceptModal = ({
   isOpen,
@@ -8,6 +10,7 @@ const SubconceptModal = ({
   onSuccess,
   initialData = null,
   concepts = [],
+  generals = [],
   defaultConceptId = "",
 }) => {
   const { tenantInfo } = useAuth();
@@ -155,23 +158,61 @@ const SubconceptModal = ({
             >
               Concepto *
             </label>
-            <select
-              id="conceptId"
-              name="conceptId"
-              value={formData.conceptId}
-              onChange={handleInputChange}
-              disabled={loading}
-              className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500 ${
-                errors.conceptId ? "border-red-300" : "border-gray-300"
-              }`}
-            >
-              <option value="">Selecciona un concepto</option>
-              {concepts.map((concept) => (
-                <option key={concept.id} value={concept.id}>
-                  {concept.name}
-                </option>
-              ))}
-            </select>
+            {(() => {
+              // Mapa generalId -> nombre para mostrar el General de cada concepto
+              const generalNameById = {};
+              generals.forEach((g) => {
+                generalNameById[g.id] = g.name;
+              });
+              const options = concepts.map((concept) => {
+                const generalName = generalNameById[concept.generalId];
+                return {
+                  value: concept.id,
+                  conceptName: concept.name,
+                  generalName: generalName || "",
+                  // label combinado (concepto + general) para que el buscador filtre por ambos
+                  label: generalName
+                    ? `${concept.name}  ·  ${generalName}`
+                    : concept.name,
+                };
+              });
+              return (
+                <Select
+                  inputId="conceptId"
+                  value={
+                    options.find((o) => o.value === formData.conceptId) || null
+                  }
+                  onChange={(opt) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      conceptId: opt?.value || "",
+                    }));
+                    if (errors.conceptId) {
+                      setErrors((prev) => ({ ...prev, conceptId: "" }));
+                    }
+                  }}
+                  options={options}
+                  styles={treeSelectStyles}
+                  isSearchable
+                  isClearable
+                  isDisabled={loading}
+                  placeholder="Selecciona un concepto"
+                  noOptionsMessage={() => "Sin resultados"}
+                  menuPortalTarget={menuPortalTarget}
+                  menuPosition="fixed"
+                  formatOptionLabel={(opt) => (
+                    <span>
+                      <span className="font-semibold">{opt.conceptName}</span>
+                      {opt.generalName && (
+                        <span className="text-gray-500">
+                          {"  ·  " + opt.generalName}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                />
+              );
+            })()}
             {errors.conceptId && (
               <p className="mt-1 text-sm text-red-600">{errors.conceptId}</p>
             )}
