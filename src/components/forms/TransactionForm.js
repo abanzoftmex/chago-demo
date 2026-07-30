@@ -1,5 +1,7 @@
 import React, { useState, useRef } from "react";
+import Select from "react-select";
 import { transactionService } from "../../lib/services/transactionService";
+import { CREATE_NEW, treeSelectStyles, keepCreateFilter, menuPortalTarget } from "./treeSelectStyles";
 import ConceptSelector from "./ConceptSelector";
 import SubconceptSelector from "./SubconceptSelector";
 import ProviderSelector from "./ProviderSelector";
@@ -624,30 +626,43 @@ const TransactionForm = ({
                 Error al cargar categorías
               </div>
             ) : (
-              <select
-                value={formData.generalId}
-                onChange={(e) => {
-                  const selectedValue = e.target.value;
-                  if (selectedValue === 'CREATE_NEW') {
-                    setShowGeneralModal(true);
-                  } else {
-                    setFormData(prev => ({ ...prev, generalId: selectedValue, conceptId: '', subconceptId: '' }));
-                  }
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500"
-                disabled={loading}
-                required
-              >
-                <option value="">Selecciona una categoría general</option>
-                {generals.map(g => (
-                  <option key={g.id} value={g.id}>
-                    {g.name} ({g.type === 'entrada' ? 'Entrada' : g.type === 'salida' ? 'Salida' : 'Ambos'})
-                  </option>
-                ))}
-                <option value="CREATE_NEW" className="font-semibold text-primary">
-                  + Agregar nuevo general
-                </option>
-              </select>
+              (() => {
+                const generalOptions = generals.map((g) => ({
+                  value: g.id,
+                  label: `${g.name} (${g.type === 'entrada' ? 'Entrada' : g.type === 'salida' ? 'Salida' : 'Ambos'})`,
+                }));
+                const allOptions = [
+                  ...generalOptions,
+                  { value: CREATE_NEW, label: "＋ Agregar nuevo general", __isCreate: true },
+                ];
+                return (
+                  <Select
+                    value={generalOptions.find((o) => o.value === formData.generalId) || null}
+                    onChange={(opt) => {
+                      if (opt && opt.value === CREATE_NEW) {
+                        setShowGeneralModal(true);
+                      } else {
+                        setFormData(prev => ({
+                          ...prev,
+                          generalId: opt?.value || '',
+                          conceptId: '',
+                          subconceptId: '',
+                        }));
+                      }
+                    }}
+                    options={allOptions}
+                    styles={treeSelectStyles}
+                    filterOption={keepCreateFilter}
+                    isSearchable
+                    isClearable
+                    isDisabled={loading}
+                    placeholder="Selecciona una categoría general"
+                    noOptionsMessage={() => "Sin resultados"}
+                    menuPortalTarget={menuPortalTarget}
+                    menuPosition="fixed"
+                  />
+                );
+              })()
             )}
             {errors.generalId && (
               <p className="mt-1 text-sm text-red-600">{errors.generalId}</p>

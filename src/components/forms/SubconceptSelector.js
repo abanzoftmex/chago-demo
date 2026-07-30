@@ -1,6 +1,8 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
+import Select from 'react-select';
 import { subconceptService } from '../../lib/services/subconceptService';
 import { useAuth } from '../../context/AuthContextMultiTenant';
+import { CREATE_NEW, treeSelectStyles, keepCreateFilter, menuPortalTarget } from './treeSelectStyles';
 
 const SubconceptSelector = forwardRef(({ 
   conceptId,
@@ -52,12 +54,15 @@ const SubconceptSelector = forwardRef(({
     loadSubconcepts();
   }, [conceptId, loadSubconcepts]);
 
-  const handleSelectChange = (e) => {
-    const selectedValue = e.target.value;
-    if (selectedValue === 'CREATE_NEW') {
+  const handleSelectChange = (opt) => {
+    if (!opt) {
+      onChange('');
+      return;
+    }
+    if (opt.value === CREATE_NEW) {
       onCreateNew && onCreateNew();
     } else {
-      onChange(selectedValue);
+      onChange(opt.value);
     }
   };
 
@@ -90,27 +95,31 @@ const SubconceptSelector = forwardRef(({
     );
   }
 
+  const options = subconcepts.map((s) => ({ value: s.id, label: s.name }));
+  const allOptions = [
+    ...options,
+    { value: CREATE_NEW, label: "＋ Agregar nuevo subconcepto", __isCreate: true },
+  ];
+  const selectedOption = options.find((o) => o.value === value) || null;
+
   return (
     <div className={`relative ${className}`}>
-      <select
-        value={value || ''}
+      <Select
+        value={selectedOption}
         onChange={handleSelectChange}
-        required={required}
-        disabled={disabled || !conceptId}
-        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
-      >
-        <option value="">
-          {!conceptId ? "Primero selecciona un concepto" : placeholder}
-        </option>
-        {subconcepts.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name}
-          </option>
-        ))}
-        <option value="CREATE_NEW" className="font-semibold text-primary">
-          + Agregar nuevo subconcepto
-        </option>
-      </select>
+        options={allOptions}
+        styles={treeSelectStyles}
+        filterOption={keepCreateFilter}
+        isSearchable
+        isClearable
+        isDisabled={disabled || !conceptId}
+        placeholder={
+          !conceptId ? "Primero selecciona un concepto" : placeholder
+        }
+        noOptionsMessage={() => "Sin resultados"}
+        menuPortalTarget={menuPortalTarget}
+        menuPosition="fixed"
+      />
     </div>
   );
 });

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
+import Select from 'react-select';
 import { conceptService } from '../../lib/services/conceptService';
 import { useAuth } from '../../context/AuthContextMultiTenant';
+import { CREATE_NEW, treeSelectStyles, keepCreateFilter, menuPortalTarget } from './treeSelectStyles';
 
 const ConceptSelector = forwardRef(({ 
   type, 
@@ -53,13 +55,15 @@ const ConceptSelector = forwardRef(({
     loadConcepts();
   }, [type, generalId, loadConcepts]);
 
-  const handleSelectChange = (e) => {
-    const selectedValue = e.target.value;
-    
-    if (selectedValue === 'CREATE_NEW') {
+  const handleSelectChange = (opt) => {
+    if (!opt) {
+      onChange('');
+      return;
+    }
+    if (opt.value === CREATE_NEW) {
       onCreateNew && onCreateNew();
     } else {
-      onChange(selectedValue);
+      onChange(opt.value);
     }
   };
 
@@ -106,27 +110,34 @@ const ConceptSelector = forwardRef(({
     );
   }
 
+  const options = concepts.map((concept) => ({
+    value: concept.id,
+    label: concept.name,
+  }));
+  const allOptions = [
+    ...options,
+    { value: CREATE_NEW, label: "＋ Agregar nuevo concepto", __isCreate: true },
+  ];
+  const selectedOption = options.find((o) => o.value === value) || null;
+
   return (
     <div className={`relative ${className}`}>
-      <select
-        value={value || ''}
+      <Select
+        value={selectedOption}
         onChange={handleSelectChange}
-        required={required}
-        disabled={disabled || !generalId}
-        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
-      >
-        <option value="">
-          {!generalId ? "Primero selecciona una categoría general" : placeholder}
-        </option>
-        {concepts.map((concept) => (
-          <option key={concept.id} value={concept.id}>
-            {concept.name}
-          </option>
-        ))}
-        <option value="CREATE_NEW" className="font-semibold text-primary">
-          + Agregar nuevo concepto
-        </option>
-      </select>
+        options={allOptions}
+        styles={treeSelectStyles}
+        filterOption={keepCreateFilter}
+        isSearchable
+        isClearable
+        isDisabled={disabled || !generalId}
+        placeholder={
+          !generalId ? "Primero selecciona una categoría general" : placeholder
+        }
+        noOptionsMessage={() => "Sin resultados"}
+        menuPortalTarget={menuPortalTarget}
+        menuPosition="fixed"
+      />
     </div>
   );
 });
