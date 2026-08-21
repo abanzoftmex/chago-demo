@@ -12,9 +12,12 @@ import {
   DatabaseBackup,
   Download,
   FolderOpen,
+  KeyRound,
+  Link2,
   RefreshCw,
   RotateCcw,
   SearchX,
+  ShieldOff,
   Trash2,
   Users,
 } from "lucide-react";
@@ -59,6 +62,12 @@ function TenantDetailContent() {
   const [result, setResult] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
 
+  // Vínculo con punto-de-venta — ver src/lib/server/posIntegrationService.js.
+  const [posIntegration, setPosIntegration] = useState(null);
+  const [posLoading, setPosLoading] = useState(true);
+  const [posWorking, setPosWorking] = useState(false);
+  const [generatedToken, setGeneratedToken] = useState(null); // solo se ve una vez, tras generarlo
+
   const { backups, backupsLoading, working, loadBackups, createBackup, runConfirmedAction } =
     useBackups({ setResult });
 
@@ -91,12 +100,60 @@ function TenantDetailContent() {
     }
   }, [tenantId, sessionExpired]);
 
+  const loadPosIntegration = useCallback(async () => {
+    setPosLoading(true);
+    try {
+      const response = await fetch(`/api/admin/pos-integration?tenantId=${encodeURIComponent(tenantId)}`);
+      const data = await response.json();
+      if (!response.ok) {
+        if (response.status === 401) {
+          sessionExpired();
+          return;
+        }
+        setResult({ tone: "error", title: data?.message || "Error cargando el vínculo de POS." });
+        return;
+      }
+      setPosIntegration(data);
+    } catch (error) {
+      console.error("Error cargando vínculo de POS:", error);
+    } finally {
+      setPosLoading(false);
+    }
+  }, [tenantId, sessionExpired]);
+
   useEffect(() => {
     if (router.isReady && tenantId) {
       loadDetails();
       loadBackups(tenantId);
+      loadPosIntegration();
     }
-  }, [router.isReady, tenantId, loadDetails, loadBackups]);
+  }, [router.isReady, tenantId, loadDetails, loadBackups, loadPosIntegration]);
+
+  const runPosAction = async (action) => {
+    setPosWorking(true);
+    setGeneratedToken(null);
+    try {
+      const response = await fetch("/api/admin/pos-integration", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenantId, action }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setResult({ tone: "error", title: data?.message || "No se pudo completar la acción." });
+        return;
+      }
+      if (action === "generate" && data.token) {
+        setGeneratedToken(data.token);
+      }
+      await loadPosIntegration();
+    } catch (error) {
+      console.error("Error en acción de vínculo POS:", error);
+      setResult({ tone: "error", title: `Error: ${error.message}` });
+    } finally {
+      setPosWorking(false);
+    }
+  };
 
   const handleConfirm = (confirmName) =>
     runConfirmedAction(confirmAction, confirmName, {
@@ -384,6 +441,92 @@ function TenantDetailContent() {
                     })}
                   </div>
                 )}
+              </Card>
+
+              {/* Vínculo con punto de venta */}
+              <Card className="sa-rise overflow-hidden" style={{ animationDelay: "0.23s" }}>
+                <CardHeader className="flex-row items-start justify-between gap-3 pb-4">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Link2 className="size-4 text-muted-foreground" strokeWidth={1.8} />
+                      Punto de venta
+                    </CardTitle>
+                    <CardDescription className="mt-1">
+                      Refleja las ventas cobradas como Entradas automáticas.
+                    </CardDescription>
+                  </div>
+                  {!posLoading && (
+                    <Badge variant={posIntegration?.enabled ? "success" : "secondary"}>
+                      {posIntegration?.enabled ? "Vinculado" : "Sin vincular"}
+                    </Badge>
+                  )}
+                </CardHeader>
+                <CardContent className="space-y-4 pt-0">
+                  {posLoading ? (
+                    <Skeleton className="h-16 rounded-2xl" />
+                  ) : (
+                    <>
+                      {generatedToken && (
+                        <div className="space-y-2 rounded-2xl border border-brand/30 bg-brand/5 p-4">
+                          <p className="text-sm font-semibold text-foreground">
+                            Token generado — cópialo ahora
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            No se vuelve a mostrar. Pégalo en Torre de Control, del lado de
+                            punto-de-venta, para completar el vínculo.
+                          </p>
+                          <CopyId value={generatedToken} className="w-full" />
+                        </div>
+                      )}
+
+                      <p className="text-sm text-muted-foreground">
+                        {posIntegration?.hasToken
+                          ? `Token generado${posIntegration.linkedAt ? " · " + formatDateTime(posIntegration.linkedAt) : ""}.`
+                          : "Todavía no se ha generado un token para este tenant."}
+                      </p>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => runPosAction("generate")}
+                          disabled={posWorking}
+                        >
+                          <KeyRound className="size-3.5" />
+                          {posIntegration?.hasToken ? "Regenerar token" : "Generar token"}
+                        </Button>
+                        {posIntegration?.hasToken && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => runPosAction(posIntegration.enabled ? "disable" : "enable")}
+                            disabled={posWorking}
+                          >
+                            {posIntegration.enabled ? "Desactivar" : "Activar"}
+                          </Button>
+                        )}
+                        {posIntegration?.hasToken && (
+                          <Button
+                            variant="destructive-outline"
+                            size="sm"
+                            onClick={() => runPosAction("revoke")}
+                            disabled={posWorking}
+                          >
+                            <ShieldOff className="size-3.5" />
+                            Revocar
+                          </Button>
+                        )}
+                      </div>
+
+                      {posIntegration?.hasToken && !posIntegration?.conceptId && (
+                        <p className="text-xs text-amber-600">
+                          Falta activarse desde Torre de Control para crear el concepto y los
+                          subconceptos de Ventas POS.
+                        </p>
+                      )}
+                    </>
+                  )}
+                </CardContent>
               </Card>
 
               {/* Zona de riesgo */}

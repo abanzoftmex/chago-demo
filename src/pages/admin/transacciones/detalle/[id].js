@@ -576,6 +576,20 @@ const TransactionDetail = () => {
           {getStatusBadge(transaction.status)}
         </div>
 
+        {transaction.locked && (
+          <div className="mb-6 flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+            <FileText className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-medium">Esta entrada viene del punto de venta</p>
+              <p className="mt-0.5 text-blue-700">
+                Se generó automáticamente al cobrar una venta y no se puede editar ni eliminar
+                aquí. Si algo cambió, corrígelo cancelando esa venta en el punto de venta —
+                la entrada se anula sola cuando eso pasa.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Payment Progress */}
         <div className="mb-6 border border-border rounded-lg p-4 bg-background">
           <div className="flex items-center justify-between mb-2">
@@ -797,7 +811,7 @@ const TransactionDetail = () => {
             <span>Volver</span>
           </button>
 
-          {!['contador', 'director_general'].includes(userRole) && (
+          {!['contador', 'director_general'].includes(userRole) && !transaction.locked && (
             <button
               onClick={() => {
                 setDeleteReasonError(""); // Limpiar errores previos

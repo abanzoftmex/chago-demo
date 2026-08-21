@@ -146,10 +146,16 @@ service cloud.firestore {
         allow create: if canManageDataInTenant(tenantId) &&
           request.resource.data.createdBy == getCurrentUser() &&
           request.resource.data.createdAt == request.time;
+        // Una transacción con locked:true la creó la integración con
+        // punto-de-venta (Admin SDK, no sujeto a estas reglas) — un usuario
+        // normal no puede editarla ni borrarla desde aquí. Solo se corrige
+        // cancelando la venta original en el POS, que la anula por su
+        // propio camino (Admin SDK también).
         allow update: if canManageDataInTenant(tenantId) &&
+          resource.data.locked != true &&
           request.resource.data.updatedBy == getCurrentUser() &&
           request.resource.data.updatedAt == request.time;
-        allow delete: if canDeleteTenantData(tenantId);
+        allow delete: if canDeleteTenantData(tenantId) && resource.data.locked != true;
       }
       
       // ===== SUBCOLECCIONES: CATÁLOGOS =====
