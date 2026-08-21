@@ -21,7 +21,18 @@ if (!admin.apps.length) {
     try {
       admin.initializeApp({
         credential: admin.credential.cert({ projectId, clientEmail, privateKey }),
-        storageBucket: process.env.FIREBASE_STORAGE_BUCKET || `${projectId}.appspot.com`,
+        // El fallback a `${projectId}.appspot.com` apunta a un bucket que no
+        // existe en proyectos creados después de oct-2024 (Firebase ya no
+        // aprovisiona ese dominio por defecto) — este proyecto es uno de
+        // esos: su bucket real es `chago-demo.firebasestorage.app`, el mismo
+        // que ya usa el SDK de cliente (`NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`,
+        // con el que sí funcionan los adjuntos subidos a mano). Se prioriza
+        // esa variable — que además no exige configurar nada nuevo, porque
+        // ya existe y ya está bien puesta — antes de caer al fallback viejo.
+        storageBucket:
+          process.env.FIREBASE_STORAGE_BUCKET ||
+          process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
+          `${projectId}.appspot.com`,
       });
       console.log("✅ Firebase Admin inicializado correctamente");
     } catch (error) {
