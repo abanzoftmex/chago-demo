@@ -75,6 +75,7 @@ export async function revokePosIntegration(tenantId) {
         posIntegration: {
           enabled: false,
           tokenHash: null,
+          generalId: null,
           conceptId: null,
           subconceptIds: null,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -84,8 +85,8 @@ export async function revokePosIntegration(tenantId) {
     );
 }
 
-/** Guarda el catálogo (concepto + subconceptos) resuelto al activar. */
-export async function savePosIntegrationCatalog(tenantId, { conceptId, subconceptIds }) {
+/** Guarda el catálogo (general + concepto + subconceptos) resuelto al activar. */
+export async function savePosIntegrationCatalog(tenantId, { generalId, conceptId, subconceptIds }) {
   await admin
     .firestore()
     .collection("tenants")
@@ -93,6 +94,7 @@ export async function savePosIntegrationCatalog(tenantId, { conceptId, subconcep
     .set(
       {
         posIntegration: {
+          generalId,
           conceptId,
           subconceptIds,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),

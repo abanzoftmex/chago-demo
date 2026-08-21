@@ -85,7 +85,7 @@ export default async function handler(req, res) {
 
   const { integration } = verification;
   const subconceptId = integration.subconceptIds?.[paymentMethod];
-  if (!integration.conceptId || !subconceptId) {
+  if (!integration.generalId || !integration.conceptId || !subconceptId) {
     return res.status(409).json({
       error: "Este tenant no tiene el catálogo de Ventas POS activado — vuelve a guardar el vínculo en Torre de Control",
     });
@@ -105,6 +105,7 @@ export default async function handler(req, res) {
     const now = admin.firestore.FieldValue.serverTimestamp();
     const transactionData = {
       type: "entrada",
+      generalId: integration.generalId,
       conceptId: integration.conceptId,
       subconceptId,
       description: description || `Venta POS · Folio ${folio || externalId}`,

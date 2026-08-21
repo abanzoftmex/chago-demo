@@ -2,131 +2,127 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     // ===== HELPER FUNCTIONS =====
-    
+
     // Verificar si el usuario está autenticado
     function isAuthenticated() {
       return request.auth != null;
     }
-    
+
     // Obtener el UID del usuario autenticado
     function getCurrentUser() {
       return request.auth.uid;
     }
-    
+
     // Verificar si el usuario tiene un tenant asignado
     function hasUserTenant() {
-      return isAuthenticated() && 
+      return isAuthenticated() &&
         exists(/databases/$(database)/documents/users/$(getCurrentUser())) &&
         get(/databases/$(database)/documents/users/$(getCurrentUser())).data.tenantId != null;
     }
-    
+
     // Obtener el tenant ID del usuario
     function getUserTenantId() {
       return get(/databases/$(database)/documents/users/$(getCurrentUser())).data.tenantId;
     }
-    
+
     // Verificar si el usuario es miembro activo de un tenant
     function isActiveTenantMember(tenantId) {
-      return isAuthenticated() && 
+      return isAuthenticated() &&
         exists(/databases/$(database)/documents/tenants/$(tenantId)/members/$(getCurrentUser())) &&
         get(/databases/$(database)/documents/tenants/$(tenantId)/members/$(getCurrentUser())).data.status == 'active';
     }
-    
+
     // Obtener el rol del usuario en un tenant
     function getUserTenantRole(tenantId) {
       return get(/databases/$(database)/documents/tenants/$(tenantId)/members/$(getCurrentUser())).data.role;
     }
-    
+
     // Verificar si el usuario es admin de un tenant
     function isAdminOfTenant(tenantId) {
-      return isActiveTenantMember(tenantId) && 
+      return isActiveTenantMember(tenantId) &&
         getUserTenantRole(tenantId) == 'admin';
     }
-    
+
     // Verificar si el usuario es admin o contador de un tenant
     function canManageDataInTenant(tenantId) {
-      return isActiveTenantMember(tenantId) && 
+      return isActiveTenantMember(tenantId) &&
         getUserTenantRole(tenantId) in ['admin', 'contador'];
     }
-    
+
     // Verificar si el usuario puede leer datos de un tenant
     function canReadTenantData(tenantId) {
-      return isActiveTenantMember(tenantId) && 
+      return isActiveTenantMember(tenantId) &&
         getUserTenantRole(tenantId) in ['admin', 'contador', 'viewer'];
     }
-    
+
     // Verificar si el usuario puede eliminar datos de un tenant
     function canDeleteTenantData(tenantId) {
-      return isActiveTenantMember(tenantId) && 
+      return isActiveTenantMember(tenantId) &&
         getUserTenantRole(tenantId) == 'admin';
     }
-    
+
     // Verificar si el usuario es el propietario de un tenant
     function isTenantOwner(tenantId) {
       return isAuthenticated() &&
         exists(/databases/$(database)/documents/tenants/$(tenantId)) &&
         get(/databases/$(database)/documents/tenants/$(tenantId)).data.ownerUid == getCurrentUser();
     }
-    
+
     // ===== REGLAS PARA USUARIOS =====
-    
+
     // Colección de usuarios - Cada usuario puede leer y actualizar su propio documento
     match /users/{userId} {
       allow read: if isAuthenticated() && getCurrentUser() == userId;
       allow create: if isAuthenticated() && getCurrentUser() == userId;
       allow update: if isAuthenticated() && getCurrentUser() == userId &&
         // Prevenir que el usuario modifique su propio tenantId
-        (!('tenantId' in request.resource.data) || 
+        (!('tenantId' in request.resource.data) ||
          (request.resource.data.tenantId == resource.data.tenantId));
       allow delete: if false; // Los usuarios no pueden eliminarse a sí mismos
     }
-    
+
     // ===== REGLAS PARA TENANTS =====
-    
+
     // Colección de tenants - Solo los miembros pueden leer la info del tenant
     match /tenants/{tenantId} {
       allow read: if isActiveTenantMember(tenantId);
       allow create: if isAuthenticated(); // Permitir crear tenant durante registro
       allow update: if isAdminOfTenant(tenantId);
       allow delete: if isTenantOwner(tenantId); // Solo el dueño puede eliminar el tenant
-      
+
       // ===== SUBCOLECCIÓN: MEMBERS =====
-      
+
       // Miembros del tenant - Solo admins pueden gestionar miembros
       match /members/{memberId} {
         allow read: if isActiveTenantMember(tenantId);
         allow create: if isAdminOfTenant(tenantId);
         allow update: if isAdminOfTenant(tenantId) &&
           // Prevenir que un admin se desactive a sí mismo si es el owner
-          !(getCurrentUser() == memberId && 
-            isTenantOwner(tenantId) && 
+          !(getCurrentUser() == memberId &&
+            isTenantOwner(tenantId) &&
             request.resource.data.status != 'active');
         allow delete: if isAdminOfTenant(tenantId) &&
           // Prevenir que el owner se elimine a sí mismo
           !(getCurrentUser() == memberId && isTenantOwner(tenantId));
       }
-      
-      // ===== SUBCOLECCIÓN: ENTRADAS =====
-      
-      // Entradas del tenant
+
+      // ===== SUBCOLECCIÓN: ENTRADAS (legacy, sin uso en pantallas vivas) =====
+
       match /entradas/{entradaId} {
         allow read: if canReadTenantData(tenantId);
         allow create: if canManageDataInTenant(tenantId) &&
-          // Asegurar que se incluyan metadatos de auditoría
           request.resource.data.createdBy == getCurrentUser() &&
           request.resource.data.createdAt == request.time;
         allow update: if canManageDataInTenant(tenantId) &&
-          // Asegurar que se actualicen metadatos de auditoría
           request.resource.data.updatedBy == getCurrentUser() &&
           request.resource.data.updatedAt == request.time;
         allow delete: if canDeleteTenantData(tenantId);
       }
-      
-      // ===== SUBCOLECCIÓN: SALIDAS =====
-      
-      // Salidas del tenant
+
+      // ===== SUBCOLECCIÓN: SALIDAS (legacy, sin uso en pantallas vivas) =====
+
       match /salidas/{salidaId} {
         allow read: if canReadTenantData(tenantId);
         allow create: if canManageDataInTenant(tenantId) &&
@@ -137,10 +133,10 @@ service cloud.firestore {
           request.resource.data.updatedAt == request.time;
         allow delete: if canDeleteTenantData(tenantId);
       }
-      
+
       // ===== SUBCOLECCIÓN: TRANSACCIONES =====
-      
-      // Transacciones del tenant
+
+      // Transacciones del tenant — modelo vivo (transactionService.js)
       match /transacciones/{transaccionId} {
         allow read: if canReadTenantData(tenantId);
         allow create: if canManageDataInTenant(tenantId) &&
@@ -157,25 +153,29 @@ service cloud.firestore {
           request.resource.data.updatedAt == request.time;
         allow delete: if canDeleteTenantData(tenantId) && resource.data.locked != true;
       }
-      
+
       // ===== SUBCOLECCIONES: CATÁLOGOS =====
-      
+      // Nombres en inglés — coinciden con conceptService.js / subconceptService.js /
+      // descriptionService.js / generalService.js (el código vive los usa así,
+      // no en español; las reglas viejas apuntaban a nombres que el código
+      // ya no usa desde hace tiempo).
+
       // Conceptos del tenant
-      match /conceptos/{conceptoId} {
+      match /concepts/{conceptId} {
         allow read: if canReadTenantData(tenantId);
         allow create: if canManageDataInTenant(tenantId);
         allow update: if canManageDataInTenant(tenantId);
         allow delete: if canDeleteTenantData(tenantId);
       }
-      
+
       // Subconceptos del tenant
-      match /subconceptos/{subconceptoId} {
+      match /subconcepts/{subconceptId} {
         allow read: if canReadTenantData(tenantId);
         allow create: if canManageDataInTenant(tenantId);
         allow update: if canManageDataInTenant(tenantId);
         allow delete: if canDeleteTenantData(tenantId);
       }
-      
+
       // Proveedores del tenant
       match /proveedores/{proveedorId} {
         allow read: if canReadTenantData(tenantId);
@@ -183,25 +183,45 @@ service cloud.firestore {
         allow update: if canManageDataInTenant(tenantId);
         allow delete: if canDeleteTenantData(tenantId);
       }
-      
+
       // Descripciones del tenant
-      match /descripciones/{descripcionId} {
+      match /descriptions/{descriptionId} {
         allow read: if canReadTenantData(tenantId);
         allow create: if canManageDataInTenant(tenantId);
         allow update: if canManageDataInTenant(tenantId);
         allow delete: if canDeleteTenantData(tenantId);
       }
-      
+
       // Generales del tenant
-      match /generales/{generalId} {
+      match /generals/{generalId} {
         allow read: if canReadTenantData(tenantId);
         allow create: if canManageDataInTenant(tenantId);
         allow update: if canManageDataInTenant(tenantId);
         allow delete: if canDeleteTenantData(tenantId);
       }
-      
+
+      // ===== SUBCOLECCIÓN: PAGOS =====
+
+      // Pagos parciales de una transacción — paymentService.js
+      match /payments/{paymentId} {
+        allow read: if canReadTenantData(tenantId);
+        allow create: if canManageDataInTenant(tenantId);
+        allow update: if canManageDataInTenant(tenantId);
+        allow delete: if canDeleteTenantData(tenantId);
+      }
+
+      // ===== SUBCOLECCIÓN: GASTOS RECURRENTES =====
+
+      // recurringExpenseService.js
+      match /recurringExpenses/{expenseId} {
+        allow read: if canReadTenantData(tenantId);
+        allow create: if canManageDataInTenant(tenantId);
+        allow update: if canManageDataInTenant(tenantId);
+        allow delete: if canDeleteTenantData(tenantId);
+      }
+
       // ===== SUBCOLECCIÓN: CONFIGURACIONES =====
-      
+
       // Configuraciones del tenant - Solo admins
       match /configuraciones/{configId} {
         allow read: if isActiveTenantMember(tenantId);
@@ -213,25 +233,33 @@ service cloud.firestore {
         allow read: if isActiveTenantMember(tenantId);
         allow write: if isAdminOfTenant(tenantId);
       }
-      
-      // ===== SUBCOLECCIÓN: LOGS AUDITORÍA =====
-      
-      // Logs de auditoría del tenant - Solo lectura para admins
-      match /audit_logs/{logId} {
+
+      // ===== SUBCOLECCIÓN: LOGS =====
+
+      // logService.js — getLogsCollection(tenantId) -> tenants/{tenantId}/logs
+      match /logs/{logId} {
         allow read: if isAdminOfTenant(tenantId);
-        allow create: if isActiveTenantMember(tenantId); // Sistema puede crear logs
+        allow create: if isActiveTenantMember(tenantId); // Sistema/usuarios pueden crear logs
         allow update, delete: if false; // Los logs no se pueden modificar
       }
+
+      // ===== SUBCOLECCIÓN: LOGS AUDITORÍA (legacy) =====
+
+      match /audit_logs/{logId} {
+        allow read: if isAdminOfTenant(tenantId);
+        allow create: if isActiveTenantMember(tenantId);
+        allow update, delete: if false;
+      }
     }
-    
+
     // ===== REGLAS LEGACY (COMPATIBILIDAD) =====
-    
+
     // Roles legacy - Solo lectura para usuarios autenticados
     match /roles/{roleId} {
       allow read: if isAuthenticated();
       allow write: if false; // Solo admins a través del backend
     }
-    
+
     // Reglas para datos legacy (sistema anterior)
     // Solo aplicar si el usuario NO tiene tenant asignado
     match /transactions/{transactionId} {
@@ -240,23 +268,38 @@ service cloud.firestore {
       allow update: if isAuthenticated() && !hasUserTenant();
       allow delete: if isAuthenticated() && !hasUserTenant();
     }
-    
+
     // Catálogos legacy
     match /{catalog}/{docId} {
-      allow read: if isAuthenticated() && !hasUserTenant() && 
+      allow read: if isAuthenticated() && !hasUserTenant() &&
         catalog in ['concepts', 'subconcepts', 'descriptions', 'providers', 'generals'];
-      allow write: if isAuthenticated() && !hasUserTenant() && 
+      allow write: if isAuthenticated() && !hasUserTenant() &&
         catalog in ['concepts', 'subconcepts', 'descriptions', 'providers', 'generals'];
     }
-    
+
     // Gastos recurrentes legacy
     match /recurring_expenses/{expenseId} {
       allow read: if isAuthenticated() && !hasUserTenant();
       allow write: if isAuthenticated() && !hasUserTenant();
     }
-    
+
+    // ===== ARRASTRE MENSUAL (monthly_carryover) =====
+    //
+    // OJO: esta colección NO está particionada por tenant en el modelo de
+    // datos (carryoverService.js guarda el doc como "{year}-{month}", sin
+    // ningún campo de tenant) — hoy TODOS los tenants comparten el mismo
+    // documento de arrastre para un mes dado. Esto es un hallazgo aparte,
+    // de diseño de datos, no algo que una regla de Firestore pueda arreglar
+    // por sí sola sin cambiar cómo se guarda. Mientras tanto, esta regla
+    // solo exige estar autenticado y pertenecer a algún tenant — es la
+    // mejor barrera posible sin tocar el modelo, y ya es muchísimo mejor
+    // que "cualquiera en internet" que es lo que hay publicado hoy.
+    match /monthly_carryover/{docId} {
+      allow read, write: if isAuthenticated() && hasUserTenant();
+    }
+
     // ===== REGLAS ADICIONALES DE SEGURIDAD =====
-    
+
     // Prevenir acceso a cualquier otra colección no definida
     match /{document=**} {
       allow read, write: if false;
