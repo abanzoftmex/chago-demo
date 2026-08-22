@@ -83,6 +83,11 @@ const ConceptModal = ({
   const selectedGeneral = generals.find(g => g.id === formData.generalId);
   const inheritedType = selectedGeneral?.type;
 
+  // Un concepto que nació de la integración con punto de venta no puede
+  // cambiar de General — el servicio ya lo descarta en silencio si llega,
+  // pero dejar el selector activo aquí daría a entender que sí se guardó.
+  const isLocked = !!initialData?.locked;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -234,7 +239,7 @@ const ConceptModal = ({
                   styles={treeSelectStyles}
                   isSearchable
                   isClearable
-                  isDisabled={loading}
+                  isDisabled={loading || isLocked}
                   placeholder="Selecciona una categoría general"
                   noOptionsMessage={() => "Sin resultados"}
                   menuPortalTarget={menuPortalTarget}
@@ -244,6 +249,11 @@ const ConceptModal = ({
             })()}
             {errors.generalId && (
               <p className="mt-1 text-sm text-red-600">{errors.generalId}</p>
+            )}
+            {isLocked && (
+              <p className="mt-1.5 text-sm text-gray-500">
+                Este concepto pertenece a la integración con punto de venta — solo el nombre se puede editar.
+              </p>
             )}
             
             {/* Mostrar tipo heredado */}

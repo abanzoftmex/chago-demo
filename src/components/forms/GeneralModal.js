@@ -17,6 +17,12 @@ export default function GeneralModal({ isOpen, onClose, onSuccess, type = 'entra
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Un general que nació de la integración con punto de venta solo puede
+  // cambiar de nombre — el servicio descarta en silencio type/description/
+  // hasPreviousBalance si llegan, así que aquí se deshabilitan para no dar
+  // a entender que sí se guardaron.
+  const isLocked = !!(initialData && initialData.id && initialData.locked);
+
   useEffect(() => {
     if (isOpen) {
       if (initialData && initialData.id) {
@@ -117,6 +123,14 @@ export default function GeneralModal({ isOpen, onClose, onSuccess, type = 'entra
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {isLocked && (
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+              <p className="text-sm text-blue-800">
+                Este General pertenece a la integración con punto de venta — solo el nombre se puede editar.
+              </p>
+            </div>
+          )}
+
           {errors.submit && (
             <div className="bg-red-50 border border-red-200 rounded-md p-3">
               <div className="flex">
@@ -165,7 +179,7 @@ export default function GeneralModal({ isOpen, onClose, onSuccess, type = 'entra
               className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500 ${
                 errors.type ? 'border-red-300' : 'border-gray-300'
               }`}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isLocked}
             >
               <option value="entrada">Entrada</option>
               <option value="salida">Salida</option>
@@ -191,7 +205,7 @@ export default function GeneralModal({ isOpen, onClose, onSuccess, type = 'entra
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
               placeholder="Descripción opcional de la categoría general"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isLocked}
             />
           </div>
 
@@ -208,7 +222,7 @@ export default function GeneralModal({ isOpen, onClose, onSuccess, type = 'entra
               role="switch"
               aria-checked={formData.hasPreviousBalance}
               onClick={() => setFormData(prev => ({ ...prev, hasPreviousBalance: !prev.hasPreviousBalance }))}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isLocked}
               className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 ${
                 formData.hasPreviousBalance ? 'bg-orange-500' : 'bg-gray-200'
               }`}

@@ -128,28 +128,39 @@ export const generalService = {
   },
 
   // Update general
+  //
+  // Si el general lo creó la integración con punto de venta (`locked:true`),
+  // SOLO se permite cambiar el nombre — el resto de `updateData` se
+  // descarta en silencio. Es la única categoría general que un cliente con
+  // el paquete de punto de venta no puede reconfigurar por su cuenta,
+  // porque `pos-transactions.js` (en el otro repo) depende de que siga
+  // existiendo con esta misma forma.
   async update(id, updateData, tenantId) {
     try {
       if (!tenantId) {
         throw new Error('Tenant ID es requerido');
       }
-      
+
+      const existing = await this.getById(id, tenantId);
+      const safeUpdateData = existing?.locked ? { name: updateData.name } : updateData;
+
       // Validar tipo si se está actualizando
-      if (updateData.type && !['entrada', 'salida', 'ambos'].includes(updateData.type)) {
+      if (safeUpdateData.type && !['entrada', 'salida', 'ambos'].includes(safeUpdateData.type)) {
         throw new Error('Tipo inválido. Debe ser: entrada, salida o ambos');
       }
-      
+
       const docRef = doc(db, getGeneralsCollection(tenantId), id);
-      await updateDoc(docRef, updateData);
-      
-      return { id, ...updateData };
+      await updateDoc(docRef, safeUpdateData);
+
+      return { id, ...safeUpdateData };
     } catch (error) {
       console.error('Error updating general:', error);
       throw new Error(error.message || 'Error al actualizar la categoría general');
     }
   },
 
-  // Delete general — blocked if it has associated transactions
+  // Delete general — bloqueado si lo creó la integración con punto de venta,
+  // o si tiene transacciones asociadas.
   async delete(id, tenantId, user = null) {
     if (!tenantId) {
       throw new Error('Tenant ID es requerido');
@@ -159,6 +170,13 @@ export const generalService = {
     const userRole = user?.role || user?.userRole;
     if (user && ['contador', 'director_general'].includes(userRole)) {
       throw new Error("No tienes permisos para eliminar categorías generales");
+    }
+
+    // Un general de la integración con punto de venta no se elimina nunca —
+    // ni con 0 concepts/transacciones. Solo su nombre se puede cambiar.
+    const existing = await this.getById(id, tenantId);
+    if (existing?.locked) {
+      throw new Error('Este General pertenece a la integración con punto de venta y no puede eliminarse. Puedes cambiarle el nombre.');
     }
 
     // Block deletion if there are transactions referencing this general

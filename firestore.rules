@@ -161,19 +161,28 @@ service cloud.firestore {
       // ya no usa desde hace tiempo).
 
       // Conceptos del tenant
+      //
+      // Un concepto con locked:true lo creó la integración con punto de
+      // venta (Admin SDK, no sujeto a estas reglas) — un usuario normal
+      // solo puede cambiarle el nombre (nunca generalId/type/etc.) y nunca
+      // puede borrarlo. Mismo criterio que ya usa `transacciones`.
       match /concepts/{conceptId} {
         allow read: if canReadTenantData(tenantId);
         allow create: if canManageDataInTenant(tenantId);
-        allow update: if canManageDataInTenant(tenantId);
-        allow delete: if canDeleteTenantData(tenantId);
+        allow update: if canManageDataInTenant(tenantId) &&
+          (resource.data.locked != true ||
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']));
+        allow delete: if canDeleteTenantData(tenantId) && resource.data.locked != true;
       }
 
-      // Subconceptos del tenant
+      // Subconceptos del tenant — mismo criterio que concepts de arriba.
       match /subconcepts/{subconceptId} {
         allow read: if canReadTenantData(tenantId);
         allow create: if canManageDataInTenant(tenantId);
-        allow update: if canManageDataInTenant(tenantId);
-        allow delete: if canDeleteTenantData(tenantId);
+        allow update: if canManageDataInTenant(tenantId) &&
+          (resource.data.locked != true ||
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']));
+        allow delete: if canDeleteTenantData(tenantId) && resource.data.locked != true;
       }
 
       // Proveedores del tenant
@@ -192,12 +201,14 @@ service cloud.firestore {
         allow delete: if canDeleteTenantData(tenantId);
       }
 
-      // Generales del tenant
+      // Generales del tenant — mismo criterio de `locked` que concepts/subconcepts.
       match /generals/{generalId} {
         allow read: if canReadTenantData(tenantId);
         allow create: if canManageDataInTenant(tenantId);
-        allow update: if canManageDataInTenant(tenantId);
-        allow delete: if canDeleteTenantData(tenantId);
+        allow update: if canManageDataInTenant(tenantId) &&
+          (resource.data.locked != true ||
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']));
+        allow delete: if canDeleteTenantData(tenantId) && resource.data.locked != true;
       }
 
       // ===== SUBCOLECCIÓN: PAGOS =====

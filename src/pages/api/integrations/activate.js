@@ -16,6 +16,12 @@
  * Body: { chagoTenantId, businessName? } — businessName es el nombre del
  * negocio en punto-de-venta, usado solo para nombrar el General; si no
  * llega, se usa el propio chagoTenantId para que el nombre nunca quede vacío.
+ *
+ * Los 3 niveles nacen con `locked:true, origen:'pos_sync'` — es la marca que
+ * generalService/conceptService/subconceptService usan para impedir que se
+ * borren o se reestructuren (cambiar generalId/conceptId) desde la UI de
+ * chago-demo; solo el nombre queda libre. Si una activación anterior a este
+ * cambio dejó algún nivel sin la marca, se le agrega aquí mismo al reusarlo.
  */
 
 import admin, { assertAdminInitialized } from "../../../lib/firebase/firebaseAdmin";
@@ -52,16 +58,27 @@ export default async function handler(req, res) {
     if (generalId) {
       const existing = await generalsRef.doc(generalId).get();
       if (!existing.exists) generalId = null;
+      // Autoreparación: si venía de antes de que existiera el bloqueo, se
+      // marca ahora — sin esto un cliente podría borrar/reestructurar un
+      // General ya en uso por la integración.
+      else if (existing.data()?.locked !== true) {
+        await generalsRef.doc(generalId).update({ locked: true, origen: "pos_sync" });
+      }
     }
     if (!generalId) {
       const existingQuery = await generalsRef.where("name", "==", generalName).limit(1).get();
       if (!existingQuery.empty) {
         generalId = existingQuery.docs[0].id;
+        if (existingQuery.docs[0].data()?.locked !== true) {
+          await generalsRef.doc(generalId).update({ locked: true, origen: "pos_sync" });
+        }
       } else {
         const newGeneral = await generalsRef.add({
           name: generalName,
           type: "entrada",
           isActive: true,
+          locked: true,
+          origen: "pos_sync",
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
         generalId = newGeneral.id;
@@ -75,23 +92,30 @@ export default async function handler(req, res) {
     if (conceptId) {
       const existing = await conceptsRef.doc(conceptId).get();
       if (!existing.exists) conceptId = null;
+      else if (existing.data()?.locked !== true) {
+        await conceptsRef.doc(conceptId).update({ locked: true, origen: "pos_sync" });
+      }
     }
     if (!conceptId) {
       const existingQuery = await conceptsRef.where("name", "==", CONCEPT_NAME).limit(1).get();
       if (!existingQuery.empty) {
         conceptId = existingQuery.docs[0].id;
-        // Se activó antes de que este endpoint generara el General: se
-        // completa la rama en vez de dejar el concepto huérfano.
+        // Se activó antes de que este endpoint generara el General (o antes
+        // del bloqueo): se completa la rama y se marca, en vez de dejar el
+        // concepto huérfano o editable.
         const conceptData = existingQuery.docs[0].data();
-        if (conceptData.generalId !== generalId) {
-          await conceptsRef.doc(conceptId).update({ generalId });
-        }
+        const conceptFix = {};
+        if (conceptData.generalId !== generalId) conceptFix.generalId = generalId;
+        if (conceptData.locked !== true) { conceptFix.locked = true; conceptFix.origen = "pos_sync"; }
+        if (Object.keys(conceptFix).length > 0) await conceptsRef.doc(conceptId).update(conceptFix);
       } else {
         const newConcept = await conceptsRef.add({
           name: CONCEPT_NAME,
           type: "entrada",
           generalId,
           isActive: true,
+          locked: true,
+          origen: "pos_sync",
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
         conceptId = newConcept.id;
@@ -108,11 +132,16 @@ export default async function handler(req, res) {
         .get();
       if (!existingQuery.empty) {
         subconceptIds[name] = existingQuery.docs[0].id;
+        if (existingQuery.docs[0].data()?.locked !== true) {
+          await subconceptsRef.doc(subconceptIds[name]).update({ locked: true, origen: "pos_sync" });
+        }
       } else {
         const newSubconcept = await subconceptsRef.add({
           name,
           conceptId,
           isActive: true,
+          locked: true,
+          origen: "pos_sync",
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
         subconceptIds[name] = newSubconcept.id;

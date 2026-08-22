@@ -45,6 +45,11 @@ const SubconceptModal = ({
   // Obtener el concepto seleccionado para mostrar información
   const selectedConcept = concepts.find(c => c.id === formData.conceptId);
 
+  // Un subconcepto que nació de la integración con punto de venta no puede
+  // cambiar de Concepto — el servicio ya lo descarta en silencio si llega,
+  // pero dejar el selector activo aquí daría a entender que sí se guardó.
+  const isLocked = !!initialData?.locked;
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -195,7 +200,7 @@ const SubconceptModal = ({
                   styles={treeSelectStyles}
                   isSearchable
                   isClearable
-                  isDisabled={loading}
+                  isDisabled={loading || isLocked}
                   placeholder="Selecciona un concepto"
                   noOptionsMessage={() => "Sin resultados"}
                   menuPortalTarget={menuPortalTarget}
@@ -215,6 +220,11 @@ const SubconceptModal = ({
             })()}
             {errors.conceptId && (
               <p className="mt-1 text-sm text-red-600">{errors.conceptId}</p>
+            )}
+            {isLocked && (
+              <p className="mt-1.5 text-sm text-gray-500">
+                Este subconcepto pertenece a la integración con punto de venta — solo el nombre se puede editar.
+              </p>
             )}
             
             {/* Mostrar información del concepto y tipo heredado */}

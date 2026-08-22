@@ -129,23 +129,32 @@ export const subconceptService = {
   },
 
   // Update subconcept
+  //
+  // Si el subconcepto lo creó la integración con punto de venta
+  // (`locked:true`), SOLO se permite cambiar el nombre — `conceptId` no se
+  // puede reasignar. El resto de `updateData` se descarta en silencio.
   async update(id, updateData, tenantId) {
     try {
       if (!tenantId) {
         throw new Error('Tenant ID es requerido');
       }
-      
+
+      const existing = await this.getById(id, tenantId);
+      const safeUpdateData = existing?.locked ? { name: updateData.name } : updateData;
+
       const docRef = doc(db, getSubconceptsCollection(tenantId), id);
-      await updateDoc(docRef, updateData);
-      
-      return { id, ...updateData };
+      await updateDoc(docRef, safeUpdateData);
+
+      return { id, ...safeUpdateData };
     } catch (error) {
       console.error('Error updating subconcept:', error);
       throw new Error('Error al actualizar el subconcepto');
     }
   },
 
-  // Delete subconcept — blocked if it has associated transactions
+  // Delete subconcept — bloqueado si lo creó la integración con punto de
+  // venta (SIN excepción: ni con 0 transacciones), o si tiene transacciones
+  // asociadas.
   async delete(id, tenantId, user = null) {
     if (!tenantId) {
       throw new Error('Tenant ID es requerido');
@@ -155,6 +164,11 @@ export const subconceptService = {
     const userRole = user?.role || user?.userRole;
     if (user && ['contador', 'director_general'].includes(userRole)) {
       throw new Error("No tienes permisos para eliminar subconceptos");
+    }
+
+    const existing = await this.getById(id, tenantId);
+    if (existing?.locked) {
+      throw new Error('Este Subconcepto pertenece a la integración con punto de venta y no puede eliminarse. Puedes cambiarle el nombre.');
     }
 
     // Block deletion if there are transactions referencing this subconcept

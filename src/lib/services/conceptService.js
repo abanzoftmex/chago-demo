@@ -157,31 +157,45 @@ export const conceptService = {
   },
 
   // Update concept
+  //
+  // Si el concepto lo creó la integración con punto de venta (`locked:true`),
+  // SOLO se permite cambiar el nombre — en particular, `generalId` no se
+  // puede reasignar (no puede "cambiarse de rama"). El resto de
+  // `updateData` se descarta en silencio.
   async update(id, updateData, tenantId) {
     try {
       if (!tenantId) {
         throw new Error('Tenant ID es requerido');
       }
-      
+
+      const existing = await this.getById(id, tenantId);
+      const safeUpdateData = existing?.locked ? { name: updateData.name } : updateData;
+
       // Validar tipo si se está actualizando
-      if (updateData.type && !['entrada', 'salida', 'ambos'].includes(updateData.type)) {
+      if (safeUpdateData.type && !['entrada', 'salida', 'ambos'].includes(safeUpdateData.type)) {
         throw new Error('Tipo inválido. Debe ser: entrada, salida o ambos');
       }
-      
-      const docRef = doc(db, getConceptsCollection(tenantId), id);
-      await updateDoc(docRef, updateData);
 
-      return { id, ...updateData };
+      const docRef = doc(db, getConceptsCollection(tenantId), id);
+      await updateDoc(docRef, safeUpdateData);
+
+      return { id, ...safeUpdateData };
     } catch (error) {
       console.error('Error updating concept:', error);
       throw new Error(error.message || 'Error al actualizar el concepto');
     }
   },
 
-  // Delete concept — blocked if it has associated transactions
+  // Delete concept — bloqueado si lo creó la integración con punto de
+  // venta, o si tiene transacciones asociadas.
   async delete(id, tenantId) {
     if (!tenantId) {
       throw new Error('Tenant ID es requerido');
+    }
+
+    const existing = await this.getById(id, tenantId);
+    if (existing?.locked) {
+      throw new Error('Este Concepto pertenece a la integración con punto de venta y no puede eliminarse. Puedes cambiarle el nombre.');
     }
 
     // Block deletion if there are transactions referencing this concept

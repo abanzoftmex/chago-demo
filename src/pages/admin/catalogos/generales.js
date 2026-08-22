@@ -6,11 +6,12 @@ import MassiveCsvImportModal from "../../../components/forms/MassiveCsvImportMod
 import { generalService } from "../../../lib/services/generalService";
 import { useAuth } from '../../../context/AuthContextMultiTenant';
 import ConfirmDialog from '../../../components/ui/ConfirmDialog';
-import { 
+import {
   PencilIcon,
   TrashIcon,
   ArrowUpOnSquareIcon,
   PlusIcon,
+  LockClosedIcon,
 } from '@heroicons/react/24/outline';
 
 const breadcrumbs = [
@@ -302,8 +303,14 @@ export default function GeneralesPage() {
                     paginatedGenerals.map((general) => (
                       <tr key={general.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-bold text-gray-900">
+                          <div className="flex items-center gap-1.5 text-sm font-bold text-gray-900">
                             {general.name}
+                            {general.locked && (
+                              <LockClosedIcon
+                                className="h-3.5 w-3.5 text-gray-400"
+                                title="Pertenece a la integración con punto de venta"
+                              />
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -349,9 +356,14 @@ export default function GeneralesPage() {
                             </button>
                             {userRole !== 'contador' && userRole !== 'director_general' && (
                               <button
-                                onClick={() => handleDeleteGeneral(general)}
-                                  className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center cursor-pointer"
-                                  title="Eliminar general"
+                                onClick={() => !general.locked && handleDeleteGeneral(general)}
+                                disabled={general.locked}
+                                className={
+                                  general.locked
+                                    ? "bg-gray-100 text-gray-300 py-1.5 px-2.5 rounded-md flex items-center cursor-not-allowed"
+                                    : "bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center cursor-pointer"
+                                }
+                                title={general.locked ? "No se puede eliminar: pertenece a la integración con punto de venta" : "Eliminar general"}
                               >
                                 <TrashIcon className="h-4 w-4" />
                               </button>
