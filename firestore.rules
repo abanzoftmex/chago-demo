@@ -148,10 +148,10 @@ service cloud.firestore {
         // cancelando la venta original en el POS, que la anula por su
         // propio camino (Admin SDK también).
         allow update: if canManageDataInTenant(tenantId) &&
-          resource.data.locked != true &&
+          resource.data.get('locked', false) != true &&
           request.resource.data.updatedBy == getCurrentUser() &&
           request.resource.data.updatedAt == request.time;
-        allow delete: if canDeleteTenantData(tenantId) && resource.data.locked != true;
+        allow delete: if canDeleteTenantData(tenantId) && resource.data.get('locked', false) != true;
       }
 
       // ===== SUBCOLECCIONES: CATÁLOGOS =====
@@ -170,9 +170,9 @@ service cloud.firestore {
         allow read: if canReadTenantData(tenantId);
         allow create: if canManageDataInTenant(tenantId);
         allow update: if canManageDataInTenant(tenantId) &&
-          (resource.data.locked != true ||
+          (resource.data.get('locked', false) != true ||
            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']));
-        allow delete: if canDeleteTenantData(tenantId) && resource.data.locked != true;
+        allow delete: if canDeleteTenantData(tenantId) && resource.data.get('locked', false) != true;
       }
 
       // Subconceptos del tenant — mismo criterio que concepts de arriba.
@@ -180,9 +180,9 @@ service cloud.firestore {
         allow read: if canReadTenantData(tenantId);
         allow create: if canManageDataInTenant(tenantId);
         allow update: if canManageDataInTenant(tenantId) &&
-          (resource.data.locked != true ||
+          (resource.data.get('locked', false) != true ||
            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']));
-        allow delete: if canDeleteTenantData(tenantId) && resource.data.locked != true;
+        allow delete: if canDeleteTenantData(tenantId) && resource.data.get('locked', false) != true;
       }
 
       // Proveedores del tenant
@@ -206,9 +206,9 @@ service cloud.firestore {
         allow read: if canReadTenantData(tenantId);
         allow create: if canManageDataInTenant(tenantId);
         allow update: if canManageDataInTenant(tenantId) &&
-          (resource.data.locked != true ||
+          (resource.data.get('locked', false) != true ||
            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']));
-        allow delete: if canDeleteTenantData(tenantId) && resource.data.locked != true;
+        allow delete: if canDeleteTenantData(tenantId) && resource.data.get('locked', false) != true;
       }
 
       // ===== SUBCOLECCIÓN: PAGOS =====
