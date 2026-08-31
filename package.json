@@ -15,7 +15,8 @@
     "deploy-firestore": "firebase deploy --only firestore",
     "simulate-september": "node scripts/simulate-september-2025-clean.cjs simulate",
     "simulate-october": "node scripts/simulate-october-2025.cjs simulate",
-    "simulate-help": "node scripts/simulate-september-2025-clean.cjs help"
+    "simulate-help": "node scripts/simulate-september-2025-clean.cjs help",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-chago \"node tests/rules/firestore.rules.test.mjs\""
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -50,6 +51,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@tailwindcss/postcss": "^4",
     "eslint": "^9",
     "eslint-config-next": "15.4.4",
