@@ -26,10 +26,14 @@ export const formatPercentage = (amount, total) => {
 };
 
 // Function to calculate tree comparison (for mixed trees - type 'ambos')
-export const calculateTreeComparison = (allTransactions, stats, filters, generals, concepts) => {
+export const calculateTreeComparison = (allTransactions, stats, filters, generals, concepts, soloPagados = false) => {
   if (!allTransactions || allTransactions.length === 0 || !stats || !stats.weeklyBreakdown) {
     return [];
   }
+
+  // En modo "pagos reales realizados" se usa lo efectivamente pagado (totalPaid)
+  // en lugar del monto registrado (amount).
+  const getVal = (t) => (soloPagados ? (t.totalPaid || 0) : (t.amount || 0));
 
   const today = new Date();
   today.setHours(23, 59, 59, 999);
@@ -102,7 +106,7 @@ export const calculateTreeComparison = (allTransactions, stats, filters, general
         initialCarryoverByTree[treeKey] = { entradas: 0, salidas: 0 };
       }
       
-      const amount = transaction.amount || 0;
+      const amount = getVal(transaction);
       if (transaction.type === 'entrada') {
         initialCarryoverByTree[treeKey].entradas += amount;
       } else if (transaction.type === 'salida') {
@@ -116,8 +120,8 @@ export const calculateTreeComparison = (allTransactions, stats, filters, general
   
   allTransactions.forEach(transaction => {
     const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
-    const amount = transaction.amount || 0;
-    
+    const amount = getVal(transaction);
+
     const isInPeriod = (!startDate || transactionDate >= startDate) && (!endDate || transactionDate <= endDate);
     const isUntilToday = transactionDate <= today;
 

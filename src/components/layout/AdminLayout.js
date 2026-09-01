@@ -3,7 +3,6 @@ import { useRouter } from "next/router";
 import { useAuth } from "../../context/AuthContextMultiTenant";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
-import Toast from "../ui/Toast";
 
 const AdminLayout = ({ children, title = "Dashboard", breadcrumbs = [] }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -79,9 +78,6 @@ const AdminLayout = ({ children, title = "Dashboard", breadcrumbs = [] }) => {
           <div className="px-0">{children}</div>
         </main>
       </div>
-
-      {/* Toast notifications */}
-      <Toast />
     </div>
   );
 };

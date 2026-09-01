@@ -40,9 +40,9 @@ export const addPageHeader = async (doc, title = 'Reporte Administrativo', total
     doc.setFillColor(0, 0, 0, 0.1);
     doc.rect(0, 40, 210, 2, 'F');
 
-    // Add logo or EYS fallback
+    // Add logo or EYS fallback (más pequeño y centrado verticalmente en el header)
     try {
-        await addLogoToPDF(doc, 15, 8, 25, logoUrl);
+        await addLogoToPDF(doc, 15, 12, 16, logoUrl, 45);
     } catch (error) {
         console.error('Error añadiendo logo:', error);
     }
@@ -618,12 +618,12 @@ export const createEnhancedPDFReport = async (transactions, stats, filters, conc
 
         currentY = addSectionHeader(doc, 'Listado de Transacciones', 50);
 
-        // Get reference data for lookups
+        // Get reference data for lookups (tenant-scoped: sin tenantId, subconceptService lanza error)
         const [concepts, providers, generals, subconcepts] = await Promise.all([
-            conceptService.getAll(),
-            providerService.getAll(),
-            generalService.getAll(),
-            subconceptService.getAll()
+            conceptService.getAll(tenantId),
+            providerService.getAll(tenantId),
+            generalService.getAll(tenantId),
+            subconceptService.getAll(tenantId)
         ]);
 
         const conceptMap = {};

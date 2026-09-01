@@ -89,45 +89,62 @@ export const ToastProvider = ({ children }) => {
   );
 };
 
+// Icon/estilo por tipo (a nivel de módulo: los usan tanto el modo global como el controlado)
+const getToastIcon = (type) => {
+  switch (type) {
+    case 'success':
+      return <CheckCircleIcon className="h-5 w-5 text-green-500" />;
+    case 'error':
+      return <XCircleIcon className="h-5 w-5 text-red-500" />;
+    case 'warning':
+      return <ExclamationTriangleIcon className="h-5 w-5 text-yellow-500" />;
+    default:
+      return <InformationCircleIcon className="h-5 w-5 text-blue-500" />;
+  }
+};
+
+const getToastStyles = (type) => {
+  const baseStyles = "border-l-4 bg-background shadow-lg";
+
+  switch (type) {
+    case 'success':
+      return `${baseStyles} border-green-500`;
+    case 'error':
+      return `${baseStyles} border-red-500`;
+    case 'warning':
+      return `${baseStyles} border-yellow-500`;
+    default:
+      return `${baseStyles} border-blue-500`;
+  }
+};
+
 // Toast Component
-const Toast = () => {
+// - Sin props: renderiza la pila global desde el contexto (una sola vez en la app).
+// - Con `message`: modo controlado, muestra un único toast (pantallas con estado local propio).
+const Toast = ({ message = null, type = 'info', onClose } = {}) => {
   const context = useContext(ToastContext);
+
+  // Modo controlado (props): un solo toast
+  if (message) {
+    return (
+      <div className="fixed bottom-4 right-4 z-50 space-y-2">
+        <ToastItem
+          toast={{ id: 'controlled', message, type }}
+          onRemove={() => onClose && onClose()}
+          getIcon={getToastIcon}
+          getStyles={getToastStyles}
+        />
+      </div>
+    );
+  }
+
+  // Modo global (contexto)
   if (!context) return null;
-  
   const { toasts, removeToast } = context;
-
-  const getToastIcon = (type) => {
-    switch (type) {
-      case 'success':
-        return <CheckCircleIcon className="h-5 w-5 text-green-500" />;
-      case 'error':
-        return <XCircleIcon className="h-5 w-5 text-red-500" />;
-      case 'warning':
-        return <ExclamationTriangleIcon className="h-5 w-5 text-yellow-500" />;
-      default:
-        return <InformationCircleIcon className="h-5 w-5 text-blue-500" />;
-    }
-  };
-
-  const getToastStyles = (type) => {
-    const baseStyles = "border-l-4 bg-background shadow-lg";
-    
-    switch (type) {
-      case 'success':
-        return `${baseStyles} border-green-500`;
-      case 'error':
-        return `${baseStyles} border-red-500`;
-      case 'warning':
-        return `${baseStyles} border-yellow-500`;
-      default:
-        return `${baseStyles} border-blue-500`;
-    }
-  };
-
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2">
+    <div className="fixed bottom-4 right-4 z-50 space-y-2">
       {toasts.map((toast) => (
         <ToastItem
           key={toast.id}

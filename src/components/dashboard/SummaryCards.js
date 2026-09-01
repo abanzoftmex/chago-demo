@@ -6,27 +6,39 @@ import {
 } from '@heroicons/react/24/outline';
 
 const SummaryCards = ({ summary, currentMonthName }) => {
-  // Extraer solo el nombre del mes (sin el año) si viene en formato "Mes Año"
-  const monthOnly = currentMonthName ? currentMonthName.split(' ')[0] : '';
+  // El label puede ser un mes ("Septiembre de 2026") o un rango personalizado
+  // ("1 sept 2026 – 15 sept 2026"). Se detecta por el separador "–".
+  const isRange = currentMonthName ? currentMonthName.includes('–') : false;
+  const periodWord = isRange ? 'Período' : 'Mes';
+  // Para mes: solo el nombre ("Septiembre"); para rango: el rango completo.
+  const periodLabel = currentMonthName
+    ? isRange
+      ? currentMonthName
+      : currentMonthName.split(' ')[0]
+    : '';
 
   const cards = [
     {
-      title: `Entradas del Mes (${monthOnly})`,
+      title: `Entradas del ${periodWord} (${periodLabel})`,
       bgcolorcard: 'bg-green-50',
       value: summary.entradas,
       icon: ArrowTrendingUpIcon,
       color: 'text-green-600',
       bgColor: 'bg-green-100',
-      count: summary.entradasCount
+      count: summary.entradasCount,
+      pendingLabel: 'Por pagar',
+      pendingValue: summary.entradasPorPagar,
     },
     {
-      title: `Salidas del Mes (${monthOnly})`,
+      title: `Salidas del ${periodWord} (${periodLabel})`,
       bgcolorcard: 'bg-red-50',
       value: summary.salidas,
       icon: ArrowTrendingDownIcon,
       color: 'text-red-600',
       bgColor: 'bg-red-100',
-      count: summary.salidasCount
+      count: summary.salidasCount,
+      pendingLabel: 'Por pagar',
+      pendingValue: summary.salidasPorPagar,
     },
     {
       title: 'Saldo General',
@@ -70,6 +82,11 @@ const SummaryCards = ({ summary, currentMonthName }) => {
                 <p className={`text-2xl font-bold ${card.color}`}>
                   {card.isCount ? card.value : formatCurrency(card.value)}
                 </p>
+                {card.pendingValue !== undefined && card.pendingValue !== null && (
+                  <p className="text-sm font-semibold text-amber-700 mt-1">
+                    {card.pendingLabel}: {formatCurrency(card.pendingValue)}
+                  </p>
+                )}
                 {card.showSplit ? (
                   <div className="mt-2 flex items-center justify-center space-x-4 text-xs">
                     <div className="flex items-center space-x-1">

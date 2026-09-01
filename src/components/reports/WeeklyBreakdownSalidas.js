@@ -27,13 +27,14 @@ const WeeklyBreakdownSalidas = ({
   providers = [],
   filters,
   currentDate,
-  formatCurrency
+  formatCurrency,
+  soloPagados = false,
 }) => {
   const { user } = useAuth();
   const [selectedWeekDetail, setSelectedWeekDetail] = useState(null);
   const { disabledRows, toggleRow } = usePersistedDisabledRows(user?.uid, "salidas");
   const { selectedWeekOverview, handleWeekOverviewClick, clearWeekOverview } = useWeekDayBreakdown({
-    transactions, generals, concepts, subconcepts, filters, currentDate, type: "salida",
+    transactions, generals, concepts, subconcepts, filters, currentDate, type: "salida", soloPagados,
   });
 
   const generalMap = useMemo(() => Object.fromEntries(generals.map((g) => [g.id, g.name])), [generals]);
@@ -41,7 +42,16 @@ const WeeklyBreakdownSalidas = ({
   const subconceptMap = useMemo(() => Object.fromEntries(subconcepts.map((s) => [s.id, s.name])), [subconcepts]);
   const providerNameMap = useMemo(() => buildProviderNameMap(providers), [providers]);
 
-  if (!stats || !stats.weeklyBreakdown || !stats.weeklyBreakdown.weeks) {
+  // Según el filtro de montos: registrados (weeklyBreakdown) o pagos reales (weeklyBreakdownPagados)
+  const wb = soloPagados
+    ? stats?.weeklyBreakdownPagados || stats?.weeklyBreakdown
+    : stats?.weeklyBreakdown;
+
+  // Monto por transacción según el modo (para los modales de detalle)
+  const montoTransaccion = (t) =>
+    soloPagados ? t.totalPaid || 0 : t.amount || 0;
+
+  if (!stats || !wb || !wb.weeks) {
     return null;
   }
 
@@ -77,7 +87,7 @@ const WeeklyBreakdownSalidas = ({
                 <th rowSpan={2} className="px-4 py-2 text-center text-xs font-bold text-red-800 tracking-wider border-r-2 border-red-200">
                   Concepto
                 </th>
-                <th colSpan={stats.weeklyBreakdown.weeks.length} className="px-4 py-2 text-center text-xs font-bold text-red-800 tracking-wider border-r-2 border-red-200">
+                <th colSpan={wb.weeks.length} className="px-4 py-2 text-center text-xs font-bold text-red-800 tracking-wider border-r-2 border-red-200">
                   Semanas
                 </th>
                 <th rowSpan={2} className="px-4 py-2 text-center text-xs font-bold tracking-wider bg-red-200 text-red-800">
@@ -85,7 +95,7 @@ const WeeklyBreakdownSalidas = ({
                 </th>
               </tr>
               <tr>
-                {stats.weeklyBreakdown.weeks.map((week, index) => {
+                {wb.weeks.map((week, index) => {
                   return (
                   <th key={index} className="px-4 py-3 text-center text-xs font-medium text-red-800 tracking-wider bg-red-50">
                     <button
@@ -112,7 +122,7 @@ const WeeklyBreakdownSalidas = ({
               </tr>
             </thead>
             <tbody className="bg-background divide-y divide-border">
-              {Object.entries(stats.weeklyBreakdown.salidas || {}).map(([subconcept, weekData]) => {
+              {Object.entries(wb.salidas || {}).map(([subconcept, weekData]) => {
                 const parts = subconcept.split(' > ');
                 const isActive = !disabledRows.has(subconcept);
                 return (
@@ -138,7 +148,7 @@ const WeeklyBreakdownSalidas = ({
                       </div>
                     </div>
                   </td>
-                  {stats.weeklyBreakdown.weeks.map((week, index) => {
+                  {wb.weeks.map((week, index) => {
                     const amount = weekData[`week${index + 1}`];
                     return (
                     <td key={index} className="px-4 py-3 whitespace-nowrap text-xs text-right">
@@ -166,8 +176,8 @@ const WeeklyBreakdownSalidas = ({
                 <td className="px-4 py-3 whitespace-nowrap text-xs text-foreground">
                   {/* Vacío para totales */}
                 </td>
-                {stats.weeklyBreakdown.weeks.map((week, index) => {
-                  const weekTotal = Object.entries(stats.weeklyBreakdown.salidas || {}).reduce(
+                {wb.weeks.map((week, index) => {
+                  const weekTotal = Object.entries(wb.salidas || {}).reduce(
                     (sum, [key, data]) => disabledRows.has(key) ? sum : sum + (data[`week${index + 1}`] || 0),
                     0
                   );
@@ -178,7 +188,7 @@ const WeeklyBreakdownSalidas = ({
                   );
                 })}
                 <td className="px-4 py-3 whitespace-nowrap text-xs text-right font-bold text-red-800 bg-red-200">
-                  {formatCurrency(Object.entries(stats.weeklyBreakdown.salidas || {}).reduce(
+                  {formatCurrency(Object.entries(wb.salidas || {}).reduce(
                     (sum, [key, data]) => disabledRows.has(key) ? sum : sum + (data.total || 0),
                     0
                   ))}
@@ -273,7 +283,7 @@ const WeeklyBreakdownSalidas = ({
                                   })}
                                 </td>
                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-semibold text-red-600">
-                                  {formatCurrency(transaction.amount || 0)}
+                                  {formatCurrency(montoTransaccion(transaction))}
                                 </td>
                                 <td className="px-4 py-3 text-sm text-gray-900 max-w-xs truncate" title={transaction.description || 'Sin descripción'}>
                                   {transaction.description || 'Sin descripción'}

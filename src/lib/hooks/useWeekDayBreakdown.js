@@ -9,6 +9,7 @@ export function useWeekDayBreakdown({
   filters,
   currentDate,
   type = null,
+  soloPagados = false,
 }) {
   const [selectedWeekOverview, setSelectedWeekOverview] = useState(null);
 
@@ -50,8 +51,9 @@ export function useWeekDayBreakdown({
       }
       const prev = rowsMap[fullName].days[dayKey] || { amount: 0, descriptions: [] };
       const desc = t.description?.trim() || null;
+      const val = parseFloat(soloPagados ? t.totalPaid : t.amount) || 0;
       rowsMap[fullName].days[dayKey] = {
-        amount: prev.amount + (parseFloat(t.amount) || 0),
+        amount: prev.amount + val,
         descriptions: desc ? [...prev.descriptions, desc] : prev.descriptions,
       };
     });

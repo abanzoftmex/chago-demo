@@ -131,7 +131,7 @@ const drawEYSFallback = (doc, x, y, maxHeight) => {
  * @param {number} maxHeight - Maximum height for the logo
  * @param {string|null} logoUrl - Firebase Storage URL for the logo (optional)
  */
-export const addLogoToPDF = async (doc, x = 15, y = 8, maxHeight = 25, logoUrl = null) => {
+export const addLogoToPDF = async (doc, x = 15, y = 8, maxHeight = 25, logoUrl = null, maxWidth = null) => {
   if (!logoUrl) {
     drawEYSFallback(doc, x, y, maxHeight);
     return false;
@@ -147,8 +147,15 @@ export const addLogoToPDF = async (doc, x = 15, y = 8, maxHeight = 25, logoUrl =
     }
 
     const aspectRatio = logoData.width / logoData.height;
-    const logoHeight = maxHeight;
-    const logoWidth = logoHeight * aspectRatio;
+
+    // El logo se ajusta DENTRO de una caja (maxWidth x maxHeight) manteniendo la
+    // proporción, para que un logo ancho no desborde el header.
+    let logoHeight = maxHeight;
+    let logoWidth = logoHeight * aspectRatio;
+    if (maxWidth && logoWidth > maxWidth) {
+      logoWidth = maxWidth;
+      logoHeight = logoWidth / aspectRatio;
+    }
 
     doc.addImage(logoData.dataURL, 'PNG', x, y, logoWidth, logoHeight);
     return true;

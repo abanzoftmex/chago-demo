@@ -609,8 +609,12 @@ export const reportService = {
           stats.divisionBreakdown[divisionName].pendingAmount += transaction.balance || 0;
         }
 
-        // Provider breakdown (solo para salidas) - solo para transacciones del período actual
-        if (isInPeriod && !isCarryover && transaction.type === 'salida' && transaction.providerId) {
+        // Provider breakdown - solo período actual, con proveedor.
+        // Acumula el TIPO seleccionado (entrada o salida); con "Todos" acumula ambos.
+        // Se filtra por filters.type para que el arrastre de salidas no contamine
+        // el desglose cuando el reporte está en Entradas.
+        if (isInPeriod && !isCarryover && transaction.providerId &&
+            (!filters.type || transaction.type === filters.type)) {
           if (!stats.providerBreakdown[providerName]) {
             stats.providerBreakdown[providerName] = {
               amount: 0,
@@ -679,13 +683,22 @@ export const reportService = {
         providerBreakdownCount: Object.keys(stats.providerBreakdown).length
       });
 
-      // Generar Weekly Breakdown si hay filtro de fechas
+      // Generar Weekly Breakdown si hay filtro de fechas.
+      // Se calculan dos versiones: por montos registrados (amount) y por pagos
+      // reales (totalPaid), para que el reporte pueda alternar sin recalcular todo.
       if (hasDateFilter && filters.startDate && filters.endDate) {
         stats.weeklyBreakdown = await this.generateWeeklyBreakdown(
           transactions,
           filters.startDate,
           filters.endDate,
           subconceptHierarchyMap
+        );
+        stats.weeklyBreakdownPagados = await this.generateWeeklyBreakdown(
+          transactions,
+          filters.startDate,
+          filters.endDate,
+          subconceptHierarchyMap,
+          true
         );
       }
 
@@ -696,8 +709,9 @@ export const reportService = {
     }
   },
 
-  // Generar desglose semanal por subconceptos
-  async generateWeeklyBreakdown(transactions, startDate, endDate, subconceptHierarchyMap) {
+  // Generar desglose semanal por subconceptos.
+  // soloPagados=true usa lo efectivamente pagado (totalPaid) en lugar de amount.
+  async generateWeeklyBreakdown(transactions, startDate, endDate, subconceptHierarchyMap, soloPagados = false) {
     try {
       // Parsear fechas
       const start = new Date(startDate);
@@ -780,7 +794,8 @@ export const reportService = {
         // Obtener la jerarquía completa del subconcepto
         const hierarchy = subconceptHierarchyMap[transaction.subconceptId];
         const subconceptKey = hierarchy ? hierarchy.full : 'Sin Subconcepto';
-        const amount = parseFloat(transaction.amount) || 0;
+        const amount =
+          parseFloat(soloPagados ? transaction.totalPaid : transaction.amount) || 0;
 
         if (transaction.type === 'salida') {
           // Inicializar si no existe
@@ -879,11 +894,12 @@ export const reportService = {
       const workbook = XLSX.utils.book_new();
 
       // Get reference data for lookups
-      const [concepts, providers, descriptions, generals] = await Promise.all([
+      const [concepts, providers, descriptions, generals, subconcepts] = await Promise.all([
         conceptService.getAll(tenantId),
         providerService.getAll(tenantId),
         descriptionService.getAll(tenantId),
-        generalService.getAll(tenantId)
+        generalService.getAll(tenantId),
+        subconceptService.getAll(tenantId)
       ]);
 
       const conceptMap = {};
@@ -906,141 +922,97 @@ export const reportService = {
         generalMap[general.id] = general.name;
       });
 
-      // Filtrar transacciones para Excel: NO incluir gastos pendientes de meses anteriores
+      const subconceptMap = {};
+      subconcepts.forEach(subconcept => {
+        subconceptMap[subconcept.id] = subconcept.name;
+      });
+
+      // Filtrar transacciones para Excel según el RANGO de fechas y el TIPO del filtro.
+      // El rango excluye el arrastre de meses anteriores; el tipo evita que, en modo
+      // Entradas, se cuelen salidas pendientes que agrega getFilteredTransactions.
       let filteredTransactions = transactions;
+
+      const parseLocal = (value, endOfDay = false) => {
+        if (!value) return null;
+        if (value instanceof Date) {
+          const d = new Date(value);
+          d.setHours(endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0);
+          return d;
+        }
+        const [y, m, day] = String(value).split('-').map(Number);
+        return new Date(y, m - 1, day, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0);
+      };
+
       if (filters.startDate && filters.endDate) {
-        const reportEndDate = new Date(filters.endDate);
-        const reportYear = reportEndDate.getFullYear();
-        const reportMonth = reportEndDate.getMonth(); // 0-based
-
-        filteredTransactions = transactions.filter(transaction => {
-          // Incluir todas las entradas
-          if (transaction.type === 'entrada') {
-            return true;
-          }
-
-          // Para salidas, solo incluir las del período del reporte (no gastos pendientes de meses anteriores)
-          if (transaction.type === 'salida') {
-            const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
-            // Validar que la fecha sea válida
-            if (isNaN(transactionDate.getTime())) {
-              return false;
-            }
-            
-            const transactionYear = transactionDate.getFullYear();
-            const transactionMonth = transactionDate.getMonth();
-
-            // Solo incluir gastos del mismo año y mes del reporte
-            return transactionYear === reportYear && transactionMonth === reportMonth;
-          }
-
-          return true;
-        });
-
-        console.log('📊 Filtrado de transacciones para Excel:', {
-          reportMonth: `${reportYear}-${String(reportMonth + 1).padStart(2, '0')}`,
-          totalTransactions: transactions.length,
-          filteredTransactions: filteredTransactions.length,
-          excluded: transactions.length - filteredTransactions.length,
-          note: 'Excluidos gastos pendientes de meses anteriores del Excel'
+        const start = parseLocal(filters.startDate, false);
+        const end = parseLocal(filters.endDate, true);
+        filteredTransactions = filteredTransactions.filter(transaction => {
+          const d = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
+          if (isNaN(d.getTime())) return false;
+          return (!start || d >= start) && (!end || d <= end);
         });
       }
 
-      // Transactions sheet - con columnas separadas y ordenadas correctamente
+      if (filters.type) {
+        filteredTransactions = filteredTransactions.filter(t => t.type === filters.type);
+      }
+
+      // Hoja de Transacciones — detalle completo (independiente del modo de montos):
+      // fecha, tipo, árbol (general/concepto/subconcepto), descripción, proveedor,
+      // ingreso/gasto según caso, total pagado y resta por pagar. Con totales al final.
+      const restanteDe = (t) => {
+        const amount = t.amount || 0;
+        const paid = t.totalPaid || 0;
+        const balance = (t.balance !== undefined && t.balance !== null) ? t.balance : amount - paid;
+        return Math.max(0, balance);
+      };
+
       const transactionsData = filteredTransactions
         .map(transaction => {
           const isIncome = transaction.type === 'entrada';
-          const totalPaid = transaction.totalPaid || 0;
-
+          const amount = transaction.amount || 0;
           return {
             'Fecha': new Date(transaction.date?.toDate ? transaction.date.toDate() : transaction.date)
               .toLocaleDateString('es-ES'),
-            'Tipo': transaction.type === 'entrada' ? 'Entrada' : 'Salida',
+            'Tipo': isIncome ? 'Entrada' : 'Salida',
             'General': generalMap[transaction.generalId] || 'Sin categoría general',
             'Concepto': conceptMap[transaction.conceptId] || 'Sin concepto',
+            'Subconcepto': subconceptMap[transaction.subconceptId] || 'Sin subconcepto',
+            'Descripción': transaction.description || '',
             'Proveedor': providerMap[transaction.providerId] || 'N/A',
-            'División': !isIncome ? formatDivision(transaction.division) : 'N/A',
-            'Ingreso': isIncome ? transaction.amount : '',
-            'Gasto': !isIncome ? transaction.amount : '',
-            'Total Pagado': !isIncome ? totalPaid : '',
+            'Ingreso': isIncome ? amount : '',
+            'Gasto': !isIncome ? amount : '',
+            'Total Pagado': transaction.totalPaid || 0,
+            'Resta por Pagar': restanteDe(transaction),
             '_sortOrder': isIncome ? 0 : 1 // Para ordenar entradas primero
           };
         })
         .sort((a, b) => {
-          // Primero por tipo (entradas primero)
           if (a._sortOrder !== b._sortOrder) {
             return a._sortOrder - b._sortOrder;
           }
-          // Luego por General
           return a.General.localeCompare(b.General);
         })
-        .map(transaction => {
-          // Remover el campo auxiliar de ordenamiento
-          const { _sortOrder, ...cleanTransaction } = transaction;
-          return cleanTransaction;
-        });
+        .map(({ _sortOrder, ...cleanTransaction }) => cleanTransaction);
 
-      // Agregar filas de totales al final (sin gastos pendientes)
-      // Calcular balance sin gastos pendientes: solo entradas del período + arrastre de ingresos - gastos del período
-      const balanceSinPendientes = stats.totalEntradas + (stats.carryoverIncome || 0) - Math.abs(stats.totalSalidas);
+      // Totales por columna (numéricos, para que el cliente pueda operarlos en Excel)
+      const totIngreso = filteredTransactions
+        .filter(t => t.type === 'entrada')
+        .reduce((s, t) => s + (t.amount || 0), 0);
+      const totGasto = filteredTransactions
+        .filter(t => t.type === 'salida')
+        .reduce((s, t) => s + (t.amount || 0), 0);
+      const totPagado = filteredTransactions.reduce((s, t) => s + (t.totalPaid || 0), 0);
+      const totRestante = filteredTransactions.reduce((s, t) => s + restanteDe(t), 0);
 
       transactionsData.push(
         {}, // Fila vacía para separar
         {
-          'Fecha': '',
-          'Tipo': '',
-          'General': '',
-          'Concepto': '',
-          'Proveedor': 'TOTALES:',
-          'División': '',
-          'Ingreso': '',
-          'Gasto': '',
-          'Total Pagado': ''
-        },
-        {
-          'Fecha': '',
-          'Tipo': '',
-          'General': '',
-          'Concepto': '',
-          'Proveedor': 'Total Ingresos:',
-          'División': '',
-          'Ingreso': '',
-          'Gasto': `$${stats.totalEntradas.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
-          'Total Pagado': ''
-        },
-        {
-          'Fecha': '',
-          'Tipo': '',
-          'General': '',
-          'Concepto': '',
-          'Proveedor': 'Total Gastos:',
-          'División': '',
-          'Ingreso': '',
-          'Gasto': `$${Math.abs(stats.totalSalidas).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
-          'Total Pagado': ''
-        },
-        {
-          'Fecha': '',
-          'Tipo': '',
-          'General': '',
-          'Concepto': '',
-          'Proveedor': 'Ingresos del mes anterior:',
-          'División': '',
-          'Ingreso': '',
-          'Gasto': `$${(stats.carryoverIncome || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
-          'Total Pagado': ''
-        },
-        {}, // Fila vacía para separar
-        {
-          'Fecha': '',
-          'Tipo': '',
-          'General': '',
-          'Concepto': '',
-          'Proveedor': 'BALANCE FINAL:',
-          'División': '',
-          'Ingreso': '',
-          'Gasto': `${balanceSinPendientes >= 0 ? '+' : ''}$${Math.abs(balanceSinPendientes).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
-          'Total Pagado': ''
+          'Proveedor': 'TOTALES',
+          'Ingreso': totIngreso,
+          'Gasto': totGasto,
+          'Total Pagado': totPagado,
+          'Resta por Pagar': totRestante
         }
       );
 
@@ -1048,6 +1020,8 @@ export const reportService = {
       XLSX.utils.book_append_sheet(workbook, transactionsSheet, 'Transacciones');
 
       // Summary sheet (sin gastos pendientes)
+      // Balance final: entradas del período + arrastre de ingresos - gastos del período.
+      const balanceSinPendientes = stats.totalEntradas + (stats.carryoverIncome || 0) - Math.abs(stats.totalSalidas);
       const summaryData = [
         ['Estadística', 'Valor'],
         ['Total de Transacciones', stats.totalTransactions],

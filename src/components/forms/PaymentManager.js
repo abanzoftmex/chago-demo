@@ -269,7 +269,9 @@ const PaymentManager = ({
       const paymentData = {
         transactionId,
         amount: parseFloat(formData.amount),
-        date: new Date(formData.date),
+        // "YYYY-MM-DD" a mediodía LOCAL para evitar el corrimiento de zona horaria
+        // (new Date("2026-08-14") se interpreta como UTC y en México cae el 13).
+        date: new Date(formData.date + "T12:00:00"),
         notes: formData.notes,
       };
 

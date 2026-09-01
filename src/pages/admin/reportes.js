@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { useToast } from "../../components/ui/Toast";
 import { Button } from "../../components/ui/Button";
-import AdvancedDateSelector from "../../components/dashboard/AdvancedDateSelector";
 import SummaryCards from "../../components/dashboard/SummaryCards";
 import { reportService } from "../../lib/services/reportService";
 import { dashboardService } from "../../lib/services/dashboardService";
@@ -74,6 +73,9 @@ const selectStyles = {
   }),
 };
 
+// Oculta temporalmente la sección "Desglose de Balance" (poner en true para reactivarla).
+const SHOW_BALANCE_BREAKDOWN = false;
+
 const Reportes = () => {
   const { success, error } = useToast();
   const { user, tenantInfo } = useAuth();
@@ -96,6 +98,7 @@ const Reportes = () => {
   const [selectedTreeBalance, setSelectedTreeBalance] = useState(null);
   const [selectedTreeTransactions, setSelectedTreeTransactions] = useState(null);
   const [selectedWeekDetail, setSelectedWeekDetail] = useState(null);
+  const [selectedBreakdownDetail, setSelectedBreakdownDetail] = useState(null);
   const [showPendingSalidasModal, setShowPendingSalidasModal] = useState(false);
   const [pendingSalidasTransactions, setPendingSalidasTransactions] = useState([]);
 
@@ -103,13 +106,108 @@ const Reportes = () => {
     startDate: "",
     endDate: "",
     type: "",
+    montos: "",
     generalId: "",
     conceptId: "",
     subconceptId: "",
     division: "",
   });
-  const [currentMonthName, setCurrentMonthName] = useState("");
   const [currentDate, setCurrentDate] = useState(new Date());
+
+  // Label del período derivado del RANGO real de filtros (no del mes del selector):
+  // - Si el rango es un mes calendario completo -> nombre del mes ("Septiembre de 2026").
+  // - Si es un rango personalizado -> "1 sept 2026 – 15 sept 2026".
+  const currentMonthName = useMemo(() => {
+    const parse = (s) => {
+      if (!s) return null;
+      if (s instanceof Date) return s;
+      const [y, m, d] = s.split("-").map(Number);
+      return new Date(y, m - 1, d);
+    };
+    const cap = (str) => str.charAt(0).toUpperCase() + str.slice(1);
+    const start = parse(filters.startDate);
+    const end = parse(filters.endDate);
+
+    if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return cap(
+        currentDate.toLocaleDateString("es-ES", {
+          month: "long",
+          year: "numeric",
+        })
+      );
+    }
+
+    // ¿El rango cubre exactamente un mes calendario completo?
+    const lastDay = new Date(
+      end.getFullYear(),
+      end.getMonth() + 1,
+      0
+    ).getDate();
+    const esMesCompleto =
+      start.getDate() === 1 &&
+      end.getDate() === lastDay &&
+      start.getMonth() === end.getMonth() &&
+      start.getFullYear() === end.getFullYear();
+
+    if (esMesCompleto) {
+      return cap(
+        start.toLocaleDateString("es-ES", { month: "long", year: "numeric" })
+      );
+    }
+
+    const fmt = (dt) =>
+      dt.toLocaleDateString("es-ES", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    return `${fmt(start)} – ${fmt(end)}`;
+  }, [filters.startDate, filters.endDate, currentDate]);
+
+  // Texto largo del período para el subtítulo del reporte:
+  // - Mes completo -> "Reporte del mes de Septiembre de 2026".
+  // - Rango personalizado -> "Reporte del 1 de Septiembre de 2026 al 15 de Septiembre de 2026".
+  const reportPeriodLabel = useMemo(() => {
+    const MESES = [
+      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+    ];
+    const parse = (s) => {
+      if (!s) return null;
+      if (s instanceof Date) return s;
+      const [y, m, d] = s.split("-").map(Number);
+      return new Date(y, m - 1, d);
+    };
+    const start = parse(filters.startDate);
+    const end = parse(filters.endDate);
+    if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return "Reporte General";
+    }
+
+    const lastDay = new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate();
+    const esMesCompleto =
+      start.getDate() === 1 &&
+      end.getDate() === lastDay &&
+      start.getMonth() === end.getMonth() &&
+      start.getFullYear() === end.getFullYear();
+
+    if (esMesCompleto) {
+      return `Reporte del mes de ${MESES[start.getMonth()]} de ${start.getFullYear()}`;
+    }
+
+    const largo = (dt) =>
+      `${dt.getDate()} de ${MESES[dt.getMonth()]} de ${dt.getFullYear()}`;
+    return `Reporte del ${largo(start)} al ${largo(end)}`;
+  }, [filters.startDate, filters.endDate]);
+
+  // Opciones del filtro de montos a mostrar:
+  // - "" (Todos): montos registrados de las transacciones (campo amount).
+  // - "pagados": solo los pagos efectivamente realizados/registrados (totalPaid).
+  const montosOptions = [
+    { value: "", label: "Todos" },
+    { value: "pagados", label: "Pagos reales realizados" },
+  ];
+
   const [concepts, setConcepts] = useState([]);
   const [subconcepts, setSubconcepts] = useState([]);
   const [providers, setProviders] = useState([]);
@@ -135,9 +233,6 @@ const Reportes = () => {
       0
     );
 
-    // Update month name
-    updateMonthName(newDate);
-
     // Format dates to YYYY-MM-DD without timezone conversion
     const formatDateLocal = (date) => {
       const year = date.getFullYear();
@@ -153,18 +248,6 @@ const Reportes = () => {
       endDate: formatDateLocal(endOfMonth),
     }));
   };
-
-  const updateMonthName = (date) => {
-    const monthName = date.toLocaleDateString("es-ES", {
-      month: "long",
-      year: "numeric",
-    });
-    setCurrentMonthName(monthName.charAt(0).toUpperCase() + monthName.slice(1));
-  };
-
-  useEffect(() => {
-    updateMonthName(currentDate);
-  }, [currentDate]);
 
   const loadReferenceData = async () => {
     try {
@@ -510,7 +593,7 @@ const Reportes = () => {
       success(`Reporte exportado a PDF: ${filename}`);
     } catch (err) {
       console.error("Error exporting to PDF:", err);
-      error("Error al exportar a PDF");
+      error(`Error al exportar a PDF: ${err.message}`);
     } finally {
       setExporting(false);
     }
@@ -560,12 +643,56 @@ const Reportes = () => {
   // Función para calcular comparativos por árbol (General → Concepto → Subconcepto)
   // Solo para árboles de tipo 'ambos' que tienen transacciones de entrada y salida
   const calculateTreeComparison = () => {
-    return calculateTreeComparisonUtil(allTransactions, stats, filters, generals, concepts);
+    return calculateTreeComparisonUtil(
+      allTransactions,
+      stats,
+      filters,
+      generals,
+      concepts,
+      filters.montos === "pagados"
+    );
   };
 
   // Función para obtener el balance de un árbol específico por su nombre completo
   const getTreeBalanceByName = (treeString) => {
     return getTreeBalanceByNameUtil(treeString, calculateTreeComparison);
+  };
+
+  // Abre el modal de detalle de un desglose (general | concepto | subconcepto):
+  // sus transacciones DENTRO del rango seleccionado (y del tipo filtrado),
+  // con monto, pagado y por pagar.
+  const openBreakdownDetail = (level, name) => {
+    const type = getFilteredTransactionType();
+    const parseLocal = (s) => {
+      if (!s) return null;
+      const [y, m, d] = s.split("-").map(Number);
+      return new Date(y, m - 1, d);
+    };
+    const rStart = parseLocal(filters.startDate);
+    const rEnd = parseLocal(filters.endDate);
+    if (rEnd) rEnd.setHours(23, 59, 59, 999);
+
+    const genMap = Object.fromEntries(generals.map((g) => [g.id, g.name]));
+    const conMap = Object.fromEntries(concepts.map((c) => [c.id, c.name]));
+    const subMap = Object.fromEntries(subconcepts.map((s) => [s.id, s.name]));
+    // Los nombres/fallbacks deben coincidir con las claves de *Breakdown en stats.
+    const nameOf = (t) => {
+      if (level === "general") return genMap[t.generalId] || "Sin categoría general";
+      if (level === "concepto") return conMap[t.conceptId] || "Sin concepto";
+      return subMap[t.subconceptId] || "Sin subconcepto";
+    };
+
+    const rows = (transactions || []).filter((t) => {
+      if (type && t.type !== type) return false;
+      if (nameOf(t) !== name) return false;
+      if (rStart && rEnd) {
+        const d = t.date?.toDate ? t.date.toDate() : new Date(t.date);
+        if (isNaN(d.getTime()) || d < rStart || d > rEnd) return false;
+      }
+      return true;
+    });
+
+    setSelectedBreakdownDetail({ level, name, type, transactions: rows });
   };
 
   // Función para verificar si un árbol es de tipo "ambos"
@@ -584,21 +711,18 @@ const Reportes = () => {
       <div className="space-y-6">
         {/* Filters Section */}
         <div className="bg-background rounded-lg border border-border p-6">
-          <div className="flex justify-between items-center mb-4">
+          <div className="mb-4">
             <h2 className="text-xl font-semibold text-foreground flex items-center">
               <ChartBarIcon className="h-5 w-5 mr-2" />
-              Filtros de Reporte: {currentMonthName}
+              Reporte General
             </h2>
-            <AdvancedDateSelector
-              currentDate={currentDate}
-              onDateChange={handleDateChange}
-              onSuccess={success}
-              onError={error}
-            />
+            <p className="text-sm text-muted-foreground mt-1">
+              {reportPeriodLabel}
+            </p>
           </div>
 
-          {/* Primera fila: Rango de fechas + Tipo */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Primera fila: Rango de fechas + Tipo + Estatus */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Date Range */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
@@ -637,6 +761,25 @@ const Reportes = () => {
                 <option value="entrada">Entrada</option>
                 <option value="salida">Salida</option>
               </select>
+            </div>
+
+            {/* Montos Filter */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                Montos
+              </label>
+              <Select
+                value={
+                  montosOptions.find((o) => o.value === filters.montos) ||
+                  montosOptions[0]
+                }
+                onChange={(opt) =>
+                  handleFilterChange("montos", opt?.value || "")
+                }
+                options={montosOptions}
+                styles={selectStyles}
+                isSearchable={false}
+              />
             </div>
           </div>
 
@@ -784,19 +927,88 @@ const Reportes = () => {
         {stats && (() => {
           // Preparar los datos para SummaryCards
           const filteredType = getFilteredTransactionType();
+          const soloPagados = filters.montos === "pagados";
+
+          let entradas;
+          let salidas;
+          let entradasCount;
+          let salidasCount;
+
+          let entradasPorPagar;
+          let salidasPorPagar;
+
+          if (soloPagados) {
+            // Modo "Pagos reales realizados": sumar únicamente lo efectivamente
+            // pagado/registrado en cada transacción (totalPaid), no el monto total.
+            // Además se calcula lo pendiente ("Por pagar") = saldo aún no registrado.
+            // IMPORTANTE: solo transacciones DENTRO del rango seleccionado; se excluye
+            // el arrastre de meses anteriores que agrega getFilteredTransactions.
+            const parseLocal = (s) => {
+              if (!s) return null;
+              const [y, m, d] = s.split("-").map(Number);
+              return new Date(y, m - 1, d);
+            };
+            const rStart = parseLocal(filters.startDate);
+            const rEnd = parseLocal(filters.endDate);
+            if (rEnd) rEnd.setHours(23, 59, 59, 999);
+            const enRango = (t) => {
+              if (!rStart || !rEnd) return true;
+              const d = t.date?.toDate ? t.date.toDate() : new Date(t.date);
+              if (isNaN(d.getTime())) return false;
+              return d >= rStart && d <= rEnd;
+            };
+
+            let pagEntradas = 0;
+            let pagSalidas = 0;
+            let pagEntradasCount = 0;
+            let pagSalidasCount = 0;
+            let pendEntradas = 0;
+            let pendSalidas = 0;
+            (transactions || []).forEach((t) => {
+              if (!enRango(t)) return;
+              const amount = t.amount || 0;
+              const paid = t.totalPaid || 0;
+              const balance =
+                t.balance !== undefined && t.balance !== null
+                  ? t.balance
+                  : amount - paid;
+              const restante = Math.max(0, balance);
+              if (t.type === "entrada") {
+                pagEntradas += paid;
+                pendEntradas += restante;
+                if (paid > 0) pagEntradasCount++;
+              } else if (t.type === "salida") {
+                pagSalidas += paid;
+                pendSalidas += restante;
+                if (paid > 0) pagSalidasCount++;
+              }
+            });
+            entradas = filteredType === "salida" ? 0 : pagEntradas;
+            salidas = filteredType === "entrada" ? 0 : pagSalidas;
+            entradasCount = filteredType === "salida" ? 0 : pagEntradasCount;
+            salidasCount = filteredType === "entrada" ? 0 : pagSalidasCount;
+            entradasPorPagar = filteredType === "salida" ? 0 : pendEntradas;
+            salidasPorPagar = filteredType === "entrada" ? 0 : pendSalidas;
+          } else {
+            // Modo "Todos": montos registrados de las transacciones.
+            entradas = filteredType === "salida" ? 0 : stats.totalEntradas;
+            salidas = filteredType === "entrada" ? 0 : stats.totalSalidas;
+            entradasCount = filteredType === "salida" ? 0 : stats.entradasCount;
+            salidasCount = filteredType === "entrada" ? 0 : stats.salidasCount;
+          }
+
           const summary = {
-            entradas: filteredType === 'salida' ? 0 : stats.totalEntradas,
-            salidas: filteredType === 'entrada' ? 0 : stats.totalSalidas,
-            balance: (filteredType === 'salida' ? 0 : stats.totalEntradas) - (filteredType === 'entrada' ? 0 : stats.totalSalidas),
-            totalTransactions: filteredType === 'entrada' 
-              ? stats.entradasCount 
-              : filteredType === 'salida' 
-                ? stats.salidasCount 
-                : stats.entradasCount + stats.salidasCount,
-            entradasCount: filteredType === 'salida' ? 0 : stats.entradasCount,
-            salidasCount: filteredType === 'entrada' ? 0 : stats.salidasCount
+            entradas,
+            salidas,
+            balance: entradas - salidas,
+            totalTransactions: entradasCount + salidasCount,
+            entradasCount,
+            salidasCount,
+            // Solo en modo "pagos reales": saldo pendiente por registrar (Por pagar)
+            entradasPorPagar,
+            salidasPorPagar,
           };
-          
+
           return <SummaryCards summary={summary} currentMonthName={currentMonthName} />;
         })()}
 
@@ -813,6 +1025,7 @@ const Reportes = () => {
               subconcepts={subconcepts}
               generals={generals}
               providers={providers}
+              soloPagados={filters.montos === "pagados"}
             />
 
             {/* Weekly Breakdown for Entradas - PRIMERO */}
@@ -830,6 +1043,7 @@ const Reportes = () => {
                 formatCurrency={formatCurrency}
                 getTreeBalanceByName={getTreeBalanceByName}
                 isAmboTree={isAmboTree}
+                soloPagados={filters.montos === "pagados"}
               />
             )}
 
@@ -848,11 +1062,13 @@ const Reportes = () => {
                 formatCurrency={formatCurrency}
                 getTreeBalanceByName={getTreeBalanceByName}
                 isAmboTree={isAmboTree}
+                soloPagados={filters.montos === "pagados"}
               />
             )}
 
-            {/* Balance Breakdown */}
-            {(stats.carryoverBalance !== 0 ||
+            {/* Balance Breakdown (oculto temporalmente: SHOW_BALANCE_BREAKDOWN) */}
+            {SHOW_BALANCE_BREAKDOWN &&
+              (stats.carryoverBalance !== 0 ||
               stats.carryoverIncome !== 0 ||
               stats.currentPeriodBalance !== 0) && (
                 <div className="bg-background rounded-lg border border-border p-6">
@@ -1295,7 +1511,14 @@ const Reportes = () => {
                       .map(([general, data]) => (
                         <tr key={general}>
                           <td className="px-6 py-4 text-sm font-medium text-foreground" style={{width: '200px', minWidth: '200px'}}>
-                            <div className="truncate">{general}</div>
+                            <button
+                              onClick={() => openBreakdownDetail("general", general)}
+                              title="Ver transacciones de la categoría general"
+                              className="inline-flex items-center gap-1.5 max-w-full px-2 py-1 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-800 hover:text-blue-900 font-medium transition-colors cursor-pointer border border-blue-300"
+                            >
+                              <EyeIcon className="h-3.5 w-3.5 flex-shrink-0" />
+                              <span className="truncate">{general}</span>
+                            </button>
                           </td>
                           {showIncomeInBreakdown && (
                             <td className={`px-6 py-4 whitespace-nowrap text-sm ${data.entradas === 0 ? 'text-foreground' : 'text-green-600'
@@ -1397,7 +1620,14 @@ const Reportes = () => {
                       .map(([concept, data]) => (
                         <tr key={concept}>
                           <td className="px-6 py-4 text-sm font-medium text-foreground" style={{width: '200px', minWidth: '200px'}}>
-                            <div className="truncate">{concept}</div>
+                            <button
+                              onClick={() => openBreakdownDetail("concepto", concept)}
+                              title="Ver transacciones del concepto"
+                              className="inline-flex items-center gap-1.5 max-w-full px-2 py-1 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-800 hover:text-blue-900 font-medium transition-colors cursor-pointer border border-blue-300"
+                            >
+                              <EyeIcon className="h-3.5 w-3.5 flex-shrink-0" />
+                              <span className="truncate">{concept}</span>
+                            </button>
                           </td>
                           {showIncomeInBreakdown && (
                             <td className={`px-6 py-4 whitespace-nowrap text-sm ${data.entradas === 0 ? 'text-foreground' : 'text-green-600'
@@ -1499,7 +1729,14 @@ const Reportes = () => {
                       .map(([subconcept, data]) => (
                         <tr key={subconcept}>
                           <td className="px-6 py-4 text-sm font-medium text-foreground" style={{width: '200px', minWidth: '200px'}}>
-                            <div className="truncate">{subconcept}</div>
+                            <button
+                              onClick={() => openBreakdownDetail("subconcepto", subconcept)}
+                              title="Ver transacciones del subconcepto"
+                              className="inline-flex items-center gap-1.5 max-w-full px-2 py-1 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-800 hover:text-blue-900 font-medium transition-colors cursor-pointer border border-blue-300"
+                            >
+                              <EyeIcon className="h-3.5 w-3.5 flex-shrink-0" />
+                              <span className="truncate">{subconcept}</span>
+                            </button>
                           </td>
                           {showIncomeInBreakdown && (
                             <td className={`px-6 py-4 whitespace-nowrap text-sm ${data.entradas === 0 ? 'text-foreground' : 'text-green-600'
@@ -1549,8 +1786,224 @@ const Reportes = () => {
             </div>
           )}
 
-        {/* Provider Breakdown (for salidas) */}
-        {stats && getFilteredTransactionType() === 'salida' && Object.keys(stats.providerBreakdown).length > 0 && (
+        {/* Modal de Detalle de Subconcepto */}
+        {selectedBreakdownDetail && (() => {
+          const rows = selectedBreakdownDetail.transactions || [];
+          const isEntrada = selectedBreakdownDetail.type === "entrada";
+          const levelLabel =
+            selectedBreakdownDetail.level === "general"
+              ? "Categoría General"
+              : selectedBreakdownDetail.level === "concepto"
+              ? "Concepto"
+              : "Subconcepto";
+          const montoDe = (t) => t.amount || 0;
+          const pagadoDe = (t) => t.totalPaid || 0;
+          const porPagarDe = (t) => {
+            const bal =
+              t.balance !== undefined && t.balance !== null
+                ? t.balance
+                : (t.amount || 0) - (t.totalPaid || 0);
+            return Math.max(0, bal);
+          };
+          const totMonto = rows.reduce((s, t) => s + montoDe(t), 0);
+          const totPagado = rows.reduce((s, t) => s + pagadoDe(t), 0);
+          const totPorPagar = rows.reduce((s, t) => s + porPagarDe(t), 0);
+          const providerName = (t) =>
+            t.providerName ||
+            providers.find((p) => p.id === t.providerId)?.name ||
+            "N/A";
+
+          // Columnas de contexto según el nivel: en General se muestran Concepto y
+          // Subconcepto; en Concepto se muestra Subconcepto (para no perder al usuario).
+          const conMap = Object.fromEntries(concepts.map((c) => [c.id, c.name]));
+          const subMap = Object.fromEntries(subconcepts.map((s) => [s.id, s.name]));
+          const showConcepto = selectedBreakdownDetail.level === "general";
+          const showSubconcepto =
+            selectedBreakdownDetail.level === "general" ||
+            selectedBreakdownDetail.level === "concepto";
+
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div
+                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                onClick={() => setSelectedBreakdownDetail(null)}
+              />
+              <div className="relative bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden">
+                <div
+                  className={`px-6 py-4 rounded-t-xl bg-gradient-to-r ${
+                    isEntrada
+                      ? "from-green-600 to-emerald-700"
+                      : "from-red-500 to-red-700"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold text-white">
+                        Detalle de {levelLabel}
+                      </h3>
+                      <p className="text-white/90 text-sm mt-0.5">
+                        {selectedBreakdownDetail.name} • {reportPeriodLabel}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setSelectedBreakdownDetail(null)}
+                      className="p-1 rounded-lg hover:bg-white/20 transition-colors"
+                    >
+                      <XMarkIcon className="h-6 w-6 text-white" />
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  className="overflow-y-auto"
+                  style={{ maxHeight: "calc(90vh - 160px)" }}
+                >
+                  <div className="px-6 py-4">
+                    {rows.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-100 sticky top-0">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                Fecha
+                              </th>
+                              {showConcepto && (
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                  Concepto
+                                </th>
+                              )}
+                              {showSubconcepto && (
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                  Subconcepto
+                                </th>
+                              )}
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                Monto
+                              </th>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                Pagado
+                              </th>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                Por Pagar
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                Descripción
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                Proveedor
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {rows
+                              .slice()
+                              .sort((a, b) => {
+                                const da = a.date?.toDate
+                                  ? a.date.toDate()
+                                  : new Date(a.date);
+                                const db = b.date?.toDate
+                                  ? b.date.toDate()
+                                  : new Date(b.date);
+                                return db - da;
+                              })
+                              .map((t, i) => {
+                                const d = t.date?.toDate
+                                  ? t.date.toDate()
+                                  : new Date(t.date);
+                                return (
+                                  <tr key={t.id || i} className="hover:bg-gray-50">
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                      {d.toLocaleDateString("es-MX", {
+                                        day: "2-digit",
+                                        month: "short",
+                                        year: "numeric",
+                                      })}
+                                    </td>
+                                    {showConcepto && (
+                                      <td className="px-4 py-3 text-sm text-gray-900">
+                                        {conMap[t.conceptId] || "—"}
+                                      </td>
+                                    )}
+                                    {showSubconcepto && (
+                                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                                        {subMap[t.subconceptId] || "—"}
+                                      </td>
+                                    )}
+                                    <td
+                                      className={`px-4 py-3 whitespace-nowrap text-sm text-right font-semibold ${
+                                        isEntrada ? "text-green-600" : "text-red-600"
+                                      }`}
+                                    >
+                                      {formatCurrency(montoDe(t))}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-blue-600">
+                                      {formatCurrency(pagadoDe(t))}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-orange-600">
+                                      {formatCurrency(porPagarDe(t))}
+                                    </td>
+                                    <td
+                                      className="px-4 py-3 text-sm text-gray-900 max-w-xs truncate"
+                                      title={t.description || "Sin descripción"}
+                                    >
+                                      {t.description || "Sin descripción"}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                      {providerName(t)}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-gray-100 font-bold border-t-2 border-gray-300">
+                              <td className="px-4 py-3 text-sm text-gray-800">
+                                Totales
+                              </td>
+                              {showConcepto && <td className="px-4 py-3"></td>}
+                              {showSubconcepto && <td className="px-4 py-3"></td>}
+                              <td
+                                className={`px-4 py-3 text-sm text-right ${
+                                  isEntrada ? "text-green-700" : "text-red-700"
+                                }`}
+                              >
+                                {formatCurrency(totMonto)}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-right text-blue-700">
+                                {formatCurrency(totPagado)}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-right text-orange-700">
+                                {formatCurrency(totPorPagar)}
+                              </td>
+                              <td className="px-4 py-3"></td>
+                              <td className="px-4 py-3"></td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <p className="text-sm">
+                          No hay transacciones en este subconcepto para el período
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="px-6 py-3 bg-gray-50 border-t border-gray-200 rounded-b-xl">
+                  <div className="text-xs text-gray-600 text-center">
+                    Mostrando <strong>{rows.length}</strong> transacciones •{" "}
+                    {selectedBreakdownDetail.name}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Provider Breakdown (entradas o salidas según el tipo filtrado) */}
+        {stats && getFilteredTransactionType() && Object.keys(stats.providerBreakdown).length > 0 && (
           <div className="bg-background rounded-lg border border-border p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-foreground">
@@ -1581,18 +2034,20 @@ const Reportes = () => {
                       Transacciones
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      % de Salidas
+                      {getFilteredTransactionType() === 'entrada' ? '% de Entradas' : '% de Salidas'}
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-background divide-y divide-border">
                   {Object.entries(stats.providerBreakdown).map(
-                    ([provider, data]) => (
+                    ([provider, data]) => {
+                      const isEntrada = getFilteredTransactionType() === 'entrada';
+                      return (
                       <tr key={provider}>
                         <td className="px-6 py-4 text-sm font-medium text-foreground" style={{width: '200px', minWidth: '200px'}}>
                           <div className="truncate">{provider}</div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
+                        <td className={`px-6 py-4 whitespace-nowrap text-sm ${isEntrada ? 'text-green-600' : 'text-red-600'}`}>
                           {formatCurrency(data.amount)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
@@ -1604,11 +2059,12 @@ const Reportes = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                           {data.count}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">
-                          {formatPercentage(data.amount, stats.totalSalidas)}
+                        <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${isEntrada ? 'text-green-600' : 'text-red-600'}`}>
+                          {formatPercentage(data.amount, isEntrada ? stats.totalEntradas : stats.totalSalidas)}
                         </td>
                       </tr>
-                    )
+                      );
+                    }
                   )}
                 </tbody>
               </table>

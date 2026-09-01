@@ -14,7 +14,11 @@ const TreeComparisonSection = ({
   subconcepts,
   generals,
   providers = [],
+  soloPagados = false,
 }) => {
+  // En modo "pagos reales", cada transacción vale lo efectivamente pagado (totalPaid).
+  const montoTransaccion = (t) =>
+    soloPagados ? t.totalPaid || 0 : t.amount || 0;
   const [selectedTreeTransactions, setSelectedTreeTransactions] = useState(null);
 
   const providerNameMap = useMemo(
@@ -241,7 +245,7 @@ const TreeComparisonSection = ({
         // Calcular saldo acumulado para cada transacción
         let runningBalance = 0;
         const transactionsWithBalance = sortedTransactions.map(transaction => {
-          const amount = transaction.amount || 0;
+          const amount = montoTransaccion(transaction);
           if (transaction.type === 'entrada') {
             runningBalance += amount;
           } else if (transaction.type === 'salida') {
@@ -394,7 +398,7 @@ const TreeComparisonSection = ({
                               <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-semibold ${
                                 transaction.type === 'entrada' ? 'text-green-600' : 'text-red-600'
                               }`}>
-                                {transaction.type === 'entrada' ? '+' : '-'}{formatCurrency(transaction.amount || 0)}
+                                {transaction.type === 'entrada' ? '+' : '-'}{formatCurrency(montoTransaccion(transaction))}
                               </td>
                               <td className="px-4 py-3 text-sm text-gray-900 max-w-xs truncate" title={transaction.description || 'Sin descripción'}>
                                 {transaction.description || 'Sin descripción'}
