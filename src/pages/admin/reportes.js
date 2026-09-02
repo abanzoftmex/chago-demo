@@ -291,7 +291,7 @@ const Reportes = () => {
       // console.log(`Calculando arrastre manualmente para ${month}/${year}`);
       
       // Calcular y guardar el arrastre
-      const carryoverData = await carryoverService.calculateAndSaveCarryover(year, month);
+      const carryoverData = await carryoverService.calculateAndSaveCarryover(year, month, tenantId);
       
       success(`Arrastre calculado: ${carryoverData.saldoArrastre.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })} para ${month}/${year}`);
       
@@ -356,7 +356,7 @@ const Reportes = () => {
         if (filterYear === currentYear && filterMonth === currentMonth) {
           // console.log('Verificando cálculo de arrastre automático para el mes actual...');
           try {
-            const carryoverResult = await reportService.checkAndCalculateCarryoverIfNeeded();
+            const carryoverResult = await reportService.checkAndCalculateCarryoverIfNeeded(tenantId);
             if (carryoverResult.calculated) {
               // console.log('✅ Arrastre calculado automáticamente:', carryoverResult.message);
             } else if (carryoverResult.error) {
@@ -484,7 +484,7 @@ const Reportes = () => {
 
         // console.log(`checkCarryoverStatus: startDate=${startDateStr}, year=${year}, month=${month}`);
 
-        const status = await reportService.getCarryoverStatus(year, month);
+        const status = await reportService.getCarryoverStatus(year, month, tenantId);
         // console.log(`checkCarryoverStatus: status recibido:`, status);
 
         setCarryoverStatus(status);
@@ -499,7 +499,7 @@ const Reportes = () => {
         data: null
       });
     }
-  }, [filters.startDate]);
+  }, [filters.startDate, tenantId]);
 
   // useEffect para generar reporte cuando cambian los filtros
   // Debe estar después de las definiciones de generateReport y loadCarryoverInfo

@@ -237,7 +237,7 @@ export const reportService = {
           // Si estamos viendo octubre, buscamos el arrastre calculado PARA octubre (desde septiembre)
 
           // console.log(`🔍 Buscando arrastre calculado PARA ${month}/${year}`);
-          monthlyCarryover = await carryoverService.getCarryoverForMonth(year, month);
+          monthlyCarryover = await carryoverService.getCarryoverForMonth(year, month, tenantId);
           // console.log('📊 Resultado de carryover desde registro:', monthlyCarryover);
 
           if (monthlyCarryover && monthlyCarryover.saldoArrastre > 0) {
@@ -1152,9 +1152,9 @@ export const reportService = {
   },
 
   // Procesar el arrastre mensual de saldos (manual)
-  async processMonthlyCarryover(user) {
+  async processMonthlyCarryover(user, tenantId) {
     try {
-      return await carryoverService.processMonthlyCarryover(user);
+      return await carryoverService.processMonthlyCarryover(user, tenantId);
     } catch (error) {
       console.error('Error processing monthly carryover:', error);
       throw new Error('Error al procesar el arrastre mensual');
@@ -1162,9 +1162,9 @@ export const reportService = {
   },
 
   // Verificar y calcular arrastre automáticamente si es necesario
-  async checkAndCalculateCarryoverIfNeeded() {
+  async checkAndCalculateCarryoverIfNeeded(tenantId) {
     try {
-      return await carryoverService.checkAndCalculateCarryoverIfNeeded();
+      return await carryoverService.checkAndCalculateCarryoverIfNeeded(tenantId);
     } catch (error) {
       console.error('Error checking carryover:', error);
       // No lanzar error para no romper la carga de reportes
@@ -1176,9 +1176,9 @@ export const reportService = {
   },
 
   // Obtener información del arrastre para un mes específico
-  async getCarryoverInfo(year, month) {
+  async getCarryoverInfo(year, month, tenantId) {
     try {
-      return await carryoverService.getCarryoverForMonth(year, month);
+      return await carryoverService.getCarryoverForMonth(year, month, tenantId);
     } catch (error) {
       console.error('Error getting carryover info:', error);
       throw new Error('Error al obtener información del arrastre');
@@ -1186,9 +1186,9 @@ export const reportService = {
   },
 
   // Obtener el estado del arrastre (si ya fue ejecutado, etc.)
-  async getCarryoverStatus(year, month) {
+  async getCarryoverStatus(year, month, tenantId) {
     try {
-      return await carryoverService.getCarryoverStatus(year, month);
+      return await carryoverService.getCarryoverStatus(year, month, tenantId);
     } catch (error) {
       console.error('Error getting carryover status:', error);
       return {

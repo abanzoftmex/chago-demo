@@ -18,11 +18,22 @@ import { transactionService } from "./transactionService";
 import { generalService } from "./generalService";
 import { conceptService } from "./conceptService";
 
-const COLLECTION_NAME = "monthly_carryover";
+/**
+ * El arrastre vive DENTRO del tenant.
+ *
+ * Estaba en una coleccion raiz `monthly_carryover` con clave `YYYY-MM` a
+ * secas: un solo documento para todos los tenants, que ademas se suma al
+ * balance total del reporte y sale impreso en el PDF. Cualquiera que abriera
+ * Reportes lo recalculaba y el numero pasaba a verse en los demas.
+ */
+const carryoverPath = (tenantId) => {
+  if (!tenantId) throw new Error("Tenant ID es requerido para el arrastre mensual");
+  return `tenants/${tenantId}/monthly_carryover`;
+};
 
 export const carryoverService = {
   // Calcular y guardar el arrastre del mes anterior
-  async calculateAndSaveCarryover(year, month) {
+  async calculateAndSaveCarryover(year, month, tenantId) {
     try {
       // Obtener el mes anterior
       const prevMonth = month === 1 ? 12 : month - 1;
@@ -36,7 +47,7 @@ export const carryoverService = {
       console.log(`Rango: ${startDate.toISOString()} - ${endDate.toISOString()}`);
 
       // Obtener todas las transacciones del mes anterior usando el mismo método que los reportes
-      const transactions = await transactionService.getByDateRange(startDate, endDate);
+      const transactions = await transactionService.getByDateRange(startDate, endDate, {}, tenantId);
       
       console.log(`🔍 ARRASTRE: Transacciones obtenidas del ${startDate.toISOString().split('T')[0]} al ${endDate.toISOString().split('T')[0]}: ${transactions.length}`);
 
@@ -60,7 +71,7 @@ export const carryoverService = {
       // Obtener el arrastre que tenía el mes anterior (si existía)
       let arrastePrevio = 0;
       try {
-        const prevCarryover = await this.getCarryoverForMonth(prevYear, prevMonth);
+        const prevCarryover = await this.getCarryoverForMonth(prevYear, prevMonth, tenantId);
         if (prevCarryover && prevCarryover.saldoArrastre > 0) {
           arrastePrevio = prevCarryover.saldoArrastre;
           console.log(`Arrastre previo encontrado para ${prevMonth}/${prevYear}: ${arrastePrevio}`);
@@ -95,7 +106,7 @@ export const carryoverService = {
 
       // Guardar en Firestore usando un ID único basado en año y mes
       const docId = `${year}-${month.toString().padStart(2, '0')}`;
-      await setDoc(doc(db, COLLECTION_NAME, docId), carryoverData);
+      await setDoc(doc(db, carryoverPath(tenantId), docId), carryoverData);
 
       console.log(`Arrastre guardado para ${month}/${year}: ${saldoArrastre > 0 ? saldoArrastre : 0}`);
 
@@ -107,12 +118,12 @@ export const carryoverService = {
   },
 
   // Obtener el arrastre de un mes específico
-  async getCarryoverForMonth(year, month) {
+  async getCarryoverForMonth(year, month, tenantId) {
     try {
       const docId = `${year}-${month.toString().padStart(2, '0')}`;
       console.log(`🔍 Buscando documento de arrastre: ${docId}`);
       
-      const docRef = doc(db, COLLECTION_NAME, docId);
+      const docRef = doc(db, carryoverPath(tenantId), docId);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
@@ -130,7 +141,7 @@ export const carryoverService = {
   },
 
   // Inicializar el sistema de arrastre (para el mes actual)
-  async initializeCarryoverSystem() {
+  async initializeCarryoverSystem(tenantId) {
     try {
       const now = new Date();
       const currentYear = now.getFullYear();
@@ -139,7 +150,7 @@ export const carryoverService = {
       console.log(`Inicializando sistema de arrastre para ${currentMonth}/${currentYear}`);
 
       // Verificar si ya existe el arrastre para el mes actual
-      const existingCarryover = await this.getCarryoverForMonth(currentYear, currentMonth);
+      const existingCarryover = await this.getCarryoverForMonth(currentYear, currentMonth, tenantId);
       
       if (existingCarryover) {
         console.log(`Ya existe arrastre para ${currentMonth}/${currentYear}:`, existingCarryover.saldoArrastre);
@@ -147,7 +158,7 @@ export const carryoverService = {
       }
 
       // Calcular y guardar el arrastre del mes anterior al actual
-      const carryoverData = await this.calculateAndSaveCarryover(currentYear, currentMonth);
+      const carryoverData = await this.calculateAndSaveCarryover(currentYear, currentMonth, tenantId);
       
       return carryoverData;
     } catch (error) {
@@ -157,10 +168,10 @@ export const carryoverService = {
   },
 
   // Obtener todos los arrastres históricos
-  async getAllCarryovers() {
+  async getAllCarryovers(tenantId) {
     try {
       const q = query(
-        collection(db, COLLECTION_NAME),
+        collection(db, carryoverPath(tenantId)),
         orderBy("year", "desc"),
         orderBy("month", "desc")
       );
@@ -180,11 +191,11 @@ export const carryoverService = {
   },
 
   // Verificar si ya existe una transacción de arrastre para un mes específico
-  async carryoverTransactionExists(year, month) {
+  async carryoverTransactionExists(year, month, tenantId) {
     try {
       const transactions = await transactionService.getAll({
-        type: 'entrada'
-      });
+        type: "entrada"
+      }, tenantId);
 
       // Buscar transacciones de arrastre para el mes específico
       const carryoverExists = transactions.some(transaction => {
@@ -202,7 +213,7 @@ export const carryoverService = {
   },
 
   // Crear un ingreso de arrastre para el mes actual
-  async createCarryoverIncomeTransaction(carryoverAmount, previousYear, previousMonth, user) {
+  async createCarryoverIncomeTransaction(carryoverAmount, previousYear, previousMonth, user, tenantId) {
     try {
       if (carryoverAmount <= 0) {
         console.log("No hay saldo positivo para arrastrar");
@@ -214,14 +225,14 @@ export const carryoverService = {
       const currentMonth = now.getMonth() + 1;
 
       // Verificar si ya existe una transacción de arrastre para este mes
-      const exists = await this.carryoverTransactionExists(currentYear, currentMonth);
+      const exists = await this.carryoverTransactionExists(currentYear, currentMonth, tenantId);
       if (exists) {
         throw new Error(`Ya existe una transacción de arrastre para ${currentMonth}/${currentYear}`);
       }
 
       // Crear o obtener los conceptos especiales para arrastre
-      const carryoverGeneral = await this.getOrCreateCarryoverGeneral();
-      const carryoverConcept = await this.getOrCreateCarryoverConcept();
+      const carryoverGeneral = await this.getOrCreateCarryoverGeneral(tenantId);
+      const carryoverConcept = await this.getOrCreateCarryoverConcept(tenantId);
 
       const prevMonthName = new Date(previousYear, previousMonth - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
 
@@ -243,7 +254,7 @@ export const carryoverService = {
         status: 'confirmado'
       };
 
-      const transaction = await transactionService.create(transactionData, user);
+      const transaction = await transactionService.create(transactionData, user, tenantId);
       
       console.log(`Transacción de arrastre creada: ${carryoverAmount} de ${previousMonth}/${previousYear}`);
       
@@ -255,10 +266,10 @@ export const carryoverService = {
   },
 
   // Obtener o crear la categoría general para arrastre
-  async getOrCreateCarryoverGeneral() {
+  async getOrCreateCarryoverGeneral(tenantId) {
     try {
       // Buscar si ya existe
-      const generals = await generalService.getAll();
+      const generals = await generalService.getAll(tenantId);
       let carryoverGeneral = generals.find(g => g.name === 'Arrastre de Saldo' && g.type === 'entrada');
       
       if (!carryoverGeneral) {
@@ -268,7 +279,7 @@ export const carryoverService = {
           type: 'entrada',
           description: 'Categoría para ingresos de arrastre de saldo de meses anteriores',
           isSystem: true
-        });
+        }, tenantId);
         console.log('Categoría general de arrastre creada:', carryoverGeneral.id);
       }
       
@@ -280,10 +291,10 @@ export const carryoverService = {
   },
 
   // Obtener o crear el concepto para arrastre
-  async getOrCreateCarryoverConcept() {
+  async getOrCreateCarryoverConcept(tenantId) {
     try {
       // Buscar si ya existe
-      const concepts = await conceptService.getAll();
+      const concepts = await conceptService.getAll(tenantId);
       let carryoverConcept = concepts.find(c => c.name === 'Saldo Arrastrado');
       
       if (!carryoverConcept) {
@@ -292,7 +303,7 @@ export const carryoverService = {
           name: 'Saldo Arrastrado',
           description: 'Concepto para ingresos de saldo arrastrado del mes anterior',
           isSystem: true
-        });
+        }, tenantId);
         console.log('Concepto de arrastre creado:', carryoverConcept.id);
       }
       
@@ -304,10 +315,10 @@ export const carryoverService = {
   },
 
   // Ejecutar proceso completo de arrastre para el mes actual
-  async processMonthlyCarryover(user) {
+  async processMonthlyCarryover(user, tenantId) {
     try {
       // Inicializar el sistema de arrastre
-      const carryoverData = await this.initializeCarryoverSystem();
+      const carryoverData = await this.initializeCarryoverSystem(tenantId);
       
       // Si hay saldo positivo, crear la transacción de ingreso
       let carryoverTransaction = null;
@@ -316,7 +327,8 @@ export const carryoverService = {
           carryoverData.saldoArrastre, 
           carryoverData.previousYear,
           carryoverData.previousMonth,
-          user
+          user,
+          tenantId
         );
       }
 
@@ -334,7 +346,7 @@ export const carryoverService = {
   },
 
   // Verificar y calcular arrastre automáticamente si es necesario para el mes actual
-  async checkAndCalculateCarryoverIfNeeded() {
+  async checkAndCalculateCarryoverIfNeeded(tenantId) {
     try {
       const now = new Date();
       const currentYear = now.getFullYear();
@@ -343,7 +355,7 @@ export const carryoverService = {
       console.log(`🔍 Verificando arrastre para ${currentMonth}/${currentYear}...`);
 
       // Verificar si ya existe el cálculo del arrastre para este mes
-      let carryoverData = await this.getCarryoverForMonth(currentYear, currentMonth);
+      let carryoverData = await this.getCarryoverForMonth(currentYear, currentMonth, tenantId);
       
       if (carryoverData) {
         console.log(`✅ Arrastre ya calculado para ${currentMonth}/${currentYear}:`, carryoverData.saldoArrastre);
@@ -355,7 +367,7 @@ export const carryoverService = {
       } else {
         // Calcular el arrastre por primera vez
         console.log(`🧮 Calculando arrastre para ${currentMonth}/${currentYear} por primera vez...`);
-        carryoverData = await this.calculateAndSaveCarryover(currentYear, currentMonth);
+        carryoverData = await this.calculateAndSaveCarryover(currentYear, currentMonth, tenantId);
         
         return {
           calculated: true,
@@ -374,10 +386,10 @@ export const carryoverService = {
   },
 
   // Obtener información del arrastre incluyendo su estado
-  async getCarryoverStatus(year, month) {
+  async getCarryoverStatus(year, month, tenantId) {
     try {
       console.log(`🔍 getCarryoverStatus: Verificando arrastre para ${month}/${year}`);
-      const carryoverData = await this.getCarryoverForMonth(year, month);
+      const carryoverData = await this.getCarryoverForMonth(year, month, tenantId);
       
       console.log(`📊 getCarryoverStatus: Resultado carryoverData:`, carryoverData);
       

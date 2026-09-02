@@ -123,6 +123,11 @@ await t(G2, "ajeno al tenant NO lee sus transacciones", () => assertFails(getDoc
 await t(G2, "anónimo NO lee nada del tenant", () => assertFails(getDocs(collection(anon, `tenants/${T}/transacciones`))));
 await t(G2, "anónimo NO lee el documento del tenant", () => assertFails(getDoc(doc(anon, "tenants", T))));
 await t(G2, "miembro lee su propio tenant", () => assertSucceeds(getDoc(doc(asViewer, "tenants", T))));
+// El arrastre pasa a vivir dentro del tenant. La coleccion raiz queda cerrada.
+await t(G2, "contador escribe el arrastre de SU tenant", () => assertSucceeds(setDoc(doc(asConta, `tenants/${T}/monthly_carryover`, "2026-09"), { saldoArrastre: 100 })));
+await t(G2, "viewer lee el arrastre pero NO lo escribe", () => assertFails(setDoc(doc(asViewer, `tenants/${T}/monthly_carryover`, "2026-09"), { saldoArrastre: 1 })));
+await t(G2, "ajeno al tenant NO lee su arrastre", () => assertFails(getDoc(doc(asOutsider, `tenants/${T}/monthly_carryover`, "2026-09"))));
+await t(G2, "la coleccion raiz de arrastre queda cerrada a todos", () => assertFails(getDoc(doc(asAdmin, "monthly_carryover", "2026-09"))));
 await t(G2, "usuario lee su propio doc de users", () => assertSucceeds(getDoc(doc(asAdmin, "users", ADMIN))));
 
 // ── Grupo 3: lo que se rompe al desplegar ───────────────────────────────

@@ -7,12 +7,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { year, month } = req.query;
+    const { year, month, tenantId } = req.query;
     
-    if (!year || !month) {
+    if (!year || !month || !tenantId) {
       return res.status(400).json({ 
-        message: 'Se requieren parámetros year y month',
-        example: '/api/debug/carryover-info?year=2025&month=10'
+        message: 'Se requieren parámetros year, month y tenantId',
+        example: '/api/debug/carryover-info?year=2025&month=10&tenantId=abc'
       });
     }
 
@@ -22,7 +22,7 @@ export default async function handler(req, res) {
     console.log(`🔍 DEBUG: Obteniendo información de arrastre para ${monthInt}/${yearInt}`);
 
     // 1. Obtener el arrastre registrado para este mes
-    const carryoverData = await carryoverService.getCarryoverForMonth(yearInt, monthInt);
+    const carryoverData = await carryoverService.getCarryoverForMonth(yearInt, monthInt, tenantId);
     
     // 2. Obtener todas las transacciones del mes anterior para verificar cálculo
     const prevMonth = monthInt === 1 ? 12 : monthInt - 1;
@@ -31,7 +31,7 @@ export default async function handler(req, res) {
     const startDate = new Date(prevYear, prevMonth - 1, 1);
     const endDate = new Date(prevYear, prevMonth, 0);
     
-    const prevMonthTransactions = await transactionService.getByDateRange(startDate, endDate);
+    const prevMonthTransactions = await transactionService.getByDateRange(startDate, endDate, {}, tenantId);
     
     // 3. Calcular totales del mes anterior manualmente
     let totalIngresos = 0;
@@ -53,7 +53,7 @@ export default async function handler(req, res) {
     // 4. Obtener arrastre del mes anterior al anterior
     let arrastePrevio = 0;
     try {
-      const prevCarryover = await carryoverService.getCarryoverForMonth(prevYear, prevMonth);
+      const prevCarryover = await carryoverService.getCarryoverForMonth(prevYear, prevMonth, tenantId);
       if (prevCarryover && prevCarryover.saldoArrastre > 0) {
         arrastePrevio = prevCarryover.saldoArrastre;
       }
@@ -67,7 +67,7 @@ export default async function handler(req, res) {
     // 6. Obtener gastos pendientes actuales
     const currentStartDate = new Date(yearInt, monthInt - 1, 1);
     const currentEndDate = new Date(yearInt, monthInt, 0);
-    const currentTransactions = await transactionService.getByDateRange(currentStartDate, currentEndDate);
+    const currentTransactions = await transactionService.getByDateRange(currentStartDate, currentEndDate, {}, tenantId);
     
     let gastosPendientesActuales = 0;
     currentTransactions.forEach(transaction => {

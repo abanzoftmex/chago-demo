@@ -245,6 +245,16 @@ service cloud.firestore {
         allow write: if isAdminOfTenant(tenantId);
       }
 
+      // ===== SUBCOLECCIÓN: ARRASTRE MENSUAL =====
+      //
+      // Un documento por mes, con clave "{year}-{month}". Lo escribe el cron
+      // mensual con Admin SDK, y la pantalla de Reportes puede recalcularlo,
+      // así que los mismos roles que gestionan datos pueden escribirlo.
+      match /monthly_carryover/{mesId} {
+        allow read: if canReadTenantData(tenantId);
+        allow write: if canManageDataInTenant(tenantId);
+      }
+
       // ===== SUBCOLECCIÓN: LOGS =====
 
       // logService.js — getLogsCollection(tenantId) -> tenants/{tenantId}/logs
@@ -294,19 +304,18 @@ service cloud.firestore {
       allow write: if isAuthenticated() && !hasUserTenant();
     }
 
-    // ===== ARRASTRE MENSUAL (monthly_carryover) =====
+    // ===== ARRASTRE MENSUAL, LEGACY EN LA RAÍZ =====
     //
-    // OJO: esta colección NO está particionada por tenant en el modelo de
-    // datos (carryoverService.js guarda el doc como "{year}-{month}", sin
-    // ningún campo de tenant) — hoy TODOS los tenants comparten el mismo
-    // documento de arrastre para un mes dado. Esto es un hallazgo aparte,
-    // de diseño de datos, no algo que una regla de Firestore pueda arreglar
-    // por sí sola sin cambiar cómo se guarda. Mientras tanto, esta regla
-    // solo exige estar autenticado y pertenecer a algún tenant — es la
-    // mejor barrera posible sin tocar el modelo, y ya es muchísimo mejor
-    // que "cualquiera en internet" que es lo que hay publicado hoy.
+    // El arrastre vive ahora DENTRO de cada tenant (ver la regla de
+    // `tenants/{tenantId}/monthly_carryover`, más arriba). Estaba aquí, en una
+    // colección raíz con clave "{year}-{month}" a secas: un único documento
+    // para todos los tenants, que además se suma al balance total del reporte
+    // y sale impreso en el PDF de cada uno.
+    //
+    // La colección se cierra en vez de borrarse: los documentos que quedan son
+    // de la etapa anterior y ya no los lee nadie.
     match /monthly_carryover/{docId} {
-      allow read, write: if isAuthenticated() && hasUserTenant();
+      allow read, write: if false;
     }
 
     // ===== REGLAS ADICIONALES DE SEGURIDAD =====
