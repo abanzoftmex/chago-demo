@@ -20,6 +20,11 @@
 
 import admin, { assertAdminInitialized } from "../../../lib/firebase/firebaseAdmin";
 import { verifyPosIntegrationToken, extractBearerToken } from "../../../lib/server/posIntegrationService";
+import {
+  findPosTransactionByExternalId,
+  posTransactionBase,
+  POS_KIND_SALE,
+} from "../../../lib/server/posTransactionWriter";
 import crypto from "crypto";
 
 export const config = {
@@ -95,34 +100,27 @@ export default async function handler(req, res) {
     const db = admin.firestore();
     const transaccionesRef = db.collection(`tenants/${chagoTenantId}/transacciones`);
 
-    // Idempotencia: una venta ya recibida antes no se duplica.
-    const existing = await transaccionesRef.where("externalId", "==", String(externalId)).limit(1).get();
-    if (!existing.empty) {
-      return res.status(200).json({ chagoTransactionId: existing.docs[0].id, alreadyExisted: true });
+    // Idempotencia: una venta ya recibida antes no se duplica. La colección la
+    // comparten ventas y compras, así que un `externalId` repetido que
+    // pertenezca al otro flujo es una colisión de identificadores, no un
+    // reintento — devolver el id de una compra aquí perdería la venta.
+    const existing = await findPosTransactionByExternalId(db, chagoTenantId, externalId);
+    if (existing) {
+      if ((existing.data().posKind || POS_KIND_SALE) !== POS_KIND_SALE) {
+        return res.status(409).json({ error: "Ese externalId ya lo usa otro movimiento del punto de venta" });
+      }
+      return res.status(200).json({ chagoTransactionId: existing.id, alreadyExisted: true });
     }
 
     const amountNum = parseFloat(amount);
-    const now = admin.firestore.FieldValue.serverTimestamp();
     const transactionData = {
+      ...posTransactionBase({ amount: amountNum, externalId, date, posKind: POS_KIND_SALE }),
       type: "entrada",
       generalId: integration.generalId,
       conceptId: integration.conceptId,
       subconceptId,
       description: description || `Venta POS · Folio ${folio || externalId}`,
-      amount: amountNum,
-      date: date ? new Date(date) : new Date(),
-      providerId: "",
-      status: "pagado",
-      payments: [],
-      totalPaid: amountNum,
-      balance: 0,
-      externalId: String(externalId),
       externalFolio: folio || null,
-      origen: "pos_sync",
-      locked: true,
-      voided: false,
-      createdAt: now,
-      updatedAt: now,
     };
 
     const docRef = await transaccionesRef.add(transactionData);

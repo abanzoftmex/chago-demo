@@ -291,12 +291,13 @@ const Historial = () => {
           transactionsData = await transactionService.getByDateRange(
             startDate,
             endDate,
-            appliedFilters,
+            { ...appliedFilters, includeVoided: true },
             tenantId
           );
         } else {
           transactionsData = await transactionService.getAll({
             ...appliedFilters,
+            includeVoided: true,
             limit: ITEMS_PER_PAGE * 10,
           }, tenantId);
         }
@@ -500,13 +501,23 @@ const Historial = () => {
       (name) => name && name !== "N/A"
     );
 
-    // Verificar si el general es de tipo "ambos"
+    // Lo que vino del punto de venta se marca como tal y no como "Árbol
+    // Mixto": su General es 'ambos' porque cuelga ventas y compras a la vez,
+    // así que sin esto TODAS las ventas del POS —incluidas las de hace meses—
+    // aparecerían de golpe con esa etiqueta, que además no dice nada útil. De
+    // dónde salió la fila sí lo dice.
+    const isFromPos = transaction.origen === "pos_sync";
     const general = generals.find((g) => g.id === transaction.generalId);
-    const isAmboTree = general?.type === "ambos";
+    const isAmboTree = !isFromPos && general?.type === "ambos";
 
     return (
       <div>
         <ConceptHierarchyStacked levels={levels} />
+        {isFromPos && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mt-1">
+            Punto de venta
+          </span>
+        )}
         {isAmboTree && (
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 mt-1">
             Árbol Mixto
@@ -974,7 +985,7 @@ const Historial = () => {
                         </td> */}
                         <td className="px-4 py-3 whitespace-nowrap text-xs">
                           <div className="flex flex-col gap-0.5">
-                            <span className="font-semibold text-gray-900">{formatCurrency(transaction.amount)}</span>
+                            <span className={`font-semibold text-gray-900 ${transaction.voided ? "line-through opacity-60" : ""}`}>{formatCurrency(transaction.amount)}</span>{transaction.voided && (<span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-700">Anulada</span>)}
                             {(transaction.status === "parcial" || transaction.status === "pagado") && getPaidAmount(transaction) > 0 && (
                               <span className="text-xs text-green-700 bg-green-50 border border-green-200 rounded px-1.5 py-0.5">
                                 Pagado: {formatCurrency(getPaidAmount(transaction))}

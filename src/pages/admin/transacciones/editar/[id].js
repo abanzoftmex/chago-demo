@@ -49,7 +49,7 @@ const EditTransaction = () => {
       }
 
       if (transactionData.locked) {
-        toast.error("Esta entrada viene del punto de venta y no se puede editar aquí");
+        toast.error("Esta transacción viene del punto de venta y no se puede editar aquí");
         router.push(`/admin/transacciones/detalle/${id}`);
         return;
       }

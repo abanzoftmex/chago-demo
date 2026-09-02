@@ -10,6 +10,11 @@
  * idempotente: si ya existen de una activación anterior, los reusa en vez de
  * duplicarlos.
  *
+ * NO crea la rama de compras: esa se construye sola la primera vez que llega
+ * una compra (ver el comentario al final de este archivo y
+ * `posCatalog.ensurePurchaseBranch`). Activar el vínculo no debe cambiarle el
+ * catálogo a quien no vaya a usar esa parte.
+ *
  * Cómo se resuelve cada nivel, en orden:
  *
  *   1. Por el ID guardado en `posIntegration` (generalId/conceptId/
@@ -47,32 +52,14 @@
 
 import admin, { assertAdminInitialized } from "../../../lib/firebase/firebaseAdmin";
 import { verifyPosIntegrationToken, extractBearerToken, savePosIntegrationCatalog } from "../../../lib/server/posIntegrationService";
-
-const CONCEPT_NAME = "Ventas POS";
-const SUBCONCEPT_NAMES = ["Efectivo", "Tarjeta Débito", "Tarjeta Crédito", "Transferencia"];
-/**
- * Sufijo para cuando el nombre que nos toca ya lo ocupa un documento del
- * cliente que NO vamos a adoptar: sin él, el tenant vería dos "Ventas POS"
- * idénticos y no sabría cuál es cuál. Solo se aplica al crear, y solo si de
- * verdad hubo choque — un tenant sin colisión conserva el nombre limpio.
- */
-const NAME_SUFFIX = " (integración)";
-const nameFor = (base, collisions) => (collisions.length > 0 ? `${base}${NAME_SUFFIX}` : base);
-
-/** Un documento es de la integración si lleva la marca que puso este endpoint. */
-const isOurs = (data) => data?.origen === "pos_sync";
-
-/**
- * De los candidatos que coinciden por nombre, elige cuál adoptar.
- * Estricto (activación nueva): solo uno ya marcado como nuestro.
- * Laxo (el tenant ya tenía una activación previa, anterior a la marca): el
- * primero, como se venía haciendo — si no, duplicaría su propia rama.
- */
-function pickAdoptable(docs, lenient) {
-  const ours = docs.find((d) => isOurs(d.data()));
-  if (ours) return ours;
-  return lenient ? docs[0] || null : null;
-}
+import {
+  CONCEPT_NAME,
+  SUBCONCEPT_NAMES,
+  SALES_GENERAL_SUFFIX,
+  generalNameFor,
+  nameFor,
+  pickAdoptable,
+} from "../../../lib/server/posCatalog";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -95,7 +82,8 @@ export default async function handler(req, res) {
   // así que para ellos la adopción por nombre sigue siendo laxa.
   const hasPriorActivation = !!(integration.generalId || integration.conceptId || integration.subconceptIds);
 
-  const generalName = `Punto de venta · ${businessName?.trim() || chagoTenantId}`;
+  const negocio = businessName?.trim() || chagoTenantId;
+  const generalName = generalNameFor(negocio, SALES_GENERAL_SUFFIX);
 
   try {
     const db = admin.firestore();
@@ -108,11 +96,22 @@ export default async function handler(req, res) {
     if (generalId) {
       const existing = await generalsRef.doc(generalId).get();
       if (!existing.exists) generalId = null;
-      // Autoreparación: si venía de antes de que existiera el bloqueo, se
-      // marca ahora — sin esto un cliente podría borrar/reestructurar un
-      // General ya en uso por la integración.
-      else if (existing.data()?.locked !== true) {
-        await generalsRef.doc(generalId).update({ locked: true, origen: "pos_sync" });
+      else {
+        // Autoreparación: si venía de antes de que existiera el bloqueo, se
+        // marca ahora — sin esto un cliente podría borrar/reestructurar un
+        // General ya en uso por la integración.
+        const data = existing.data();
+        const fix = {};
+        if (data.locked !== true) { fix.locked = true; fix.origen = "pos_sync"; }
+        // Vuelve a 'entrada' si quedó en 'ambos'. Las compras tuvieron su
+        // propio General desde que se separaron los árboles; un tenant
+        // migrado de aquella versión arrastra el tipo mixto y, con él, el
+        // concepto de ventas ofreciéndose al capturar salidas.
+        if (data.type !== "entrada") fix.type = "entrada";
+        // Y se adopta la nomenclatura con sufijo, para que los dos árboles del
+        // mismo negocio se distingan en la lista de Generales.
+        if (data.name !== generalName) fix.name = generalName;
+        if (Object.keys(fix).length > 0) await generalsRef.doc(generalId).update(fix);
       }
     }
     if (!generalId) {
@@ -143,8 +142,17 @@ export default async function handler(req, res) {
     if (conceptId) {
       const existing = await conceptsRef.doc(conceptId).get();
       if (!existing.exists) conceptId = null;
-      else if (existing.data()?.locked !== true) {
-        await conceptsRef.doc(conceptId).update({ locked: true, origen: "pos_sync" });
+      else {
+        const data = existing.data();
+        const fix = {};
+        if (data.locked !== true) { fix.locked = true; fix.origen = "pos_sync"; }
+        // El tipo también se repara. Un vínculo anterior al bloqueo dejó el
+        // concepto editable, y `ConceptModal` le copia el tipo del General al
+        // guardarlo: en cuanto el General pasó a 'ambos' por las compras, el
+        // concepto de ventas se llevó ese 'ambos' de rebote y empezó a
+        // ofrecerse también al capturar salidas. Aquí solo entran ventas.
+        if (data.type !== "entrada") fix.type = "entrada";
+        if (Object.keys(fix).length > 0) await conceptsRef.doc(conceptId).update(fix);
       }
     }
     if (!conceptId) {
@@ -219,6 +227,18 @@ export default async function handler(req, res) {
     }
 
     await savePosIntegrationCatalog(chagoTenantId, { generalId, conceptId, subconceptIds });
+
+    // La rama de COMPRAS NO se crea aquí, a propósito.
+    //
+    // Crearla al activar le cambiaría el catálogo a todo tenant ya vinculado en
+    // cuanto alguien volviera a guardar el vínculo: su General pasaría a
+    // 'ambos' y le aparecería un concepto "Compras POS" vacío, sin que él haya
+    // pedido nada. Un tenant que nunca capture un costo al surtir no debe notar
+    // que esto existe.
+    //
+    // Se construye sola la primera vez que llega una compra de verdad
+    // (`ensurePurchaseBranch` desde `pos-purchases.js`), que es el momento en
+    // que el cliente sí la ha pedido.
 
     return res.status(200).json({ ok: true, generalId, conceptId, subconceptIds });
   } catch (error) {

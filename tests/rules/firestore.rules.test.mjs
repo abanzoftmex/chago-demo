@@ -36,10 +36,17 @@ await testEnv.withSecurityRulesDisabled(async (ctx) => {
   await setDoc(doc(db, `tenants/${T}/members`, VIEWER), { status: "active", role: "viewer" });
 
   const locked = { locked: true, origen: "pos_sync" };
-  await setDoc(doc(db, `tenants/${T}/generals`, "gLock"), { name: "Punto de venta · N", type: "entrada", ...locked });
+  // Cada tipo tiene su propio General: los árboles no se mezclan.
+
+  await setDoc(doc(db, `tenants/${T}/generals`, "gLock"), { name: "Punto de venta · N · Ventas", type: "entrada", ...locked });
+  await setDoc(doc(db, `tenants/${T}/generals`, "pos_general_compras"), { name: "Punto de venta · N · Compras", type: "salida", ...locked });
   await setDoc(doc(db, `tenants/${T}/concepts`, "cLock"), { name: "Ventas POS", generalId: "gLock", type: "entrada", ...locked });
   await setDoc(doc(db, `tenants/${T}/subconcepts`, "sLock"), { name: "Efectivo", conceptId: "cLock", ...locked });
   await setDoc(doc(db, `tenants/${T}/transacciones`, "txLock"), { amount: 100, conceptId: "cLock", ...locked });
+  // Rama de compras.
+  await setDoc(doc(db, `tenants/${T}/concepts`, "cCompras"), { name: "Compras POS", generalId: "pos_general_compras", type: "salida", ...locked });
+  await setDoc(doc(db, `tenants/${T}/subconcepts`, "pos_prod_665f"), { name: "Coca 600", conceptId: "cCompras", posProductId: "665f", posProductName: "Coca 600", ...locked });
+  await setDoc(doc(db, `tenants/${T}/transacciones`, "txCompra"), { type: "salida", amount: 250, conceptId: "cCompras", posKind: "compra", status: "pagado", ...locked });
   await setDoc(doc(db, `tenants/${T}/concepts`, "cFree"), { name: "Gastos", generalId: "gLock" });
   await setDoc(doc(db, `tenants/${T}/transacciones`, "txFree"), { amount: 50, conceptId: "cFree" });
   // Catálogo "de siempre": documentos que nunca tuvieron el campo `locked`.
@@ -66,6 +73,29 @@ await t(G1, "admin SÍ puede renombrar el General bloqueado", () => assertSuccee
 await t(G1, "admin NO puede mover el subconcepto (cambiar conceptId)", () => assertFails(updateDoc(doc(asAdmin, `tenants/${T}/subconcepts`, "sLock"), { conceptId: "cFree" })));
 await t(G1, "admin NO puede borrar la transacción del POS", () => assertFails(deleteDoc(doc(asAdmin, `tenants/${T}/transacciones`, "txLock"))));
 await t(G1, "admin NO puede editar el monto de la transacción del POS", () => assertFails(updateDoc(doc(asAdmin, `tenants/${T}/transacciones`, "txLock"), { amount: 1, updatedBy: ADMIN, updatedAt: serverTimestamp() })));
+
+// ── Rama de compras ─────────────────────────────────────────────────────
+// El `type` de cada General sostiene su rama: si se pudiera cambiar desde el
+// cliente, los árboles volverían a mezclarse.
+await t(G1, "admin NO puede cambiar el tipo del General de ventas", () => assertFails(updateDoc(doc(asAdmin, `tenants/${T}/generals`, "gLock"), { type: "salida" })));
+await t(G1, "admin NO puede cambiar el tipo del General de compras", () => assertFails(updateDoc(doc(asAdmin, `tenants/${T}/generals`, "pos_general_compras"), { type: "entrada" })));
+await t(G1, "admin NO puede borrar el General de compras", () => assertFails(deleteDoc(doc(asAdmin, `tenants/${T}/generals`, "pos_general_compras"))));
+await t(G1, "admin SÍ puede renombrar el General de compras", () => assertSucceeds(updateDoc(doc(asAdmin, `tenants/${T}/generals`, "pos_general_compras"), { name: "Compras del POS" })));
+await t(G1, "admin NO puede borrar el concepto de compras", () => assertFails(deleteDoc(doc(asAdmin, `tenants/${T}/concepts`, "cCompras"))));
+await t(G1, "admin NO puede recolgar el concepto de compras", () => assertFails(updateDoc(doc(asAdmin, `tenants/${T}/concepts`, "cCompras"), { generalId: "otro" })));
+await t(G1, "admin NO puede cambiar el tipo del concepto de compras", () => assertFails(updateDoc(doc(asAdmin, `tenants/${T}/concepts`, "cCompras"), { type: "entrada" })));
+await t(G1, "admin SÍ puede renombrar el concepto de compras", () => assertSucceeds(updateDoc(doc(asAdmin, `tenants/${T}/concepts`, "cCompras"), { name: "Compras del POS" })));
+// `posProductId` es la identidad que evita duplicar subconceptos por producto.
+await t(G1, "admin NO puede cambiar el posProductId del subconcepto", () => assertFails(updateDoc(doc(asAdmin, `tenants/${T}/subconcepts`, "pos_prod_665f"), { posProductId: "otro" })));
+await t(G1, "admin NO puede mover el subconcepto del producto", () => assertFails(updateDoc(doc(asAdmin, `tenants/${T}/subconcepts`, "pos_prod_665f"), { conceptId: "cLock" })));
+await t(G1, "admin NO puede borrar el subconcepto del producto", () => assertFails(deleteDoc(doc(asAdmin, `tenants/${T}/subconcepts`, "pos_prod_665f"))));
+await t(G1, "admin SÍ puede renombrar el subconcepto del producto", () => assertSucceeds(updateDoc(doc(asAdmin, `tenants/${T}/subconcepts`, "pos_prod_665f"), { name: "Coca 600 ml" })));
+await t(G1, "admin NO puede borrar la compra", () => assertFails(deleteDoc(doc(asAdmin, `tenants/${T}/transacciones`, "txCompra"))));
+await t(G1, "admin NO puede editar el monto de la compra", () => assertFails(updateDoc(doc(asAdmin, `tenants/${T}/transacciones`, "txCompra"), { amount: 1, updatedBy: ADMIN, updatedAt: serverTimestamp() })));
+// Pasarla a 'pendiente' la resucitaría como saldo de arrastre mes a mes.
+await t(G1, "admin NO puede pasar la compra a 'pendiente'", () => assertFails(updateDoc(doc(asAdmin, `tenants/${T}/transacciones`, "txCompra"), { status: "pendiente", updatedBy: ADMIN, updatedAt: serverTimestamp() })));
+// Bloquear la rama no debe bloquear la colección entera.
+await t(G1, "contador SÍ puede crear un subconcepto suyo bajo el concepto de compras", () => assertSucceeds(addDoc(collection(asConta, `tenants/${T}/subconcepts`), { name: "Fletes", conceptId: "cCompras" })));
 
 // ── Grupo 2: operación normal ───────────────────────────────────────────
 const G2 = "Normal";

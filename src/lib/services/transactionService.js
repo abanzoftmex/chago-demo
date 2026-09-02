@@ -26,6 +26,23 @@ const getTransactionsCollection = (tenantId) => {
   return "transactions";
 };
 
+/**
+ * Quita las transacciones anuladas, salvo que quien pregunta las pida.
+ *
+ * Una transacción anulada (`voided:true`) la marcó así el punto de venta al
+ * cancelar la venta o al deshacer el surtido de almacén que la originó. Deja de
+ * ser un ingreso o un gasto en el momento en que se anula, así que **no puede
+ * seguir sumando** en reportes, dashboard, arrastre ni totales — y hasta ahora
+ * lo hacía: el campo se escribía y no lo leía nadie.
+ *
+ * El filtro vive aquí, en el único punto por el que pasan todas las lecturas,
+ * en vez de repetirlo en cada agregación. Las pantallas que sí quieren
+ * enseñarla —tachada y con su etiqueta de Anulada, para que quien acaba de
+ * anular vea que funcionó— piden `includeVoided: true` explícitamente.
+ */
+const excludeVoided = (transactions, filters) =>
+  filters?.includeVoided ? transactions : transactions.filter((t) => t.voided !== true);
+
 export const transactionService = {
   // Create a new transaction
   async create(transactionData, user, tenantId = null) {
@@ -134,6 +151,8 @@ export const transactionService = {
       querySnapshot.forEach((docSnap) => {
         transactions.push({ id: docSnap.id, ...docSnap.data() });
       });
+
+      transactions = excludeVoided(transactions, filters);
 
       // Filtros de igualdad en cliente (equivalentes a los where removidos).
       if (filters.type) {
@@ -312,6 +331,8 @@ export const transactionService = {
       querySnapshot.forEach((doc) => {
         transactions.push({ id: doc.id, ...doc.data() });
       });
+
+      transactions = excludeVoided(transactions, filters);
 
       // Client-side filtering for all equality filters
       if (filters.type) {

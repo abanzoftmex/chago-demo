@@ -78,6 +78,12 @@ export async function revokePosIntegration(tenantId) {
           generalId: null,
           conceptId: null,
           subconceptIds: null,
+          // La rama de compras también se suelta: si el tenant se revincula
+          // contra otro General, colgar las compras del concepto viejo las
+          // dejaría fuera de su propio árbol.
+          purchaseGeneralId: null,
+          purchaseConceptId: null,
+          purchaseReadyAt: null,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
       },
@@ -97,6 +103,38 @@ export async function savePosIntegrationCatalog(tenantId, { generalId, conceptId
           generalId,
           conceptId,
           subconceptIds,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+      },
+      { merge: true }
+    );
+}
+
+/**
+ * Guarda la rama de COMPRAS resuelta por `ensurePurchaseBranch`.
+ *
+ * Solo escalares, a propósito: `{merge:true}` fusiona los mapas anidados en
+ * vez de reemplazarlos, así que un mapa de subconceptos por producto iría
+ * acumulando claves muertas de productos borrados, sin techo, dentro del
+ * documento del tenant. Los subconceptos de compras se resuelven por id
+ * determinista (ver `posCatalog.ensureProductSubconcept`), que no necesita
+ * mapa ninguno.
+ *
+ * `purchaseReadyAt` es el memo que permite al endpoint de compras saltarse
+ * la comprobación de la rama en el caso normal. Es seguro porque ni el
+  General ni el concepto se pueden borrar desde la UI.
+ */
+export async function savePosPurchaseCatalog(tenantId, { purchaseGeneralId, purchaseConceptId }) {
+  await admin
+    .firestore()
+    .collection("tenants")
+    .doc(tenantId)
+    .set(
+      {
+        posIntegration: {
+          purchaseGeneralId,
+          purchaseConceptId,
+          purchaseReadyAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
       },

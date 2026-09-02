@@ -147,7 +147,11 @@ const SolicitudesPago = () => {
       const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
       const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
 
-      const transactionQuery = { 
+      // includeVoided: estas listas SÍ muestran las anuladas, tachadas y con su
+      // etiqueta, para que quien acaba de anular vea que funcionó. Los reportes
+      // y los totales no las piden, así que no suman en ningún lado.
+      const transactionQuery = {
+        includeVoided: true,
         type: "salida", 
         limit: 1000, // Aumentamos el límite para traer más datos y paginar en el frontend
         startDate: startOfMonth,
@@ -1055,7 +1059,10 @@ const SolicitudesPago = () => {
                                 {getProviderLabel(transaction)}
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap text-xs font-semibold text-red-800 bg-red-50">
-                                {formatCurrencyMx(transaction.amount)}
+                                <span className={transaction.voided ? "line-through opacity-60" : ""}>{formatCurrencyMx(transaction.amount)}</span>
+                                {transaction.voided && (
+                                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-700">Anulada</span>
+                                )}
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap">
                                 {getStatusBadge(transaction.status, transaction)}
@@ -1078,10 +1085,15 @@ const SolicitudesPago = () => {
                                   {canManageTransactions && (
                                     <button
                                       onClick={() => handleEditTransaction(transaction)}
-                                      className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center cursor-pointer"
-                                      title="Editar gasto"
+                                      disabled={transaction.locked}
+                                      className="bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-orange-100"
+                                      title={
+                                        transaction.locked
+                                          ? "Viene del punto de venta: se corrige allá, no aquí"
+                                          : "Editar gasto"
+                                      }
                                     >
-                                      <PencilIcon className="h-4 w-4" /> 
+                                      <PencilIcon className="h-4 w-4" />
                                     </button>
                                   )}
                                   <button
@@ -1147,7 +1159,10 @@ const SolicitudesPago = () => {
                           </div>
                           <div className="text-right">
                             <p className="text-lg font-semibold text-foreground">
-                              {formatCurrencyMx(transaction.amount)}
+                              <span className={transaction.voided ? "line-through opacity-60" : ""}>{formatCurrencyMx(transaction.amount)}</span>
+                              {transaction.voided && (
+                                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-700">Anulada</span>
+                              )}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {formatDate(transaction.date)}

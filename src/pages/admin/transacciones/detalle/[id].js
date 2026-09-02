@@ -580,11 +580,25 @@ const TransactionDetail = () => {
           <div className="mb-6 flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
             <FileText className="mt-0.5 h-4 w-4 shrink-0" />
             <div>
-              <p className="font-medium">Esta entrada viene del punto de venta</p>
+              <p className="font-medium">
+                {transaction.type === "salida"
+                  ? "Esta salida viene del punto de venta"
+                  : "Esta entrada viene del punto de venta"}
+              </p>
               <p className="mt-0.5 text-blue-700">
-                Se generó automáticamente al cobrar una venta y no se puede editar ni eliminar
-                aquí. Si algo cambió, corrígelo cancelando esa venta en el punto de venta —
-                la entrada se anula sola cuando eso pasa.
+                {transaction.type === "salida" ? (
+                  <>
+                    Se generó automáticamente al surtir el almacén y no se puede editar ni
+                    eliminar aquí. Si algo cambió, corrígelo anulando ese movimiento en el punto
+                    de venta — la salida se anula sola cuando eso pasa.
+                  </>
+                ) : (
+                  <>
+                    Se generó automáticamente al cobrar una venta y no se puede editar ni eliminar
+                    aquí. Si algo cambió, corrígelo cancelando esa venta en el punto de venta —
+                    la entrada se anula sola cuando eso pasa.
+                  </>
+                )}
               </p>
             </div>
           </div>

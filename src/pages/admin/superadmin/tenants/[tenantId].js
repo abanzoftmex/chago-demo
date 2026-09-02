@@ -452,7 +452,8 @@ function TenantDetailContent() {
                       Punto de venta
                     </CardTitle>
                     <CardDescription className="mt-1">
-                      Refleja las ventas cobradas como Entradas automáticas.
+                      Refleja las ventas cobradas como Entradas y las compras de almacén como
+                      Salidas, de forma automática.
                     </CardDescription>
                   </div>
                   {!posLoading && (
@@ -520,8 +521,8 @@ function TenantDetailContent() {
 
                       {posIntegration?.hasToken && !posIntegration?.conceptId && (
                         <p className="text-xs text-amber-600">
-                          Falta activarse desde Torre de Control para crear el concepto y los
-                          subconceptos de Ventas POS.
+                          Falta activarse desde Torre de Control para crear las ramas de Ventas
+                          POS y Compras POS.
                         </p>
                       )}
                     </>

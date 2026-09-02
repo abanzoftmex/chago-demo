@@ -31,13 +31,14 @@ export default async function handler(req, res) {
     const docRef = admin.firestore().collection(`tenants/${chagoTenantId}/transacciones`).doc(id);
     const snap = await docRef.get();
 
-    if (!snap.exists) return res.status(404).json({ error: "Entrada no encontrada" });
+    if (!snap.exists) return res.status(404).json({ error: "Transacción no encontrada" });
 
     const data = snap.data();
     if (data.origen !== "pos_sync") {
-      // Defensa: este endpoint solo puede tocar entradas que él mismo creó,
-      // nunca una capturada a mano en chago-demo.
-      return res.status(409).json({ error: "Esta entrada no fue creada por punto-de-venta" });
+      // Defensa: este endpoint solo puede tocar lo que la propia integración
+      // creó, nunca algo capturado a mano en chago-demo. Sirve igual para la
+      // entrada de una venta que para la salida de una compra de almacén.
+      return res.status(409).json({ error: "Esta transacción no fue creada por punto-de-venta" });
     }
     if (data.voided) {
       return res.status(200).json({ ok: true, alreadyVoided: true });
@@ -46,7 +47,7 @@ export default async function handler(req, res) {
     await docRef.update({
       voided: true,
       voidedAt: admin.firestore.FieldValue.serverTimestamp(),
-      voidReason: reason || "Venta cancelada en punto de venta",
+      voidReason: reason || "Movimiento cancelado en punto de venta",
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 

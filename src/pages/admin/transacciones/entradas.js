@@ -151,7 +151,11 @@ const Ingresos = () => {
       const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
       const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
 
-      const transactionQuery = { 
+      // includeVoided: estas listas SÍ muestran las anuladas, tachadas y con su
+      // etiqueta, para que quien acaba de anular vea que funcionó. Los reportes
+      // y los totales no las piden, así que no suman en ningún lado.
+      const transactionQuery = {
+        includeVoided: true,
         type: "entrada", 
         startDate: startOfMonth,
         endDate: endOfMonth
@@ -942,7 +946,10 @@ const Ingresos = () => {
                                 {getProviderLabel(transaction)}
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap text-xs font-semibold text-green-800 bg-green-50">
-                                {formatCurrencyMx(transaction.amount)}
+                                <span className={transaction.voided ? "line-through opacity-60" : ""}>{formatCurrencyMx(transaction.amount)}</span>
+                                {transaction.voided && (
+                                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-700">Anulada</span>
+                                )}
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap">
                                 {getStatusBadge(transaction.status, transaction)}
@@ -952,8 +959,13 @@ const Ingresos = () => {
                                   {canManageTransactions && (
                                     <button
                                       onClick={() => handleEditTransaction(transaction)}
-                                      className="bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center cursor-pointer"
-                                      title="Editar entrada"
+                                      disabled={transaction.locked}
+                                      className="bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-800 py-1.5 px-2.5 rounded-md transition-colors flex items-center cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-100"
+                                      title={
+                                        transaction.locked
+                                          ? "Viene del punto de venta: se corrige allá, no aquí"
+                                          : "Editar entrada"
+                                      }
                                     >
                                     <PencilIcon className="h-4 w-4" />
                                     </button>
@@ -1004,7 +1016,10 @@ const Ingresos = () => {
                           </div>
                           <div className="text-right">
                             <p className="text-lg font-semibold text-foreground">
-                              {formatCurrencyMx(transaction.amount)}
+                              <span className={transaction.voided ? "line-through opacity-60" : ""}>{formatCurrencyMx(transaction.amount)}</span>
+                              {transaction.voided && (
+                                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-700">Anulada</span>
+                              )}
                             </p>
                             <p className="text-sm text-muted-foreground">
                               {formatDate(transaction.date)}

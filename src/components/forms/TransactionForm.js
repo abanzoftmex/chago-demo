@@ -19,6 +19,17 @@ import { subconceptService } from "../../lib/services/subconceptService";
 import { paymentService } from "../../lib/services/paymentService";
 import { sendEmailWithRateLimit } from "../../lib/utils";
 
+/**
+ * Un General sirve para capturar de un tipo si es de ese tipo o si es 'ambos'.
+ *
+ * Vive fuera del componente porque hacen falta dos efectos distintos (la carga
+ * inicial y la recarga tras crear un General desde el modal) y tenerlo escrito
+ * dos veces ya había hecho que divergieran: la recarga se dejaba fuera los
+ * 'ambos', así que crear un General hacía desaparecer del desplegable a los
+ * mixtos —entre ellos el del punto de venta— hasta recargar la página.
+ */
+const servesType = (general, type) => !type || general.type === type || general.type === 'ambos';
+
 const TransactionForm = ({
   type,
   onSuccess,
@@ -254,7 +265,7 @@ const TransactionForm = ({
         
         const allGenerals = await generalService.getAll(tenantId);
         // Filter by transaction type if provided, incluir 'ambos'
-        const filtered = allGenerals.filter(g => !formData.type || g.type === formData.type || g.type === 'ambos');
+        const filtered = allGenerals.filter(g => servesType(g, formData.type));
         setGenerals(filtered);
       } catch (err) {
         setGeneralsError(err.message);
@@ -579,7 +590,7 @@ const TransactionForm = ({
         
         const allGenerals = await generalService.getAll(tenantId);
         // Filter by transaction type if provided
-        const filtered = allGenerals.filter(g => !formData.type || g.type === formData.type);
+        const filtered = allGenerals.filter(g => servesType(g, formData.type));
         setGenerals(filtered);
       } catch (err) {
         setGeneralsError(err.message);
