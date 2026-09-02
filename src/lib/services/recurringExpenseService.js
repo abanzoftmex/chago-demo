@@ -30,13 +30,10 @@ const getDocRef = (tenantId, id) => {
   return doc(db, `tenants/${tid}/${COLLECTION_NAME}/${id}`);
 };
 
-// Helper para obtener la fecha actual en zona horaria de México
-const getMexicoDate = () => {
-  const now = new Date();
-  // Convertir a zona horaria de México (America/Mexico_City)
-  const mexicoDateStr = now.toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
-  return new Date(mexicoDateStr);
-};
+// La fecha del negocio y la regla de "cuándo toca generar" viven en
+// `lib/recurring/schedule`, compartidas con el módulo de servidor que usa el
+// cron. Escritas dos veces, acabarían discrepando.
+import { getMexicoDate, formatDateKey, shouldGenerateForDate } from "../recurring/schedule";
 
 export const recurringExpenseService = {
   // Create a new recurring expense
@@ -199,48 +196,15 @@ export const recurringExpenseService = {
     }
   },
 
-  // Helper method to format date as YYYY-MM-DD
+  // Estos dos delegan en `lib/recurring/schedule`, que es donde vive la regla
+  // y de donde la toma también el cron del servidor. Se conservan como métodos
+  // porque el resto del servicio los llama con `this.`
   formatDateKey(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return formatDateKey(date);
   },
 
-  // Helper method to determine if we should generate a transaction for a given date
   shouldGenerateForDate(currentDate, frequency, generatedDates, startDate) {
-    const dateKey = this.formatDateKey(currentDate);
-
-    // Check if already generated for this exact date
-    if (generatedDates.includes(dateKey)) {
-      return false;
-    }
-
-    // Check based on frequency
-    switch (frequency) {
-      case 'daily':
-        return true; // Generate every day (if not already generated)
-
-      case 'weekly':
-        // Generate every Monday (day 1, where Sunday = 0)
-        return currentDate.getDay() === 1;
-
-      case 'biweekly':
-        // Generate on 15th and day before last day of month
-        const day = currentDate.getDate();
-        const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
-        const dayBeforeLast = lastDayOfMonth - 1;
-        return day === 15 || day === dayBeforeLast;
-
-      case 'monthly':
-        // ✅ CORRECCIÓN: Generar SIEMPRE el día 1 del mes (normalizado)
-        // Sin importar cuántos días tenga el mes anterior (28, 29, 30 o 31)
-        // Esto asegura que todas las suscripciones mensuales se cobren el primer día del mes
-        return currentDate.getDate() === 1;
-
-      default:
-        return false;
-    }
+    return shouldGenerateForDate(currentDate, frequency, generatedDates, startDate);
   },
 
   // Get recurring expense by ID

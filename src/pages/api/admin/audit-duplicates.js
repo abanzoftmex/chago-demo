@@ -1,17 +1,29 @@
 /**
  * API Endpoint para ejecutar auditoría de duplicados
- * 
+ *
  * GET /api/admin/audit-duplicates
- * 
- * Requiere autenticación de administrador
+ *
+ * Lee la colección legacy `transactions` con Admin SDK. Antes usaba el SDK del
+ * navegador y NO comprobaba nada: cualquiera podía pedirla, y solo las reglas
+ * abiertas de producción la dejaban funcionar. Como el Admin SDK no pasa por
+ * las reglas, sin una puerta propia esto se convertiría en la única forma de
+ * leer esos datos sin autenticarse — así que lleva la misma cookie de sesión
+ * de configuración que el resto de rutas de superadmin.
  */
 
-import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
-import { db } from "../../../lib/firebase/firebaseConfig";
+import admin, { assertAdminInitialized } from "../../../lib/firebase/firebaseAdmin";
+import { verifySetupSessionCookie } from "../../../lib/server/setupSession";
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ message: 'Method not allowed' });
+  }
+
+  if (!assertAdminInitialized(res)) return;
+
+  const setupPassword = process.env.TENANT_SETUP_PASSWORD;
+  if (!setupPassword || !verifySetupSessionCookie(req.headers.cookie, setupPassword)) {
+    return res.status(401).json({ message: "Sesión de configuración expirada o inválida" });
   }
 
   try {
@@ -21,14 +33,12 @@ export default async function handler(req, res) {
     console.log('🔍 API: Iniciando auditoría de duplicados...');
 
     // Obtener todas las transacciones recurrentes del período
-    const transactionsRef = collection(db, "transactions");
-    const q = query(
-      transactionsRef,
-      where("isRecurring", "==", true),
-      orderBy("date", "asc")
-    );
-
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await admin
+      .firestore()
+      .collection("transactions")
+      .where("isRecurring", "==", true)
+      .orderBy("date", "asc")
+      .get();
     const transactions = [];
     
     querySnapshot.forEach((doc) => {

@@ -14,7 +14,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
-import { db, storage } from "../firebase/firebaseConfig";
+import { db, storage, auth } from "../firebase/firebaseConfig";
 import { logService } from "./logService";
 
 // Helper function to get collection path for tenant
@@ -43,6 +43,20 @@ const getTransactionsCollection = (tenantId) => {
 const excludeVoided = (transactions, filters) =>
   filters?.includeVoided ? transactions : transactions.filter((t) => t.voided !== true);
 
+/**
+ * Quién está escribiendo, según Firebase Auth.
+ *
+ * `firestore.rules` exige `createdBy == request.auth.uid` al crear y
+ * `updatedBy == request.auth.uid` al actualizar una transacción, así que el
+ * valor tiene que salir de la SESIÓN, no de un parámetro: hay caminos que
+ * llegan hasta aquí sin usuario —`updatePaymentStatus` llama a `update` con
+ * `user = null`— y en esos la escritura quedaría denegada.
+ *
+ * Si no hay sesión devuelve null y la regla rechaza la escritura, que es lo
+ * correcto: nadie sin autenticar debería estar creando transacciones.
+ */
+const currentUid = () => auth.currentUser?.uid || null;
+
 export const transactionService = {
   // Create a new transaction
   async create(transactionData, user, tenantId = null) {
@@ -50,6 +64,7 @@ export const transactionService = {
       const collectionPath = getTransactionsCollection(tenantId);
       const docRef = await addDoc(collection(db, collectionPath), {
         ...transactionData,
+        createdBy: currentUid(),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         status: "pendiente",
@@ -221,6 +236,7 @@ export const transactionService = {
 
       await updateDoc(docRef, {
         ...updateData,
+        updatedBy: currentUid(),
         updatedAt: serverTimestamp(),
       });
 
@@ -460,6 +476,7 @@ export const transactionService = {
       const collectionPath = getTransactionsCollection(tenantId);
       const docRef = await addDoc(collection(db, collectionPath), {
         ...transactionData,
+        createdBy: currentUid(),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         status: transactionData.status || "aprobado",

@@ -103,6 +103,11 @@ await t(G2, "viewer lee transacciones", () => assertSucceeds(getDocs(collection(
 await t(G2, "viewer NO crea transacciones", () => assertFails(addDoc(collection(asViewer, `tenants/${T}/transacciones`), { amount: 1, createdBy: VIEWER, createdAt: serverTimestamp() })));
 await t(G2, "contador crea transacción (con createdBy/createdAt)", () => assertSucceeds(addDoc(collection(asConta, `tenants/${T}/transacciones`), { amount: 10, createdBy: CONTA, createdAt: serverTimestamp() })));
 await t(G2, "contador NO crea transacción sin createdAt del servidor", () => assertFails(addDoc(collection(asConta, `tenants/${T}/transacciones`), { amount: 10, createdBy: CONTA, createdAt: new Date() })));
+// Los dos campos que el servicio tiene que poner desde la sesion de Firebase:
+// `updatePaymentStatus` llega hasta aqui sin usuario, asi que sacarlos de un
+// parametro dejaria esas escrituras denegadas.
+await t(G2, "contador NO crea transacción sin createdBy", () => assertFails(addDoc(collection(asConta, `tenants/${T}/transacciones`), { amount: 10, createdAt: serverTimestamp() })));
+await t(G2, "contador NO edita transacción sin updatedBy", () => assertFails(updateDoc(doc(asConta, `tenants/${T}/transacciones`, "txEdit"), { amount: 77, updatedAt: serverTimestamp() })));
 await t(G2, "admin borra transacción libre", () => assertSucceeds(deleteDoc(doc(asAdmin, `tenants/${T}/transacciones`, "txFree"))));
 await t(G2, "contador edita concepto libre", () => assertSucceeds(updateDoc(doc(asConta, `tenants/${T}/concepts`, "cFree"), { name: "Gastos varios" })));
 await t(G2, "contador crea concepto", () => assertSucceeds(addDoc(collection(asConta, `tenants/${T}/concepts`), { name: "Nuevo", generalId: "gLock" })));

@@ -1,6 +1,18 @@
-import { recurringExpenseService } from "../../../lib/services/recurringExpenseService";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "../../../lib/firebase/firebaseConfig";
+/**
+ * Cron diario de recurrentes (vercel.json: 0 6 * * *).
+ *
+ * Habla con Firestore por Admin SDK. Antes lo hacía con el SDK del NAVEGADOR,
+ * o sea sin identidad: funcionaba solo porque las reglas publicadas están
+ * abiertas, y habría dejado de generar —en silencio— el día que se
+ * desplegaran las del repo.
+ */
+
+import { assertAdminInitialized } from "../../../lib/firebase/firebaseAdmin";
+import {
+  listTenantIds,
+  generatePendingTransactions,
+  migrateExistingExpenses,
+} from "../../../lib/server/recurringServer";
 
 export default async function handler(req, res) {
   // Vercel cron jobs send GET requests, but we also support POST for manual testing
@@ -25,16 +37,15 @@ export default async function handler(req, res) {
 
     const today = new Date();
 
-    // Get all tenants and run for each
-    const tenantsSnap = await getDocs(collection(db, 'tenants'));
+    if (!assertAdminInitialized(res)) return;
+
     const systemUser = { uid: 'system-cron', email: 'system@cron' };
     let totalGenerated = 0;
 
-    for (const tenantDoc of tenantsSnap.docs) {
-      const tenantId = tenantDoc.id;
+    for (const tenantId of await listTenantIds()) {
       try {
-        await recurringExpenseService.migrateExistingExpenses(tenantId);
-        const generated = await recurringExpenseService.generatePendingTransactions(tenantId, systemUser);
+        await migrateExistingExpenses(tenantId);
+        const generated = await generatePendingTransactions(tenantId, systemUser);
         totalGenerated += generated.length;
         console.log(`[CRON] Tenant ${tenantId}: generated ${generated.length} transactions`);
       } catch (tenantError) {

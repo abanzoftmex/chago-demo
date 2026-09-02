@@ -1,7 +1,7 @@
 import admin from "firebase-admin";
 import { ROLE_PERMISSIONS, ROLES } from "../../../lib/services/roleService";
-import { db } from "../../../lib/firebase/firebaseConfig";
-import { doc, setDoc } from "firebase/firestore";
+
+
 
 // Initialize Firebase Admin SDK (only if not already initialized)
 if (!admin.apps.length) {
@@ -54,16 +54,21 @@ export default async function handler(req, res) {
 
     // Update role permissions in Firestore
     try {
-      // Store the updated permissions in a 'roles' collection
-      await setDoc(
-        doc(db, "roles", role),
-        {
-          permissions,
-          updatedAt: new Date(),
-          updatedBy: currentUser.uid,
-        },
-        { merge: true }
-      );
+      // Admin SDK, no el SDK del navegador: `firestore.rules` niega toda
+      // escritura sobre /roles (`allow write: if false`) precisamente porque
+      // debe pasar por aquí, donde ya se verificó el token del usuario.
+      await admin
+        .firestore()
+        .collection("roles")
+        .doc(role)
+        .set(
+          {
+            permissions,
+            updatedAt: new Date(),
+            updatedBy: currentUser.uid,
+          },
+          { merge: true }
+        );
 
       // Update the ROLE_PERMISSIONS object in memory
       ROLE_PERMISSIONS[role] = { ...ROLE_PERMISSIONS[role], ...permissions };
