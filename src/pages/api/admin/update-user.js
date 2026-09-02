@@ -1,5 +1,5 @@
 import admin from "firebase-admin";
-import { logService } from "../../../lib/services/logService";
+import { logUserUpdate } from "../../../lib/server/logServer";
 
 // Initialize Firebase Admin SDK (only if not already initialized)
 if (!admin.apps.length) {
@@ -193,7 +193,7 @@ export default async function handler(req, res) {
       console.log("Current user (performing action):", currentUserInfo);
 
       // Log the user update
-      const logResult = await logService.logUserUpdate({
+      const logResult = await logUserUpdate({
         user: currentUserInfo,
         userId: userId,
         userData: updatedUserData,

@@ -1,4 +1,4 @@
-import { logService } from "../../../lib/services/logService";
+import { createLog } from "../../../lib/server/logServer";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -25,7 +25,7 @@ export default async function handler(req, res) {
 
     console.log("Test log data:", testLogData);
 
-    const result = await logService.create(testLogData);
+    const result = await createLog(testLogData);
 
     console.log("Test log result:", result);
     console.log("=== END TEST LOGGING ENDPOINT ===");

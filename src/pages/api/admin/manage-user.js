@@ -1,5 +1,5 @@
 import admin, { assertAdminInitialized } from "../../../lib/firebase/firebaseAdmin";
-import { logService } from "../../../lib/services/logService";
+import { logUserStatusChange } from "../../../lib/server/logServer";
 import {
   updateUserStatus,
 } from "../../../lib/services/roleService";
@@ -92,7 +92,7 @@ export default async function handler(req, res) {
 
           // Log the user status change
           if (userDataBefore) {
-            await logService.logUserStatusChange({
+            await logUserStatusChange({
               user: {
                 uid: currentUser.uid,
                 displayName: currentUser.name || currentUser.email,
@@ -127,7 +127,7 @@ export default async function handler(req, res) {
 
           // Log the user status change
           if (userDataBefore) {
-            await logService.logUserStatusChange({
+            await logUserStatusChange({
               user: {
                 uid: currentUser.uid,
                 displayName: currentUser.name || currentUser.email,
