@@ -126,6 +126,8 @@ await t(G2, "miembro lee su propio tenant", () => assertSucceeds(getDoc(doc(asVi
 await t(G2, "usuario lee su propio doc de users", () => assertSucceeds(getDoc(doc(asAdmin, "users", ADMIN))));
 
 // ── Grupo 3: lo que se rompe al desplegar ───────────────────────────────
+// Lo que TODAVIA impide desplegar: la administracion de usuarios y roles sigue
+// leyendo y escribiendo /users desde el navegador.
 const G3 = "ROMPE";
 await t(G3, "superadmin (sin Firebase Auth) NO puede listar /tenants", () => assertFails(getDocs(collection(anon, "tenants"))));
 await t(G3, "ni siquiera un admin autenticado puede listar /tenants", () => assertFails(getDocs(collection(asAdmin, "tenants"))));

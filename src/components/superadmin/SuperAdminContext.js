@@ -9,8 +9,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "../../lib/firebase/firebaseConfig";
+
+
 
 const SuperAdminContext = createContext(null);
 
@@ -89,50 +89,34 @@ export function SuperAdminProvider({ children }) {
     setSessionState("locked");
   }, []);
 
+  /*
+    El directorio se pide al servidor, no a Firestore.
+
+    Desde aquí no se puede listar `/tenants`: el superadmin entra con la cookie
+    de contraseña, no con Firebase Auth, así que para Firestore es un anónimo y
+    ninguna regla puede autorizarlo. Funcionaba porque las reglas publicadas
+    están abiertas; en cuanto se desplieguen las del repo, dejaría de funcionar.
+
+    `/api/admin/tenants-directory` lo resuelve con Admin SDK detrás de esa
+    misma cookie, y devuelve exactamente la misma forma de objeto.
+  */
   const loadTenants = useCallback(async () => {
     setTenantsLoading(true);
     try {
-      const tenantsSnap = await getDocs(collection(db, "tenants"));
-      const list = [];
+      const response = await fetch("/api/admin/tenants-directory");
+      const data = await response.json();
 
-      for (const tenantDoc of tenantsSnap.docs) {
-        const tenantData = tenantDoc.data();
-
-        let adminEmail = "—";
-        let adminName = "—";
-        let adminUid = tenantData.ownerUid || "";
-
-        try {
-          const membersSnap = await getDocs(collection(db, `tenants/${tenantDoc.id}/members`));
-          const adminMember = membersSnap.docs.find((member) => member.data().role === "admin");
-
-          if (adminMember) {
-            const memberData = adminMember.data();
-            adminUid = adminMember.id;
-            adminEmail = memberData.email || "—";
-            adminName = memberData.displayName || memberData.email || "—";
-          }
-        } catch (err) {
-          console.error("Error obteniendo miembros:", err);
-        }
-
-        list.push({
-          id: tenantDoc.id,
-          ownerUid: adminUid,
-          nombreEmpresa: tenantData.nombreEmpresa || "Sin nombre",
-          adminEmail,
-          adminName,
-          createdAt: tenantData.createdAt?.toDate?.() || null,
-        });
+      if (!response.ok) {
+        return { error: data.message || "Error cargando tenants" };
       }
 
-      list.sort((a, b) => {
-        if (!a.createdAt) return 1;
-        if (!b.createdAt) return -1;
-        return b.createdAt - a.createdAt;
-      });
-
-      setTenants(list);
+      setTenants(
+        (data.tenants || []).map((tenant) => ({
+          ...tenant,
+          // El servidor manda ISO; las pantallas esperan Date.
+          createdAt: tenant.createdAt ? new Date(tenant.createdAt) : null,
+        }))
+      );
       tenantsLoadedRef.current = true;
       return { success: true };
     } catch (error) {
