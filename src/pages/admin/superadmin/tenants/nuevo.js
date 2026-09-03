@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import SuperAdminLayout from "../../../../components/superadmin/SuperAdminLayout";
 import { useSuperAdmin } from "../../../../components/superadmin/SuperAdminContext";
-import { createNewTenant } from "../../../../lib/helpers/migrationHelper";
+
 import { PageHeader } from "../../../../components/superadmin/ui/page-header";
 import {
   Card,
@@ -77,12 +77,21 @@ function NewTenantContent() {
     setLoading(true);
 
     try {
-      const response = await createNewTenant(
-        form.ownerEmail.trim(),
-        form.ownerPassword,
-        form.ownerName.trim(),
-        form.nombreEmpresa.trim()
-      );
+      // Al servidor. Hacerlo desde aquí exigía crear la cuenta con
+      // `createUserWithEmailAndPassword` —que deja la sesión iniciada como el
+      // usuario nuevo—, cerrar sesión para no desplazar al superadmin, y
+      // escribir en Firestore ya sin sesión: como anónimo.
+      const res = await fetch("/api/admin/create-tenant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ownerEmail: form.ownerEmail.trim(),
+          ownerPassword: form.ownerPassword,
+          ownerName: form.ownerName.trim(),
+          nombreEmpresa: form.nombreEmpresa.trim(),
+        }),
+      });
+      const response = await res.json();
 
       if (response.success) {
         setCreated({
