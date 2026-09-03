@@ -1,9 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { transactionService } from "../../../lib/services/transactionService";
-import { conceptService } from "../../../lib/services/conceptService";
-import { providerService } from "../../../lib/services/providerService";
-import { generalService } from "../../../lib/services/generalService";
-import { subconceptService } from "../../../lib/services/subconceptService";
+import { assertAdminInitialized } from "../../../lib/firebase/firebaseAdmin";
+import { requireTenantMember } from "../../../lib/server/requireTenantMember";
+import { listTransactions, listConcepts, listProviders, listGenerals, listSubconcepts } from "../../../lib/server/tenantDataServer";
 import {
   enhanceQuery,
   analyzeQueryType,
@@ -113,6 +111,8 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: "Method not allowed" });
   }
 
+  if (!assertAdminInitialized(res)) return;
+
   try {
     const { question, tenantId } = req.body;
 
@@ -121,6 +121,15 @@ export default async function handler(req, res) {
         success: false,
         message: "Pregunta requerida",
       });
+    }
+
+    // Esta ruta recibía el `tenantId` en el cuerpo y no comprobaba NADA. Con
+    // los servicios del navegador las reglas todavía habrían tenido algo que
+    // decir; leyendo con Admin SDK no, así que cualquiera podría pedir un
+    // resumen financiero de cualquier tenant con solo cambiar ese campo.
+    const acceso = await requireTenantMember(req, tenantId);
+    if (!acceso.ok) {
+      return res.status(acceso.status).json({ success: false, message: acceso.error });
     }
 
     // Determinar límite dinámico según el tipo de consulta
@@ -139,11 +148,11 @@ export default async function handler(req, res) {
     // Obtener todos los datos del sistema para el análisis completo
     const [transactions, concepts, providers, generals, subconcepts] =
       await Promise.all([
-        transactionService.getAll({ limit: transactionLimit }, tenantId),
-        conceptService.getAll(tenantId),
-        providerService.getAll(tenantId),
-        generalService.getAll(tenantId),
-        subconceptService.getAll(tenantId),
+        listTransactions(tenantId, { limit: transactionLimit }),
+        listConcepts(tenantId),
+        listProviders(tenantId),
+        listGenerals(tenantId),
+        listSubconcepts(tenantId),
       ]);
 
     // Agregar información de divisiones (datos estáticos)

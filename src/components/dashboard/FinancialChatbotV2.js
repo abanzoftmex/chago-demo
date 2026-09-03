@@ -19,7 +19,7 @@ import ReusableMetricsList from "../chatbot/ReusableMetricsList";
 import { useAuth } from "../../context/AuthContextMultiTenant";
 
 const FinancialChatbotV2 = () => {
-  const { tenantInfo } = useAuth();
+  const { tenantInfo, user } = useAuth();
   const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -127,9 +127,15 @@ const FinancialChatbotV2 = () => {
     }, (estimatedSeconds * 1000) / stages.length);
 
     try {
+      // El token acompaña la pregunta: la ruta comprueba con él que quien
+      // pregunta pertenece al tenant cuyos datos va a resumir.
+      const token = await user.getIdToken();
       const response = await fetch("/api/ai/chatbot", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ question: messageToSend, tenantId }),
       });
 
