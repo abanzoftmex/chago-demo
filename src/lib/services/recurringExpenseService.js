@@ -33,7 +33,7 @@ const getDocRef = (tenantId, id) => {
 // La fecha del negocio y la regla de "cuándo toca generar" viven en
 // `lib/recurring/schedule`, compartidas con el módulo de servidor que usa el
 // cron. Escritas dos veces, acabarían discrepando.
-import { getMexicoDate, formatDateKey, shouldGenerateForDate } from "../recurring/schedule";
+import { getMexicoDate, formatDateKey, shouldGenerateForDate, monthlyBackfillDates } from "../recurring/schedule";
 
 export const recurringExpenseService = {
   // Create a new recurring expense
@@ -193,6 +193,62 @@ export const recurringExpenseService = {
     } catch (error) {
       console.error("Error generating pending transactions:", error);
       throw new Error("Error al generar transacciones pendientes");
+    }
+  },
+
+  // Backfill al CREAR un recurrente MENSUAL con inicio en el pasado: genera de
+  // una vez los días 1 que ya ocurrieron (desde el inicio hasta hoy, con tope de
+  // 1 año atrás), cada uno fechado en su día 1 real y como transacción pendiente.
+  // La deduplicación por `generatedDates` evita chocar con el cron.
+  async backfillMonthly(expense, tenantId, user) {
+    try {
+      if ((expense.frequency || "monthly") !== "monthly") return [];
+      const startDate = expense.startDate?.toDate
+        ? expense.startDate.toDate()
+        : expense.startDate
+        ? new Date(expense.startDate)
+        : null;
+      const generatedDates = expense.generatedDates || expense.generatedMonths || [];
+      const dates = monthlyBackfillDates(startDate, generatedDates);
+      if (dates.length === 0) return [];
+
+      const created = [];
+      const newKeys = [];
+      for (const d of dates) {
+        const transactionData = {
+          type: expense.type || "salida",
+          generalId: expense.generalId,
+          conceptId: expense.conceptId,
+          subconceptId: expense.subconceptId,
+          description: `${expense.description} (Recurrente)`,
+          amount: expense.amount,
+          date: d, // ← su día 1 real, no "hoy"
+          providerId: expense.providerId,
+          division: expense.division,
+          isRecurring: true,
+          recurringExpenseId: expense.id,
+        };
+        const tx = await transactionService.create(transactionData, user, tenantId);
+        created.push(tx);
+        newKeys.push(formatDateKey(d));
+      }
+
+      const updatedGeneratedDates = [...generatedDates, ...newKeys];
+      await this.update(
+        expense.id,
+        {
+          lastGenerated: serverTimestamp(),
+          generatedDates: updatedGeneratedDates,
+          generatedMonths: updatedGeneratedDates, // compat mensual
+        },
+        tenantId
+      );
+
+      console.log(`Backfill mensual: generadas ${created.length} transacciones para ${expense.id}`);
+      return created;
+    } catch (error) {
+      console.error("Error en backfill mensual:", error);
+      throw new Error("Error al generar las transacciones pasadas del recurrente");
     }
   },
 

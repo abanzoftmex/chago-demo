@@ -6,6 +6,10 @@ import { conceptService } from "../../lib/services/conceptService";
 import { subconceptService } from "../../lib/services/subconceptService";
 import { providerService } from "../../lib/services/providerService";
 import { generalService } from "../../lib/services/generalService";
+import { formatDateKey, nextMonthlyGenerationDate, monthlyBackfillDates } from "../../lib/recurring/schedule";
+import Select from "react-select";
+import ConfirmDialog from "../ui/ConfirmDialog";
+import { CREATE_NEW, treeSelectStyles, keepCreateFilter, menuPortalTarget } from "./treeSelectStyles";
 import ConceptSelector from "./ConceptSelector";
 import SubconceptSelector from "./SubconceptSelector";
 import ProviderSelector from "./ProviderSelector";
@@ -42,7 +46,7 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
     providerId: "",
     division: "general",
     frequency: "monthly", // New field for frequency
-    startDate: new Date().toISOString().split("T")[0], // When to start generating
+    startDate: formatDateKey(new Date()), // When to start generating (fecha local, sin corrimiento UTC)
     isActive: true
   });
 
@@ -58,6 +62,8 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
   const [showGeneralModal, setShowGeneralModal] = useState(false);
   const [showConceptModal, setShowConceptModal] = useState(false);
   const [showSubconceptModal, setShowSubconceptModal] = useState(false);
+  // Confirmación del backfill (generar meses pasados al crear un mensual).
+  const [confirmBackfill, setConfirmBackfill] = useState({ open: false, message: "", onConfirm: null });
 
   // Load generals when component mounts
   useEffect(() => {
@@ -101,11 +107,12 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
         setLoadingExpense(true);
         const expense = await recurringExpenseService.getById(expenseId, tenantId);
         if (expense) {
-          let dateStr = new Date().toISOString().split("T")[0];
+          let dateStr = formatDateKey(new Date());
           if (expense.startDate) {
             const dateObj = expense.startDate.toDate ? expense.startDate.toDate() : new Date(expense.startDate);
             if (!isNaN(dateObj.getTime())) {
-              dateStr = dateObj.toISOString().split("T")[0];
+              // Componentes locales para no recorrer el día (evita el corrimiento UTC).
+              dateStr = formatDateKey(dateObj);
             }
           }
 
@@ -246,34 +253,14 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
     return newErrors;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const formatShortDate = (d) =>
+    d.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
 
-    // Validate form
-    const validationErrors = validateForm();
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
-      return;
-    }
-
+  // Ejecuta el guardado (crear/actualizar) y, si aplica, el backfill de meses pasados.
+  const doSubmit = async (recurringData, backfillDates = []) => {
     try {
       setLoading(true);
       setErrors({});
-
-      // Prepare data for submission
-      const recurringData = {
-        type: type,
-        generalId: formData.generalId,
-        conceptId: formData.conceptId,
-        subconceptId: formData.subconceptId,
-        description: formData.description,
-        amount: parseFloat(formData.amount),
-        providerId: formData.providerId,
-        division: formData.division,
-        frequency: formData.frequency,
-        startDate: new Date(formData.startDate),
-        isActive: formData.isActive,
-      };
 
       let result;
       if (expenseId) {
@@ -284,7 +271,19 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
         recurringData.lastGenerated = null;
         result = await recurringExpenseService.create(recurringData, tenantId);
         toast.success(`${isEntrada ? "Entrada" : "Salida"} recurrente creada exitosamente`);
-        
+
+        // Backfill de meses pasados (solo mensual, solo al crear).
+        if (backfillDates.length > 0) {
+          const created = await recurringExpenseService.backfillMonthly(
+            { ...recurringData, id: result.id },
+            tenantId,
+            user
+          );
+          if (created.length > 0) {
+            toast.success(`Se generaron ${created.length} transacciones pasadas`);
+          }
+        }
+
         // Reset form (only on create)
         setFormData({
           generalId: "",
@@ -295,13 +294,12 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
           providerId: "",
           division: "general",
           frequency: "monthly",
-          startDate: new Date().toISOString().split("T")[0],
-          isActive: true
+          startDate: formatDateKey(new Date()),
+          isActive: true,
         });
       }
 
       onSuccess && onSuccess(result);
-
     } catch (error) {
       console.error("Error saving recurring transaction:", error);
       toast.error(error.message || `Error al guardar la ${isEntrada ? "entrada" : "salida"} recurrente`);
@@ -309,6 +307,55 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    // Validate form
+    const validationErrors = validateForm();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
+    // Prepare data for submission
+    const recurringData = {
+      type: type,
+      generalId: formData.generalId,
+      conceptId: formData.conceptId,
+      subconceptId: formData.subconceptId,
+      description: formData.description,
+      amount: parseFloat(formData.amount),
+      providerId: formData.providerId,
+      division: formData.division,
+      frequency: formData.frequency,
+      // Ancla a mediodía: evita que en México (UTC-6) se guarde el día anterior.
+      startDate: new Date(formData.startDate + "T12:00:00"),
+      isActive: formData.isActive,
+    };
+
+    // Solo al CREAR un mensual con inicio en el pasado: confirmar el backfill.
+    const backfillDates =
+      !expenseId && formData.frequency === "monthly"
+        ? monthlyBackfillDates(recurringData.startDate, [])
+        : [];
+
+    if (backfillDates.length > 0) {
+      const first = formatShortDate(backfillDates[0]);
+      const last = formatShortDate(backfillDates[backfillDates.length - 1]);
+      setConfirmBackfill({
+        open: true,
+        message: `Se generarán ${backfillDates.length} transacciones pasadas (${first} → ${last}). ¿Continuar?`,
+        onConfirm: () => {
+          setConfirmBackfill((c) => ({ ...c, open: false }));
+          doSubmit(recurringData, backfillDates);
+        },
+      });
+      return;
+    }
+
+    doSubmit(recurringData);
   };
 
   const handleGeneralCreated = (newGeneral) => {
@@ -356,7 +403,7 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
       daily: "Se generará una nueva transacción todos los días a la medianoche.",
       weekly: "Se generará una nueva transacción todos los lunes a la medianoche.",
       biweekly: "Se generará una nueva transacción el día 15 y el penúltimo día de cada mes a la medianoche.",
-      monthly: "Se generará una nueva transacción el primer día de cada mes a la medianoche."
+      monthly: "Mensual: se genera el día 1 de cada mes. El día que elijas no cambia la fecha; solo indica a partir de cuándo."
     };
     return descriptions[frequency] || "";
   };
@@ -425,30 +472,43 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
                 Error al cargar categorías
               </div>
             ) : (
-              <select
-                value={formData.generalId}
-                onChange={(e) => {
-                  const selectedValue = e.target.value;
-                  if (selectedValue === 'CREATE_NEW') {
-                    setShowGeneralModal(true);
-                  } else {
-                    setFormData(prev => ({ ...prev, generalId: selectedValue, conceptId: '', subconceptId: '' }));
-                  }
-                }}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 ${focusRingClass}`}
-                disabled={loading}
-                required
-              >
-                <option value="">Selecciona una categoría general</option>
-                {generals.map(g => (
-                  <option key={g.id} value={g.id}>
-                    {g.name} ({g.type === 'salida' ? 'Salida' : g.type === 'entrada' ? 'Entrada' : 'Ambos'})
-                  </option>
-                ))}
-                <option value="CREATE_NEW" className={`font-semibold ${isEntrada ? "text-emerald-600" : "text-rose-600"}`}>
-                  + Agregar nuevo general
-                </option>
-              </select>
+              (() => {
+                const labelOf = (g) =>
+                  `${g.name} (${g.type === "salida" ? "Salida" : g.type === "entrada" ? "Entrada" : "Ambos"})`;
+                const options = generals.map((g) => ({ value: g.id, label: labelOf(g) }));
+                const allOptions = [
+                  ...options,
+                  { value: CREATE_NEW, label: "＋ Agregar nuevo general", __isCreate: true },
+                ];
+                const selectedOption = options.find((o) => o.value === formData.generalId) || null;
+                return (
+                  <Select
+                    value={selectedOption}
+                    onChange={(opt) => {
+                      if (opt?.value === CREATE_NEW) {
+                        setShowGeneralModal(true);
+                        return;
+                      }
+                      setFormData((prev) => ({
+                        ...prev,
+                        generalId: opt?.value || "",
+                        conceptId: "",
+                        subconceptId: "",
+                      }));
+                    }}
+                    options={allOptions}
+                    styles={treeSelectStyles}
+                    filterOption={keepCreateFilter}
+                    isSearchable
+                    isClearable
+                    isDisabled={loading}
+                    placeholder="Selecciona una categoría general"
+                    noOptionsMessage={() => "Sin resultados"}
+                    menuPortalTarget={menuPortalTarget}
+                    menuPosition="fixed"
+                  />
+                );
+              })()
             )}
             {errors.generalId && (
               <p className="mt-1 text-sm text-red-600">{errors.generalId}</p>
@@ -521,7 +581,7 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
 
           <div>
             <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-2">
-              Fecha de inicio *
+              Generar a partir de *
             </label>
             <input
               type="date"
@@ -535,6 +595,9 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
               disabled={loading}
               required
             />
+            <p className="mt-1 text-xs text-gray-500">
+              El recurrente empieza a generarse desde esta fecha.
+            </p>
             {errors.startDate && (
               <p className="mt-1 text-sm text-red-600">{errors.startDate}</p>
             )}
@@ -628,6 +691,27 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
                 <p className="text-sm text-blue-700">
                   {getFrequencyDescription(formData.frequency)}
                 </p>
+                {formData.frequency === "monthly" && formData.startDate && (() => {
+                  const start = new Date(formData.startDate + "T12:00:00");
+                  if (isNaN(start.getTime())) return null;
+                  const fmt = (d) =>
+                    d.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
+                  // Al CREAR con inicio pasado se rellenan los meses (backfill).
+                  const backfill = !expenseId ? monthlyBackfillDates(start, []) : [];
+                  if (backfill.length > 0) {
+                    return (
+                      <p className="text-sm font-semibold text-blue-900 mt-1">
+                        Al guardar se generarán {backfill.length} transacciones (
+                        {fmt(backfill[0])} → {fmt(backfill[backfill.length - 1])}), y luego cada día 1.
+                      </p>
+                    );
+                  }
+                  return (
+                    <p className="text-sm font-semibold text-blue-900 mt-1">
+                      Primera generación: {fmt(nextMonthlyGenerationDate(start))}
+                    </p>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -683,6 +767,16 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
           generals={generals}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={confirmBackfill.open}
+        type="confirm"
+        title="Generar transacciones pasadas"
+        message={confirmBackfill.message}
+        confirmLabel="Sí, generar"
+        onConfirm={confirmBackfill.onConfirm}
+        onClose={() => setConfirmBackfill((c) => ({ ...c, open: false }))}
+      />
     </div>
   );
 };
