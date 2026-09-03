@@ -570,12 +570,15 @@ const Reportes = () => {
   // Genera el reporte siempre que haya fechas (para mostrar estadísticas generales)
   // Las secciones de desglose solo se mostrarán si hay tipo seleccionado (validación en el render)
   useEffect(() => {
-    if (filters.startDate && filters.endDate) {
+    // Requiere tenant listo: con filtros recordados (localStorage) las fechas ya
+    // existen en el primer render, antes de que cargue el tenant; sin este guard el
+    // arrastre truena con "Tenant ID es requerido". Al llegar tenantId se re-ejecuta.
+    if (tenantId && filters.startDate && filters.endDate) {
       generateReport();
       loadCarryoverInfo();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.startDate, filters.endDate, filters.type, filters.generalId, filters.conceptId, filters.subconceptId, filters.division]);
+  }, [tenantId, filters.startDate, filters.endDate, filters.type, filters.generalId, filters.conceptId, filters.subconceptId, filters.division]);
 
   // Dataset "por fecha de pago" SOLO cuando el modo Pagos reales está activo.
   // Perezoso y aislado del reporte registrado (así "Todos" no lee pagos ni recalcula).
