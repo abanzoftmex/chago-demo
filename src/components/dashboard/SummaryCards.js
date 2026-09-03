@@ -49,17 +49,15 @@ const SummaryCards = ({ summary, currentMonthName, montosPagados = false }) => {
       pendingLabel: 'Por pagar',
       pendingValue: summary.salidasPorPagar,
     },
-    // En modo "Pagos reales" el "Saldo General" (recibido − pagado) confunde
-    // (parece saldo de cuenta y no flujo), así que se oculta.
-    montosPagados
-      ? null
-      : {
-          title: 'Saldo General',
-          value: summary.balance,
-          icon: ScaleIcon,
-          color: summary.balance >= 0 ? 'text-green-600' : 'text-red-600',
-          bgColor: summary.balance >= 0 ? 'bg-green-100' : 'bg-red-50',
-        },
+    // Tarjeta de saldo: en "Todos" es el Saldo General (entradas − salidas); en
+    // "Pagos reales" es el saldo entre lo recibido y lo realizado (recibido − realizado).
+    {
+      title: montosPagados ? 'Saldo de Pagos' : 'Saldo General',
+      value: summary.balance,
+      icon: ScaleIcon,
+      color: summary.balance >= 0 ? 'text-green-600' : 'text-red-600',
+      bgColor: summary.balance >= 0 ? 'bg-green-100' : 'bg-red-50',
+    },
     {
       title: montosPagados ? 'Total de Pagos' : 'Total Transacciones',
       value: summary.totalTransactions,
