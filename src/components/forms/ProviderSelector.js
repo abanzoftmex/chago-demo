@@ -1,6 +1,8 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import Select from 'react-select';
 import { providerService } from '../../lib/services/providerService';
 import { useAuth } from '../../context/AuthContextMultiTenant';
+import { CREATE_NEW, treeSelectStyles, keepCreateFilter, menuPortalTarget } from './treeSelectStyles';
 
 const ProviderSelector = forwardRef(({ 
   value, 
@@ -41,13 +43,15 @@ const ProviderSelector = forwardRef(({
     }
   };
 
-  const handleSelectChange = (e) => {
-    const selectedValue = e.target.value;
-    
-    if (selectedValue === 'CREATE_NEW') {
+  const handleSelectChange = (opt) => {
+    if (!opt) {
+      onChange('');
+      return;
+    }
+    if (opt.value === CREATE_NEW) {
       onCreateNew && onCreateNew();
     } else {
-      onChange(selectedValue);
+      onChange(opt.value);
     }
   };
 
@@ -94,25 +98,32 @@ const ProviderSelector = forwardRef(({
     );
   }
 
+  const options = providers.map((provider) => ({
+    value: provider.id,
+    label: provider.rfc ? `${provider.name} - ${provider.rfc}` : provider.name,
+  }));
+  const allOptions = [
+    ...options,
+    { value: CREATE_NEW, label: "＋ Agregar nuevo proveedor", __isCreate: true },
+  ];
+  const selectedOption = options.find((o) => o.value === value) || null;
+
   return (
     <div className={`relative ${className}`}>
-      <select
-        value={value || ''}
+      <Select
+        value={selectedOption}
         onChange={handleSelectChange}
-        required={required}
-        disabled={disabled}
-        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
-      >
-        <option value="">{placeholder}</option>
-        {providers.map((provider) => (
-          <option key={provider.id} value={provider.id}>
-            {provider.name} - {provider.rfc}
-          </option>
-        ))}
-        <option value="CREATE_NEW" className="font-semibold text-primary">
-          + Agregar nuevo proveedor
-        </option>
-      </select>
+        options={allOptions}
+        styles={treeSelectStyles}
+        filterOption={keepCreateFilter}
+        isSearchable
+        isClearable
+        isDisabled={disabled}
+        placeholder={placeholder}
+        noOptionsMessage={() => "Sin resultados"}
+        menuPortalTarget={menuPortalTarget}
+        menuPosition="fixed"
+      />
     </div>
   );
 });

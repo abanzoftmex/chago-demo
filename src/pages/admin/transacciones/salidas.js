@@ -832,56 +832,40 @@ const SolicitudesPago = () => {
 
           {/* Transaction Form */}
           {showForm && (
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden">
-              <div className="bg-gradient-to-r from-red-600 to-red-700 px-6 py-4">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-white/10 rounded-lg">
-                      <svg
-                        className="w-5 h-5 text-white"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d={editingTransaction ? "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" : "M12 6v6m0 0v6m0-6h6m-6 0H6"}
-                        />
-                      </svg>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-white">
-                        {editingTransaction ? "Editar Gasto" : "Nuevo Gasto"}
-                      </h3>
-                      <p className="text-red-100 text-sm">
-                        {editingTransaction
-                          ? "Modifica los campos para actualizar el gasto"
-                          : "Completa los campos para crear un nuevo gasto"
-                        }
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleCancelForm}
-                    className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
+            <div className="bg-background rounded-lg border border-border overflow-hidden">
+              {/* Cabecera consistente (fondo rojo claro para salidas) */}
+              <div className="flex items-center justify-between px-6 py-4 bg-red-100 border-b border-red-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/70 rounded-lg text-red-700">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
+                        d={editingTransaction ? "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" : "M12 6v6m0 0v6m0-6h6m-6 0H6"}
                       />
                     </svg>
-                  </button>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-red-800">
+                      {editingTransaction ? "Editar Salida" : "Nueva Salida"}
+                    </h3>
+                    <p className="text-sm text-red-700/80">
+                      {editingTransaction
+                        ? "Modifica los campos para actualizar la salida"
+                        : "Completa los campos para registrar una nueva salida"}
+                    </p>
+                  </div>
                 </div>
+                <button
+                  onClick={handleCancelForm}
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-red-300 rounded-md text-sm font-medium text-red-800 bg-white hover:bg-red-50 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                  Volver
+                </button>
               </div>
               <div className="p-6">
                 <TransactionForm

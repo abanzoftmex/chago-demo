@@ -29,6 +29,7 @@ const WeeklyBreakdownSalidas = ({
   currentDate,
   formatCurrency,
   soloPagados = false,
+  montosPagados = false,
 }) => {
   const { user } = useAuth();
   const [selectedWeekDetail, setSelectedWeekDetail] = useState(null);
@@ -50,6 +51,18 @@ const WeeklyBreakdownSalidas = ({
   // Monto por transacción según el modo (para los modales de detalle)
   const montoTransaccion = (t) =>
     soloPagados ? t.totalPaid || 0 : t.amount || 0;
+
+  // En modo Pagos reales las filas son pagos (isPayment): se muestra la fecha de la
+  // transacción origen como columna extra.
+  const showOrigin =
+    selectedWeekDetail?.transactions?.some((t) => t.isPayment) || false;
+  const fmtDate = (d) => {
+    if (!d) return "-";
+    const dt = d?.toDate ? d.toDate() : new Date(d);
+    return isNaN(dt.getTime())
+      ? "-"
+      : dt.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+  };
 
   if (!stats || !wb || !wb.weeks) {
     return null;
@@ -76,7 +89,7 @@ const WeeklyBreakdownSalidas = ({
     <div className="bg-background rounded-lg border border-border p-6">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold text-red-700">
-          Resumen Mes {currentMonthName} - Salidas
+          Resumen Mes {currentMonthName} - {montosPagados ? "Pagos realizados" : "Salidas"}
         </h3>
       </div>
 
@@ -245,11 +258,16 @@ const WeeklyBreakdownSalidas = ({
                       <thead className="bg-gray-100 sticky top-0">
                         <tr>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                            Fecha
+                            {showOrigin ? "Fecha de pago" : "Fecha"}
                           </th>
                           <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
-                            Monto
+                            {showOrigin ? "Monto pagado" : "Monto"}
                           </th>
+                          {showOrigin && (
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                              Fecha origen
+                            </th>
+                          )}
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                             Descripción
                           </th>
@@ -271,7 +289,7 @@ const WeeklyBreakdownSalidas = ({
                           .map((transaction, index) => {
                             const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date);
                             
-                            const paymentBadge = getPaymentStatusBadge(transaction.status);
+                            const paymentBadge = getPaymentStatusBadge(transaction.parentStatus || transaction.status);
                             
                             return (
                               <tr key={transaction.id || index} className="hover:bg-gray-50">
@@ -284,7 +302,20 @@ const WeeklyBreakdownSalidas = ({
                                 </td>
                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-semibold text-red-600">
                                   {formatCurrency(montoTransaccion(transaction))}
+                                  {transaction.isPayment && (
+                                    <div className="text-xs font-normal text-gray-500 mt-0.5">
+                                      de {formatCurrency(transaction.parentAmount || 0)}
+                                      {transaction.parentBalance > 0 && (
+                                        <span className="text-amber-600"> · falta {formatCurrency(transaction.parentBalance)}</span>
+                                      )}
+                                    </div>
+                                  )}
                                 </td>
+                                {showOrigin && (
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                    {fmtDate(transaction.parentDate)}
+                                  </td>
+                                )}
                                 <td className="px-4 py-3 text-sm text-gray-900 max-w-xs truncate" title={transaction.description || 'Sin descripción'}>
                                   {transaction.description || 'Sin descripción'}
                                 </td>

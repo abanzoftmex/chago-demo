@@ -223,7 +223,7 @@ const Ingresos = () => {
   };
 
   const handleNewTransaction = () => {
-    setShowForm(true);
+    router.push('/admin/transacciones/nueva-entrada');
   };
 
   const handleCancelForm = () => {
@@ -750,36 +750,49 @@ const Ingresos = () => {
 
           {/* Transaction Form */}
           {showForm && (
-            <div className="bg-background rounded-lg border border-border p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-medium text-foreground">
-                  {editingTransaction ? "Editar Entrada" : "Nueva Entrada"}
-                </h3>
+            <div className="bg-background rounded-lg border border-border overflow-hidden">
+              {/* Cabecera consistente (fondo verde claro para entradas) */}
+              <div className="flex items-center justify-between px-6 py-4 bg-green-100 border-b border-green-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/70 rounded-lg text-green-700">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d={editingTransaction ? "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" : "M12 6v6m0 0v6m0-6h6m-6 0H6"}
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-green-800">
+                      {editingTransaction ? "Editar Entrada" : "Nueva Entrada"}
+                    </h3>
+                    <p className="text-sm text-green-700/80">
+                      {editingTransaction
+                        ? "Modifica los campos para actualizar la entrada"
+                        : "Completa los campos para registrar una nueva entrada"}
+                    </p>
+                  </div>
+                </div>
                 <button
                   onClick={handleCancelForm}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-green-300 rounded-md text-sm font-medium text-green-800 bg-white hover:bg-green-50 transition-colors"
                 >
-                  <svg
-                    className="w-6 h-6"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                   </svg>
+                  Volver
                 </button>
               </div>
-              <TransactionForm
-                type="entrada"
-                initialData={editingTransaction}
-                onSuccess={handleTransactionSuccess}
-                onCancel={handleCancelForm}
-              />
+              <div className="p-6">
+                <TransactionForm
+                  type="entrada"
+                  initialData={editingTransaction}
+                  onSuccess={handleTransactionSuccess}
+                  onCancel={handleCancelForm}
+                />
+              </div>
             </div>
           )}
 

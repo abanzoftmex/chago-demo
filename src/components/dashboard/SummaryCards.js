@@ -5,7 +5,7 @@ import {
   DocumentTextIcon 
 } from '@heroicons/react/24/outline';
 
-const SummaryCards = ({ summary, currentMonthName }) => {
+const SummaryCards = ({ summary, currentMonthName, montosPagados = false }) => {
   // El label puede ser un mes ("Septiembre de 2026") o un rango personalizado
   // ("1 sept 2026 – 15 sept 2026"). Se detecta por el separador "–".
   const isRange = currentMonthName ? currentMonthName.includes('–') : false;
@@ -17,9 +17,18 @@ const SummaryCards = ({ summary, currentMonthName }) => {
       : currentMonthName.split(' ')[0]
     : '';
 
+  // En modo "Pagos reales" los montos son pagos por fecha de pago, no las
+  // transacciones normales: se ajustan los títulos para no confundir.
+  const entradasTitle = montosPagados
+    ? `Pagos recibidos (${periodLabel})`
+    : `Entradas del ${periodWord} (${periodLabel})`;
+  const salidasTitle = montosPagados
+    ? `Pagos realizados (${periodLabel})`
+    : `Salidas del ${periodWord} (${periodLabel})`;
+
   const cards = [
     {
-      title: `Entradas del ${periodWord} (${periodLabel})`,
+      title: entradasTitle,
       bgcolorcard: 'bg-green-50',
       value: summary.entradas,
       icon: ArrowTrendingUpIcon,
@@ -30,7 +39,7 @@ const SummaryCards = ({ summary, currentMonthName }) => {
       pendingValue: summary.entradasPorPagar,
     },
     {
-      title: `Salidas del ${periodWord} (${periodLabel})`,
+      title: salidasTitle,
       bgcolorcard: 'bg-red-50',
       value: summary.salidas,
       icon: ArrowTrendingDownIcon,
@@ -40,15 +49,19 @@ const SummaryCards = ({ summary, currentMonthName }) => {
       pendingLabel: 'Por pagar',
       pendingValue: summary.salidasPorPagar,
     },
+    // En modo "Pagos reales" el "Saldo General" (recibido − pagado) confunde
+    // (parece saldo de cuenta y no flujo), así que se oculta.
+    montosPagados
+      ? null
+      : {
+          title: 'Saldo General',
+          value: summary.balance,
+          icon: ScaleIcon,
+          color: summary.balance >= 0 ? 'text-green-600' : 'text-red-600',
+          bgColor: summary.balance >= 0 ? 'bg-green-100' : 'bg-red-50',
+        },
     {
-      title: 'Saldo General',
-      value: summary.balance,
-      icon: ScaleIcon,
-      color: summary.balance >= 0 ? 'text-green-600' : 'text-red-600',
-      bgColor: summary.balance >= 0 ? 'bg-green-100' : 'bg-red-50',
-    },
-    {
-      title: 'Total Transacciones',
+      title: montosPagados ? 'Total de Pagos' : 'Total Transacciones',
       value: summary.totalTransactions,
       icon: DocumentTextIcon,
       color: 'text-gray-600',
@@ -58,7 +71,7 @@ const SummaryCards = ({ summary, currentMonthName }) => {
       entradasCount: summary.entradasCount,
       salidasCount: summary.salidasCount
     }
-  ];
+  ].filter(Boolean);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('es-MX', {
@@ -102,7 +115,7 @@ const SummaryCards = ({ summary, currentMonthName }) => {
                   </div>
                 ) : card.count !== undefined && (
                   <p className="text-sm text-muted-foreground mt-1">
-                    <strong>{card.count}</strong> transaccion(es)
+                    <strong>{card.count}</strong> {montosPagados ? 'pago(s)' : 'transaccion(es)'}
                   </p>
                 )}
               </div>

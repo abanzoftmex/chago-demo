@@ -17,7 +17,9 @@ import { recurringExpenseService } from "../../lib/services/recurringExpenseServ
 import {
   reportService,
   filterTransactionsByDateRange,
+  expandPaymentsToSyntheticTx,
 } from "../../lib/services/reportService";
+import { paymentService } from "../../lib/services/paymentService";
 import TreeComparisonSection from "../../components/reports/TreeComparisonSection";
 import WeeklyBreakdownCombined from "../../components/reports/WeeklyBreakdownCombined";
 import WeeklyBreakdownEntradas from "../../components/reports/WeeklyBreakdownEntradas";
@@ -35,7 +37,7 @@ function withTimeout(promise, ms, message) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
 }
 
-function groupTransactionsByDay(transactions, currentDate) {
+function groupTransactionsByDay(transactions, currentDate, soloPagados = false) {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -56,13 +58,17 @@ function groupTransactionsByDay(transactions, currentDate) {
       : new Date(transaction.date);
     const day = transactionDate.getDate();
     const dayKey = `Día ${day}`;
+    // En modo "pagos reales" se usa lo efectivamente pagado (totalPaid).
+    const value = soloPagados
+      ? transaction.totalPaid || 0
+      : transaction.amount || 0;
 
     if (dailyData[dayKey]) {
       if (transaction.type === "entrada") {
-        dailyData[dayKey].entradas += transaction.amount || 0;
+        dailyData[dayKey].entradas += value;
         dailyData[dayKey].entradasCount++;
       } else if (transaction.type === "salida") {
-        dailyData[dayKey].salidas += transaction.amount || 0;
+        dailyData[dayKey].salidas += value;
         dailyData[dayKey].salidasCount++;
       }
     }
@@ -87,6 +93,28 @@ const Dashboard = () => {
 
   const [monthlyTrends, setMonthlyTrends] = useState([]);
   const [currentDate, setCurrentDate] = useState(new Date());
+  // Modo de montos: false = todos (registrados), true = solo pagos reales realizados
+  const [soloPagados, setSoloPagados] = useState(false);
+
+  // Recordar la preferencia del switch por máquina/navegador (localStorage).
+  // Se lee en un efecto (cliente) para no romper la hidratación de Next.
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("dashboardSoloPagados") === "true") {
+        setSoloPagados(true);
+      }
+    } catch {
+      /* localStorage no disponible: se usa el valor por defecto */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("dashboardSoloPagados", soloPagados ? "true" : "false");
+    } catch {
+      /* ignorar si localStorage no está disponible */
+    }
+  }, [soloPagados]);
 
   const currentMonthName = useMemo(() => {
     const monthName = currentDate.toLocaleDateString("es-ES", {
@@ -100,6 +128,10 @@ const Dashboard = () => {
   const [stats, setStats] = useState(null);
   const [allTransactionsReport, setAllTransactionsReport] = useState([]);
   const [transactionsReport, setTransactionsReport] = useState([]);
+  // Dataset "por fecha de pago" (modo Pagos reales)
+  const [statsPagados, setStatsPagados] = useState(null);
+  const [paymentsInRange, setPaymentsInRange] = useState([]);
+  const [paymentsAllSynthetic, setPaymentsAllSynthetic] = useState([]);
   const [generals, setGenerals] = useState([]);
   const [concepts, setConcepts] = useState([]);
   const [subconcepts, setSubconcepts] = useState([]);
@@ -303,16 +335,150 @@ const Dashboard = () => {
     }
   }, [tenantInfo?.id, checkAndGenerateRecurringTransactions]);
 
+  // Dataset "por fecha de pago" SOLO cuando el modo Pagos reales está activo.
+  // Se calcula de forma perezosa y aislada del load principal (así el modo "Todos"
+  // no paga el costo de leer pagos ni recalcular stats). Guardado y cancelable.
+  useEffect(() => {
+    if (!soloPagados) return;
+    const tid = tenantInfo?.id;
+    if (!tid || !allTransactionsReport.length) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const paymentsRaw = await paymentService.getAll(tid);
+        if (cancelled) return;
+        const txById = new Map(allTransactionsReport.map((t) => [t.id, t]));
+        const syntheticAll = expandPaymentsToSyntheticTx(paymentsRaw, txById);
+        const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+        const endOfMonth = new Date(
+          currentDate.getFullYear(),
+          currentDate.getMonth() + 1,
+          0,
+          23,
+          59,
+          59,
+          999
+        );
+        const syntheticInRange = filterTransactionsByDateRange(
+          syntheticAll,
+          startOfMonth,
+          endOfMonth,
+          {}
+        );
+        const filterData = {
+          startDate: startOfMonth,
+          endDate: endOfMonth,
+          type: null,
+          generalId: null,
+          conceptId: null,
+          subconceptId: null,
+          division: null,
+        };
+        const statsPagadosData = await reportService.generateReportStats(
+          syntheticInRange,
+          filterData,
+          tid,
+          {
+            referenceData: {
+              concepts,
+              providers,
+              descriptions: [],
+              generals,
+              subconcepts,
+            },
+          }
+        );
+        if (cancelled) return;
+        setPaymentsAllSynthetic(syntheticAll);
+        setPaymentsInRange(syntheticInRange);
+        setStatsPagados(statsPagadosData);
+      } catch (e) {
+        console.error("Error building payments dataset:", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [soloPagados, tenantInfo?.id, allTransactionsReport, currentDate]);
+
+  // Modo Pagos reales: se usa el dataset "por fecha de pago" (statsPagados / pagos
+  // sintéticos) en todas las secciones de montos; el dataset ya codifica el modo.
+  const activeStats = soloPagados ? statsPagados : stats;
+  const activeTx = soloPagados ? paymentsInRange : transactionsReport;
+  const activeAllTx = soloPagados ? paymentsAllSynthetic : allTransactionsReport;
+
   const treeComparisonData = useMemo(() => {
-    if (!stats) return [];
+    if (!activeStats) return [];
     return calculateTreeComparison(
-      allTransactionsReport,
-      stats,
+      activeAllTx,
+      activeStats,
       filters,
       generals,
-      concepts
+      concepts,
+      false
     );
-  }, [allTransactionsReport, stats, filters, generals, concepts]);
+  }, [activeAllTx, activeStats, filters, generals, concepts]);
+
+  // Resumen mostrado según el modo:
+  // - Todos: montos registrados del mes (summary).
+  // - Pagos reales: montos por fecha de pago (statsPagados).
+  const displaySummary = useMemo(() => {
+    if (!soloPagados) return summary;
+    const s = statsPagados;
+    if (!s) return summary;
+
+    // "Por pagar" = saldo pendiente de las transacciones del mes (dato transaccional).
+    const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const end = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999
+    );
+    let pendEntradas = 0;
+    let pendSalidas = 0;
+    (transactionsReport || []).forEach((t) => {
+      const d = t.date?.toDate ? t.date.toDate() : new Date(t.date);
+      if (isNaN(d.getTime()) || d < start || d > end) return;
+      const amount = t.amount || 0;
+      const paid = t.totalPaid || 0;
+      const balance =
+        t.balance !== undefined && t.balance !== null ? t.balance : amount - paid;
+      const restante = Math.max(0, balance);
+      if (t.type === "entrada") pendEntradas += restante;
+      else if (t.type === "salida") pendSalidas += restante;
+    });
+
+    return {
+      entradas: s.totalEntradas,
+      salidas: s.totalSalidas,
+      balance: s.totalEntradas - s.totalSalidas,
+      totalTransactions: s.entradasCount + s.salidasCount,
+      entradasCount: s.entradasCount,
+      salidasCount: s.salidasCount,
+      entradasPorPagar: pendEntradas,
+      salidasPorPagar: pendSalidas,
+    };
+  }, [soloPagados, summary, statsPagados, transactionsReport, currentDate]);
+
+  // Gráfica de movimientos diarios según el modo:
+  // - Todos: transacciones del mes por su fecha (dailyData registrado).
+  // - Pagos reales: pagos del mes por su fecha de pago.
+  const dailyChartData = useMemo(() => {
+    if (!soloPagados) return dailyData;
+    return groupTransactionsByDay(paymentsInRange, currentDate, false);
+  }, [soloPagados, dailyData, paymentsInRange, currentDate]);
+
+  // Tendencias mensuales (últimos 6 meses) según el modo.
+  // En pagos reales se agrupan los pagos por su fecha de pago.
+  const monthlyTrendsDisplay = useMemo(() => {
+    if (!soloPagados) return monthlyTrends;
+    return dashboardService.buildMonthlyTrends(paymentsAllSynthetic, new Date(), false);
+  }, [soloPagados, monthlyTrends, paymentsAllSynthetic]);
 
   const handleDateChange = (newDate) => {
     setCurrentDate(newDate);
@@ -368,17 +534,48 @@ const Dashboard = () => {
           </div>
         </div>
 
-      
+        {/* Switch de Montos: Todos / Solo pagos reales realizados */}
+        <div className="flex items-center justify-end gap-3">
+          <span className="text-sm font-medium text-muted-foreground">Montos:</span>
+          <div className="inline-flex items-center rounded-lg border border-border bg-background p-1 text-sm">
+            <button
+              type="button"
+              onClick={() => setSoloPagados(false)}
+              className={`px-3 py-1.5 rounded-md font-medium transition-colors ${
+                !soloPagados
+                  ? "bg-[#38425b] text-white"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Todos
+            </button>
+            <button
+              type="button"
+              onClick={() => setSoloPagados(true)}
+              className={`px-3 py-1.5 rounded-md font-medium transition-colors ${
+                soloPagados
+                  ? "bg-[#38425b] text-white"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Pagos reales realizados
+            </button>
+          </div>
+        </div>
 
         {/* Summary Cards */}
-        <SummaryCards summary={summary} currentMonthName={currentMonthName} />
+        <SummaryCards
+          summary={displaySummary}
+          currentMonthName={currentMonthName}
+          montosPagados={soloPagados}
+        />
 
         {/* Report Sections */}
-        {stats && (
+        {activeStats && (
           <div className="space-y-6">
             {/* Tree Comparison Section */}
             <TreeComparisonSection
-              stats={stats}
+              stats={activeStats}
               currentMonthName={currentMonthName}
               calculateTreeComparison={() => treeComparisonData}
               formatCurrency={formatCurrency}
@@ -386,13 +583,14 @@ const Dashboard = () => {
               subconcepts={subconcepts}
               generals={generals}
               providers={providers}
+              soloPagados={false}
             />
 
             {/* Weekly Breakdown Combined (Entradas + Salidas) */}
             <WeeklyBreakdownCombined
-              stats={stats}
+              stats={activeStats}
               currentMonthName={currentMonthName}
-              transactions={transactionsReport}
+              transactions={activeTx}
               generals={generals}
               concepts={concepts}
               subconcepts={subconcepts}
@@ -400,13 +598,15 @@ const Dashboard = () => {
               filters={filters}
               currentDate={currentDate}
               formatCurrency={formatCurrency}
+              soloPagados={false}
+              montosPagados={soloPagados}
             />
 
             {/* Weekly Breakdown for Entradas */}
             <WeeklyBreakdownEntradas
-              stats={stats}
+              stats={activeStats}
               currentMonthName={currentMonthName}
-              transactions={transactionsReport}
+              transactions={activeTx}
               generals={generals}
               concepts={concepts}
               subconcepts={subconcepts}
@@ -414,13 +614,15 @@ const Dashboard = () => {
               filters={filters}
               currentDate={currentDate}
               formatCurrency={formatCurrency}
+              soloPagados={false}
+              montosPagados={soloPagados}
             />
 
             {/* Weekly Breakdown for Salidas */}
             <WeeklyBreakdownSalidas
-              stats={stats}
+              stats={activeStats}
               currentMonthName={currentMonthName}
-              transactions={transactionsReport}
+              transactions={activeTx}
               generals={generals}
               concepts={concepts}
               subconcepts={subconcepts}
@@ -428,6 +630,8 @@ const Dashboard = () => {
               filters={filters}
               currentDate={currentDate}
               formatCurrency={formatCurrency}
+              soloPagados={false}
+              montosPagados={soloPagados}
             />
           </div>
         )}
@@ -435,8 +639,8 @@ const Dashboard = () => {
         {/* Charts Section */}
         <div className="space-y-6">
           {/* Movimientos Diarios - Entradas y Salidas */}
-          {Object.keys(dailyData).length > 0 ? (
-            <DailyTransactionsChart data={dailyData} monthName={currentMonthName} currentDate={currentDate} />
+          {Object.keys(dailyChartData).length > 0 ? (
+            <DailyTransactionsChart data={dailyChartData} monthName={currentMonthName} currentDate={currentDate} />
           ) : (
             <div className="bg-background rounded-lg border border-border p-6">
               <div className="border-2 border-dashed border-border rounded-lg h-64 flex items-center justify-center">
@@ -452,8 +656,8 @@ const Dashboard = () => {
         </div>
 
         {/* Monthly Trends Chart */}
-        {monthlyTrends.length > 0 ? (
-          <MonthlyTrendsChart data={monthlyTrends} />
+        {monthlyTrendsDisplay.length > 0 ? (
+          <MonthlyTrendsChart data={monthlyTrendsDisplay} />
         ) : (
           <div className="bg-background rounded-lg border border-border p-6">
             <div className="border-2 border-dashed border-border rounded-lg h-64 flex items-center justify-center">

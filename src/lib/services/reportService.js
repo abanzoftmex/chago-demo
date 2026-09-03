@@ -34,6 +34,62 @@ export function filterTransactionsByDateRange(transactions, startDate, endDate, 
   });
 }
 
+/**
+ * Expande pagos individuales en "transacciones sintéticas" fechadas por el PAGO,
+ * para reportes de flujo por fecha de pago. Cada pago hereda el árbol (general,
+ * concepto, subconcepto, proveedor, tipo) de su transacción padre. El monto del
+ * registro sintético es el monto del pago (dinero que realmente se movió).
+ *
+ * @param {Array} payments - docs de la colección payments ({ transactionId, amount, date, notes })
+ * @param {Map|Object} transactionsById - lookup id -> transacción
+ */
+export function expandPaymentsToSyntheticTx(payments, transactionsById) {
+  if (!Array.isArray(payments)) return [];
+  const getTx = (id) =>
+    transactionsById instanceof Map
+      ? transactionsById.get(id)
+      : transactionsById?.[id];
+
+  const synthetic = [];
+  payments.forEach((p) => {
+    const tx = getTx(p.transactionId);
+    if (!tx) return; // pago huérfano (transacción eliminada)
+    const amount = p.amount || 0;
+    // Contexto de la transacción PADRE (para mostrar la historia completa en los
+    // modales: monto total de la transacción, saldo restante y estatus).
+    const parentAmount = tx.amount || 0;
+    const parentPaid = tx.totalPaid || 0;
+    const parentBalance =
+      tx.balance !== undefined && tx.balance !== null
+        ? tx.balance
+        : parentAmount - parentPaid;
+    synthetic.push({
+      id: p.id,
+      transactionId: p.transactionId,
+      date: p.date, // FECHA DEL PAGO -> dirige todo el bucketing
+      amount,
+      type: tx.type,
+      generalId: tx.generalId,
+      conceptId: tx.conceptId,
+      subconceptId: tx.subconceptId,
+      providerId: tx.providerId,
+      description: tx.description || p.notes || "",
+      notes: p.notes || "",
+      totalPaid: amount,
+      balance: 0,
+      status: "pagado",
+      // Datos de la transacción padre (solo presentes en registros de pago)
+      isPayment: true,
+      parentAmount,
+      parentPaid,
+      parentBalance: Math.max(0, parentBalance),
+      parentStatus: tx.status || "pendiente",
+      parentDate: tx.date, // fecha de la transacción origen
+    });
+  });
+  return synthetic;
+}
+
 export const reportService = {
   // Obtener transacciones filtradas para reportes incluyendo el arrastre de pendientes
   // El "arrastre" incluye TODOS los gastos pendientes de todos los meses (no solo anteriores)

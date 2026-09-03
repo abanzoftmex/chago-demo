@@ -222,6 +222,25 @@ const TreeComparisonSection = ({
           ]?.weekNumber ??
           selectedTreeTransactions.weekNumber;
 
+        // En modo Pagos reales las filas son pagos: se muestra la historia completa
+        // (fecha de pago, de X · falta Y, fecha origen y estado de la transacción origen).
+        const showOrigin = selectedTreeTransactions.transactions?.some((t) => t.isPayment) || false;
+        const fmtDate = (d) => {
+          if (!d) return "-";
+          const dt = d?.toDate ? d.toDate() : new Date(d);
+          return isNaN(dt.getTime())
+            ? "-"
+            : dt.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+        };
+        const estadoInfo = (s) => {
+          const st = (s || "pendiente").toLowerCase();
+          if (st === "pagado" || st === "liquidado")
+            return { label: "Pagado", cls: "bg-green-100 text-green-800" };
+          if (st === "parcial")
+            return { label: "Parcial", cls: "bg-amber-100 text-amber-800" };
+          return { label: "Pendiente", cls: "bg-gray-100 text-gray-700" };
+        };
+
         // Ordenar todas las transacciones cronológicamente usando createdAt (timestamp completo)
         const sortedTransactions = [...selectedTreeTransactions.transactions].sort((a, b) => {
           // Prioridad 1: Usar createdAt si está disponible (tiene timestamp completo)
@@ -329,7 +348,7 @@ const TreeComparisonSection = ({
                       <thead className="bg-gray-100 sticky top-0">
                         <tr>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                            Fecha Transacción
+                            {showOrigin ? "Fecha de pago" : "Fecha Transacción"}
                           </th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                             Subconcepto
@@ -338,14 +357,24 @@ const TreeComparisonSection = ({
                             Tipo
                           </th>
                           <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
-                            Monto
+                            {showOrigin ? "Monto pagado" : "Monto"}
                           </th>
+                          {showOrigin && (
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                              Fecha origen
+                            </th>
+                          )}
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                             Descripción
                           </th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                             Proveedor
                           </th>
+                          {showOrigin && (
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                              Estado
+                            </th>
+                          )}
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
@@ -399,7 +428,20 @@ const TreeComparisonSection = ({
                                 transaction.type === 'entrada' ? 'text-green-600' : 'text-red-600'
                               }`}>
                                 {transaction.type === 'entrada' ? '+' : '-'}{formatCurrency(montoTransaccion(transaction))}
+                                {transaction.isPayment && (
+                                  <div className="text-xs font-normal text-gray-500 mt-0.5">
+                                    de {formatCurrency(transaction.parentAmount || 0)}
+                                    {transaction.parentBalance > 0 && (
+                                      <span className="text-amber-600"> · falta {formatCurrency(transaction.parentBalance)}</span>
+                                    )}
+                                  </div>
+                                )}
                               </td>
+                              {showOrigin && (
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                  {fmtDate(transaction.parentDate)}
+                                </td>
+                              )}
                               <td className="px-4 py-3 text-sm text-gray-900 max-w-xs truncate" title={transaction.description || 'Sin descripción'}>
                                 {transaction.description || 'Sin descripción'}
                               </td>
@@ -409,6 +451,18 @@ const TreeComparisonSection = ({
                                   providerNameMap
                                 )}
                               </td>
+                              {showOrigin && (
+                                <td className="px-4 py-3 whitespace-nowrap text-sm">
+                                  {(() => {
+                                    const est = estadoInfo(transaction.parentStatus);
+                                    return (
+                                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${est.cls}`}>
+                                        {est.label}
+                                      </span>
+                                    );
+                                  })()}
+                                </td>
+                              )}
                             </tr>
                           );
                         })}

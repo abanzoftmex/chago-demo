@@ -27,16 +27,34 @@ const WeeklyBreakdownCombined = ({
   providers = [],
   filters,
   currentDate,
-  formatCurrency
+  formatCurrency,
+  soloPagados = false,
+  montosPagados = false,
 }) => {
   const { user } = useAuth();
   const [selectedWeekDetail, setSelectedWeekDetail] = useState(null);
   const { disabledRows, toggleRow } = usePersistedDisabledRows(user?.uid, "combined");
   const { selectedWeekOverview, handleWeekOverviewClick, clearWeekOverview } = useWeekDayBreakdown({
-    transactions, generals, concepts, subconcepts, filters, currentDate, type: null,
+    transactions, generals, concepts, subconcepts, filters, currentDate, type: null, soloPagados,
   });
 
-  const weeklyBreakdown = stats?.weeklyBreakdown;
+  // Monto por transacción según el modo (para el modal de detalle)
+  const montoTransaccion = (t) => (soloPagados ? t.totalPaid || 0 : t.amount || 0);
+
+  // En modo Pagos reales las filas son pagos: columna extra con la fecha origen.
+  const showOrigin =
+    selectedWeekDetail?.transactions?.some((t) => t.isPayment) || false;
+  const fmtDate = (d) => {
+    if (!d) return "-";
+    const dt = d?.toDate ? d.toDate() : new Date(d);
+    return isNaN(dt.getTime())
+      ? "-"
+      : dt.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+  };
+
+  const weeklyBreakdown = soloPagados
+    ? stats?.weeklyBreakdownPagados || stats?.weeklyBreakdown
+    : stats?.weeklyBreakdown;
   const weeks = weeklyBreakdown?.weeks || [];
   const entradasBreakdown = weeklyBreakdown?.entradas || {};
   const salidasBreakdown = weeklyBreakdown?.salidas || {};
@@ -83,7 +101,7 @@ const WeeklyBreakdownCombined = ({
     <div className="bg-background rounded-lg border border-border p-6">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold text-gray-700">
-          Resumen Mes {currentMonthName} - Entradas &amp; Salidas
+          Resumen Mes {currentMonthName} - {montosPagados ? "Pagos recibidos & realizados" : "Entradas & Salidas"}
         </h3>
       </div>
 
@@ -377,11 +395,16 @@ const WeeklyBreakdownCombined = ({
                       <thead className="bg-gray-100 sticky top-0">
                         <tr>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                            Fecha
+                            {showOrigin ? "Fecha de pago" : "Fecha"}
                           </th>
                           <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
-                            Monto
+                            {showOrigin ? "Monto pagado" : "Monto"}
                           </th>
+                          {showOrigin && (
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                              Fecha origen
+                            </th>
+                          )}
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                             Descripción
                           </th>
@@ -405,7 +428,7 @@ const WeeklyBreakdownCombined = ({
                               ? transaction.date.toDate()
                               : new Date(transaction.date);
 
-                            const paymentBadge = getPaymentStatusBadge(transaction.status);
+                            const paymentBadge = getPaymentStatusBadge(transaction.parentStatus || transaction.status);
                             const isEntradaModal = selectedWeekDetail.type === "entrada";
 
                             return (
@@ -422,8 +445,21 @@ const WeeklyBreakdownCombined = ({
                                     isEntradaModal ? "text-green-600" : "text-red-600"
                                   }`}
                                 >
-                                  {formatCurrency(transaction.amount || 0)}
+                                  {formatCurrency(montoTransaccion(transaction))}
+                                  {transaction.isPayment && (
+                                    <div className="text-[11px] font-normal text-gray-500 mt-0.5">
+                                      de {formatCurrency(transaction.parentAmount || 0)}
+                                      {transaction.parentBalance > 0 && (
+                                        <span className="text-amber-600"> · falta {formatCurrency(transaction.parentBalance)}</span>
+                                      )}
+                                    </div>
+                                  )}
                                 </td>
+                                {showOrigin && (
+                                  <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-600">
+                                    {fmtDate(transaction.parentDate)}
+                                  </td>
+                                )}
                                 <td
                                   className="px-3 py-2 text-xs text-gray-900 max-w-xs truncate"
                                   title={transaction.description || "Sin descripción"}

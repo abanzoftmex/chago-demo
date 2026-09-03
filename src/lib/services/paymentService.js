@@ -192,6 +192,24 @@ export const paymentService = {
     }
   },
 
+  // Get ALL payments for a tenant (para reportes por fecha de pago).
+  // Lee la colección completa sin where/orderBy para no requerir índices; el
+  // consumidor filtra/ordena en cliente. Cada pago conserva su propio `date`.
+  async getAll(tenantId = null) {
+    try {
+      const collectionPath = getPaymentsCollection(tenantId);
+      const querySnapshot = await getDocs(collection(db, collectionPath));
+      const payments = [];
+      querySnapshot.forEach((docSnap) => {
+        payments.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      return payments;
+    } catch (error) {
+      console.error("Error getting all payments:", error);
+      return [];
+    }
+  },
+
   // Get payments by transaction ID
   async getByTransaction(transactionId, tenantId = null) {
     try {

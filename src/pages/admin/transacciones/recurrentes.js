@@ -6,6 +6,7 @@ import { useAuth } from "../../../context/AuthContextMultiTenant";
 import { useToast } from "../../../components/ui/Toast";
 import Switch from "../../../components/ui/Switch";
 import RecurringExpenseDetailsModal from "../../../components/forms/RecurringExpenseDetailsModal";
+import ConfirmDialog from "../../../components/ui/ConfirmDialog";
 import { recurringExpenseService } from "../../../lib/services/recurringExpenseService";
 import { conceptService } from "../../../lib/services/conceptService";
 import { subconceptService } from "../../../lib/services/subconceptService";
@@ -37,7 +38,16 @@ const GastosRecurrentes = () => {
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [togglingExpense, setTogglingExpense] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: "",
+    message: "",
+    confirmLabel: "Confirmar",
+    onConfirm: null,
+  });
   const { error: notifyError, success: notifySuccess } = useToast();
+
+  const closeConfirm = () => setConfirmDialog((d) => ({ ...d, open: false }));
 
   // Check permissions
   const canManageTransactions = checkPermission("canManageTransactions");
@@ -109,31 +119,18 @@ const GastosRecurrentes = () => {
     }).format(amount);
   };
 
-  const handleToggleActive = async (expenseId, currentStatus) => {
-    // Si se va a desactivar, mostrar confirmación
-    if (currentStatus) {
-      const confirmed = confirm(
-        "¿Estás seguro de que deseas desactivar esta salida recurrente?\n\n" +
-        "⚠️ Esto eliminará todas las transacciones futuras generadas por esta salida recurrente.\n" +
-        "Las transacciones del mes actual y anteriores se mantendrán."
-      );
-      
-      if (!confirmed) {
-        return;
-      }
-    }
-
+  const doToggleActive = async (expenseId) => {
     try {
       setTogglingExpense(expenseId);
       const newStatus = await recurringExpenseService.toggleActive(expenseId, tenantId);
-      setRecurringExpenses(prev => 
-        prev.map(expense => 
-          expense.id === expenseId 
+      setRecurringExpenses(prev =>
+        prev.map(expense =>
+          expense.id === expenseId
             ? { ...expense, isActive: newStatus }
             : expense
         )
       );
-      
+
       if (newStatus) {
         notifySuccess("Salida recurrente activada exitosamente");
       } else {
@@ -145,6 +142,25 @@ const GastosRecurrentes = () => {
     } finally {
       setTogglingExpense(null);
     }
+  };
+
+  const handleToggleActive = (expenseId, currentStatus) => {
+    // Al desactivar, confirmar con modal propio; al activar, sin confirmación.
+    if (currentStatus) {
+      setConfirmDialog({
+        open: true,
+        title: "Desactivar salida recurrente",
+        message:
+          "Esto eliminará todas las transacciones futuras generadas por esta salida recurrente. Las del mes actual y anteriores se mantienen.",
+        confirmLabel: "Desactivar",
+        onConfirm: () => {
+          closeConfirm();
+          doToggleActive(expenseId);
+        },
+      });
+      return;
+    }
+    doToggleActive(expenseId);
   };
 
   const handleViewDetails = (expense) => {
@@ -162,11 +178,7 @@ const GastosRecurrentes = () => {
     setShowDetailsModal(true);
   };
 
-  const handleDelete = async (expenseId) => {
-    if (!confirm("¿Estás seguro de que deseas eliminar esta salida recurrente?")) {
-      return;
-    }
-
+  const doDelete = async (expenseId) => {
     try {
       await recurringExpenseService.delete(expenseId, tenantId);
       setRecurringExpenses(prev => prev.filter(expense => expense.id !== expenseId));
@@ -175,6 +187,20 @@ const GastosRecurrentes = () => {
       console.error("Error deleting expense:", error);
       notifyError("Error al eliminar la salida recurrente");
     }
+  };
+
+  const handleDelete = (expenseId) => {
+    setConfirmDialog({
+      open: true,
+      title: "Eliminar salida recurrente",
+      message:
+        "¿Estás seguro de que deseas eliminar esta salida recurrente? Esta acción no se puede deshacer.",
+      confirmLabel: "Eliminar",
+      onConfirm: () => {
+        closeConfirm();
+        doDelete(expenseId);
+      },
+    });
   };
 
   const filteredExpenses = recurringExpenses.filter((expense) => {
@@ -546,6 +572,16 @@ const GastosRecurrentes = () => {
             providerName={getProviderName(selectedExpense.providerId)}
           />
         )}
+
+        <ConfirmDialog
+          isOpen={confirmDialog.open}
+          type="confirm"
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmLabel={confirmDialog.confirmLabel}
+          onConfirm={confirmDialog.onConfirm}
+          onClose={closeConfirm}
+        />
       </AdminLayout>
     </ProtectedRoute>
   );

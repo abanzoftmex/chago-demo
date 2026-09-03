@@ -32,6 +32,15 @@ select option {
   color: var(--foreground);
 }
 
+/* react-datepicker: input a ancho completo y calendario por encima de todo */
+.react-datepicker-wrapper,
+.react-datepicker__input-container {
+  width: 100%;
+}
+.react-datepicker-popper {
+  z-index: 40;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

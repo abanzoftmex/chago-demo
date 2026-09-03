@@ -3,7 +3,12 @@ import AdminLayout from "../../components/layout/AdminLayout";
 import { useToast } from "../../components/ui/Toast";
 import { Button } from "../../components/ui/Button";
 import SummaryCards from "../../components/dashboard/SummaryCards";
-import { reportService } from "../../lib/services/reportService";
+import {
+  reportService,
+  filterTransactionsByDateRange,
+  expandPaymentsToSyntheticTx,
+} from "../../lib/services/reportService";
+import { paymentService } from "../../lib/services/paymentService";
 import { dashboardService } from "../../lib/services/dashboardService";
 import { generalService } from "../../lib/services/generalService";
 import { conceptService } from "../../lib/services/conceptService";
@@ -39,6 +44,32 @@ import {
   QuestionMarkCircleIcon,
 } from "@heroicons/react/24/outline";
 import Select from "react-select";
+import DatePicker, { registerLocale } from "react-datepicker";
+import { es } from "date-fns/locale";
+
+registerLocale("es", es);
+
+// Convierte "YYYY-MM-DD" (local) a Date y viceversa, sin desfase de zona horaria.
+const parseYmd = (s) => {
+  if (!s) return null;
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
+const toYmd = (dt) => {
+  if (!dt) return "";
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, "0");
+  const d = String(dt.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+// Opciones del filtro de Tipo (react-select para evitar el "apachurramiento" del
+// <select> nativo en Safari y ser consistente con los demás filtros).
+const typeOptions = [
+  { value: "", label: "Todos" },
+  { value: "entrada", label: "Entrada" },
+  { value: "salida", label: "Salida" },
+];
 
 // Estilos de react-select para que los filtros de General/Concepto/Subconcepto
 // (con búsqueda integrada) se vean consistentes con el resto del formulario.
@@ -87,6 +118,11 @@ const Reportes = () => {
   const [transactions, setTransactions] = useState([]);
   const [allTransactions, setAllTransactions] = useState([]); // Todas las transacciones sin filtro de fecha
   const [stats, setStats] = useState(null);
+  // Dataset "por fecha de pago" (modo Pagos reales): pagos expandidos como
+  // transacciones sintéticas + stats calculado sobre ellos.
+  const [statsPagados, setStatsPagados] = useState(null);
+  const [paymentsInRange, setPaymentsInRange] = useState([]);
+  const [paymentsAllSynthetic, setPaymentsAllSynthetic] = useState([]);
   const [generals, setGenerals] = useState([]);
   const [carryoverInfo, setCarryoverInfo] = useState(null);
   const [carryoverStatus, setCarryoverStatus] = useState({
@@ -102,7 +138,10 @@ const Reportes = () => {
   const [showPendingSalidasModal, setShowPendingSalidasModal] = useState(false);
   const [pendingSalidasTransactions, setPendingSalidasTransactions] = useState([]);
 
-  const [filters, setFilters] = useState({
+  // Se recuerda la última selección de filtros del usuario (misma máquina/navegador),
+  // para que al volver a Reportes encuentre lo que dejó. Init perezoso desde localStorage.
+  const REPORTES_FILTERS_KEY = "reportesFilters";
+  const defaultFilters = {
     startDate: "",
     endDate: "",
     type: "",
@@ -111,8 +150,27 @@ const Reportes = () => {
     conceptId: "",
     subconceptId: "",
     division: "",
+  };
+  const [filters, setFilters] = useState(() => {
+    if (typeof window === "undefined") return defaultFilters;
+    try {
+      const saved = JSON.parse(localStorage.getItem(REPORTES_FILTERS_KEY) || "null");
+      if (saved && typeof saved === "object") return { ...defaultFilters, ...saved };
+    } catch {
+      /* localStorage no disponible o corrupto: se usan los defaults */
+    }
+    return defaultFilters;
   });
   const [currentDate, setCurrentDate] = useState(new Date());
+
+  // Persistir los filtros ante cualquier cambio (rango, tipo, montos, árbol...).
+  useEffect(() => {
+    try {
+      localStorage.setItem(REPORTES_FILTERS_KEY, JSON.stringify(filters));
+    } catch {
+      /* almacenamiento no disponible: no es crítico */
+    }
+  }, [filters]);
 
   // Label del período derivado del RANGO real de filtros (no del mes del selector):
   // - Si el rango es un mes calendario completo -> nombre del mes ("Septiembre de 2026").
@@ -217,8 +275,14 @@ const Reportes = () => {
       // Only load if we have tenant info
       if (tenantId) {
         await loadReferenceData();
-        // Set initial date range (report will generate only when user selects a type)
-        handleDateChange(currentDate);
+        // Si había filtros recordados con rango, se respetan (solo se alinea el mes de
+        // navegación); si no, se usa el rango por defecto (mes actual).
+        if (filters.startDate) {
+          const [y, m, d] = filters.startDate.split("-").map(Number);
+          if (y && m && d) setCurrentDate(new Date(y, m - 1, d));
+        } else {
+          handleDateChange(currentDate);
+        }
       }
     };
     initializePage();
@@ -513,6 +577,79 @@ const Reportes = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.startDate, filters.endDate, filters.type, filters.generalId, filters.conceptId, filters.subconceptId, filters.division]);
 
+  // Dataset "por fecha de pago" SOLO cuando el modo Pagos reales está activo.
+  // Perezoso y aislado del reporte registrado (así "Todos" no lee pagos ni recalcula).
+  useEffect(() => {
+    if (filters.montos !== "pagados") return;
+    const tid = tenantInfo?.id;
+    if (!tid || !stats) return; // esperar a que exista un reporte generado
+    let cancelled = false;
+    (async () => {
+      try {
+        let startDate = null;
+        let endDate = null;
+        if (filters.startDate) {
+          const p = filters.startDate.split("-");
+          startDate = new Date(+p[0], +p[1] - 1, +p[2], 0, 0, 0, 0);
+        }
+        if (filters.endDate) {
+          const p = filters.endDate.split("-");
+          endDate = new Date(+p[0], +p[1] - 1, +p[2], 23, 59, 59, 999);
+        }
+        const filterData = {
+          ...filters,
+          startDate,
+          endDate,
+          conceptId: filters.conceptId || null,
+          subconceptId: filters.subconceptId || null,
+          division: filters.division || null,
+        };
+        const paymentsRaw = await paymentService.getAll(tid);
+        if (cancelled) return;
+        const txById = new Map((allTransactions || []).map((t) => [t.id, t]));
+        const syntheticAll = expandPaymentsToSyntheticTx(paymentsRaw, txById);
+        const rangeFilters = {
+          type: filterData.type || undefined,
+          generalId: filterData.generalId || undefined,
+          conceptId: filterData.conceptId || undefined,
+          subconceptId: filterData.subconceptId || undefined,
+          division: filterData.division || undefined,
+        };
+        const syntheticInRange =
+          startDate && endDate
+            ? filterTransactionsByDateRange(syntheticAll, startDate, endDate, rangeFilters)
+            : syntheticAll;
+        const statsPagadosData = await reportService.generateReportStats(
+          syntheticInRange,
+          filterData,
+          tid
+        );
+        if (cancelled) return;
+        setPaymentsAllSynthetic(syntheticAll);
+        setPaymentsInRange(syntheticInRange);
+        setStatsPagados(statsPagadosData);
+      } catch (e) {
+        console.error("Error building payments dataset (reportes):", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    filters.montos,
+    filters.startDate,
+    filters.endDate,
+    filters.type,
+    filters.generalId,
+    filters.conceptId,
+    filters.subconceptId,
+    filters.division,
+    stats,
+    allTransactions,
+    tenantInfo?.id,
+  ]);
+
   const handleFilterChange = (field, value) => {
     setFilters((prev) => {
       const newFilters = { ...prev, [field]: value };
@@ -640,16 +777,102 @@ const Reportes = () => {
     }
   };
 
+  // Modo Pagos reales: se usa el dataset "por fecha de pago" (statsPagados / pagos
+  // sintéticos) en las secciones de montos. El dataset ya codifica el modo, por eso
+  // los componentes reciben soloPagados=false. Las secciones de estatus usan `stats`.
+  const soloPagados = filters.montos === "pagados";
+  const activeStatsBase = soloPagados ? statsPagados : stats;
+  const activeTx = soloPagados ? paymentsInRange : transactions;
+  const activeAllTx = soloPagados ? paymentsAllSynthetic : allTransactions;
+
+  // En modo "Pagos reales", la columna "Por Pagar" del desglose es el saldo
+  // pendiente de las transacciones ORIGEN de los pagos del rango (no de los pagos,
+  // que siempre son balance 0). Se deduplica por transacción para no sumar el mismo
+  // saldo por cada pago, y se llavea por nombre igual que generateReportStats.
+  const paymentsPendingByLevel = useMemo(() => {
+    const byGen = {};
+    const byCon = {};
+    const bySub = {};
+    if (!soloPagados) return { byGen, byCon, bySub };
+    const genMap = Object.fromEntries((generals || []).map((g) => [g.id, g.name]));
+    const conMap = Object.fromEntries((concepts || []).map((c) => [c.id, c.name]));
+    const subMap = Object.fromEntries((subconcepts || []).map((s) => [s.id, s.name]));
+    const seen = new Set();
+    (paymentsInRange || []).forEach((p) => {
+      if (seen.has(p.transactionId)) return;
+      seen.add(p.transactionId);
+      const bal = p.parentBalance || 0;
+      const gn = genMap[p.generalId] || "Sin categoría general";
+      const cn = conMap[p.conceptId] || "Sin concepto";
+      const sn = subMap[p.subconceptId] || "Sin subconcepto";
+      byGen[gn] = (byGen[gn] || 0) + bal;
+      byCon[cn] = (byCon[cn] || 0) + bal;
+      bySub[sn] = (bySub[sn] || 0) + bal;
+    });
+    return { byGen, byCon, bySub };
+  }, [soloPagados, paymentsInRange, generals, concepts, subconcepts]);
+
+  // En modo Pagos reales, los breakdown vienen de pagos (pending = 0). Se inyecta el
+  // "Por Pagar" real (saldo de las transacciones origen) para que las tablas de
+  // desglose lo muestren sin cambiar su celda. En modo Todos se usa tal cual.
+  const activeStats = useMemo(() => {
+    if (!soloPagados || !activeStatsBase) return activeStatsBase;
+    // General: solo los grupos con pagos en el rango, con su "Por Pagar" real.
+    const injectPending = (bd, map) => {
+      const out = {};
+      Object.entries(bd || {}).forEach(([name, d]) => {
+        const pend = map[name] || 0;
+        out[name] = { ...d, pendingEntradas: pend, pendingSalidas: pend };
+      });
+      return out;
+    };
+    // Concepto/Subconcepto: se listan TODOS los que tienen transacciones en el rango
+    // (registrados) aunque no tengan pagos aún (Monto pagado 0, "me deben todo"), unidos
+    // con los que sí tuvieron pagos. El "Por Pagar" es el saldo de las transacciones del
+    // período (registrado); si el grupo solo aparece por un pago de una transacción fuera
+    // del rango, se usa el saldo de esa transacción origen.
+    const mergeLevel = (paidBd, regBd, pendMap) => {
+      const out = {};
+      const names = new Set([
+        ...Object.keys(paidBd || {}),
+        ...Object.keys(regBd || {}),
+      ]);
+      names.forEach((name) => {
+        const paid = paidBd?.[name];
+        const reg = regBd?.[name];
+        const pe = reg ? reg.pendingEntradas || 0 : pendMap[name] || 0;
+        const ps = reg ? reg.pendingSalidas || 0 : pendMap[name] || 0;
+        out[name] = {
+          entradas: paid?.entradas || 0,
+          salidas: paid?.salidas || 0,
+          paidEntradas: paid?.paidEntradas || 0,
+          paidSalidas: paid?.paidSalidas || 0,
+          pendingEntradas: pe,
+          pendingSalidas: ps,
+          total: paid?.total || 0,
+          count: paid?.count || 0,
+        };
+      });
+      return out;
+    };
+    return {
+      ...activeStatsBase,
+      generalBreakdown: injectPending(activeStatsBase.generalBreakdown, paymentsPendingByLevel.byGen),
+      conceptBreakdown: mergeLevel(activeStatsBase.conceptBreakdown, stats?.conceptBreakdown, paymentsPendingByLevel.byCon),
+      subconceptBreakdown: mergeLevel(activeStatsBase.subconceptBreakdown, stats?.subconceptBreakdown, paymentsPendingByLevel.bySub),
+    };
+  }, [soloPagados, activeStatsBase, paymentsPendingByLevel, stats]);
+
   // Función para calcular comparativos por árbol (General → Concepto → Subconcepto)
   // Solo para árboles de tipo 'ambos' que tienen transacciones de entrada y salida
   const calculateTreeComparison = () => {
     return calculateTreeComparisonUtil(
-      allTransactions,
-      stats,
+      activeAllTx,
+      activeStats,
       filters,
       generals,
       concepts,
-      filters.montos === "pagados"
+      false
     );
   };
 
@@ -682,7 +905,9 @@ const Reportes = () => {
       return subMap[t.subconceptId] || "Sin subconcepto";
     };
 
-    const rows = (transactions || []).filter((t) => {
+    // En modo Pagos reales, activeTx son los pagos (fechados por pago); en Todos,
+    // las transacciones registradas.
+    const rows = (activeTx || []).filter((t) => {
       if (type && t.type !== type) return false;
       if (nameOf(t) !== name) return false;
       if (rStart && rEnd) {
@@ -723,28 +948,29 @@ const Reportes = () => {
 
           {/* Primera fila: Rango de fechas + Tipo + Estatus */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Date Range */}
+            {/* Date Range (selector de rango con calendario) */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
                 Rango de Fechas
               </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  value={filters.startDate}
-                  onChange={(e) =>
-                    handleFilterChange("startDate", e.target.value)
-                  }
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-                <span className="text-muted-foreground shrink-0">—</span>
-                <input
-                  type="date"
-                  value={filters.endDate}
-                  onChange={(e) => handleFilterChange("endDate", e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
+              <DatePicker
+                selectsRange
+                startDate={parseYmd(filters.startDate)}
+                endDate={parseYmd(filters.endDate)}
+                onChange={([s, e]) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    startDate: toYmd(s),
+                    endDate: toYmd(e),
+                  }))
+                }
+                dateFormat="dd/MM/yyyy"
+                locale="es"
+                isClearable
+                placeholderText="Selecciona un rango"
+                wrapperClassName="w-full"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
             </div>
 
             {/* Type Filter */}
@@ -752,15 +978,16 @@ const Reportes = () => {
               <label className="block text-sm font-medium text-foreground mb-1">
                 Tipo
               </label>
-              <select
-                value={filters.type}
-                onChange={(e) => handleFilterChange("type", e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-              >
-                <option value="">Todos</option>
-                <option value="entrada">Entrada</option>
-                <option value="salida">Salida</option>
-              </select>
+              <Select
+                value={
+                  typeOptions.find((o) => o.value === filters.type) ||
+                  typeOptions[0]
+                }
+                onChange={(opt) => handleFilterChange("type", opt?.value || "")}
+                options={typeOptions}
+                styles={selectStyles}
+                isSearchable={false}
+              />
             </div>
 
             {/* Montos Filter */}
@@ -924,78 +1151,14 @@ const Reportes = () => {
         </div>
 
         {/* Statistics Summary */}
-        {stats && (() => {
-          // Preparar los datos para SummaryCards
+        {activeStats && (() => {
+          // Preparar los datos para SummaryCards. En modo "Pagos reales" activeStats
+          // es statsPagados (montos por fecha de pago); en "Todos" es el registrado.
           const filteredType = getFilteredTransactionType();
-          const soloPagados = filters.montos === "pagados";
-
-          let entradas;
-          let salidas;
-          let entradasCount;
-          let salidasCount;
-
-          let entradasPorPagar;
-          let salidasPorPagar;
-
-          if (soloPagados) {
-            // Modo "Pagos reales realizados": sumar únicamente lo efectivamente
-            // pagado/registrado en cada transacción (totalPaid), no el monto total.
-            // Además se calcula lo pendiente ("Por pagar") = saldo aún no registrado.
-            // IMPORTANTE: solo transacciones DENTRO del rango seleccionado; se excluye
-            // el arrastre de meses anteriores que agrega getFilteredTransactions.
-            const parseLocal = (s) => {
-              if (!s) return null;
-              const [y, m, d] = s.split("-").map(Number);
-              return new Date(y, m - 1, d);
-            };
-            const rStart = parseLocal(filters.startDate);
-            const rEnd = parseLocal(filters.endDate);
-            if (rEnd) rEnd.setHours(23, 59, 59, 999);
-            const enRango = (t) => {
-              if (!rStart || !rEnd) return true;
-              const d = t.date?.toDate ? t.date.toDate() : new Date(t.date);
-              if (isNaN(d.getTime())) return false;
-              return d >= rStart && d <= rEnd;
-            };
-
-            let pagEntradas = 0;
-            let pagSalidas = 0;
-            let pagEntradasCount = 0;
-            let pagSalidasCount = 0;
-            let pendEntradas = 0;
-            let pendSalidas = 0;
-            (transactions || []).forEach((t) => {
-              if (!enRango(t)) return;
-              const amount = t.amount || 0;
-              const paid = t.totalPaid || 0;
-              const balance =
-                t.balance !== undefined && t.balance !== null
-                  ? t.balance
-                  : amount - paid;
-              const restante = Math.max(0, balance);
-              if (t.type === "entrada") {
-                pagEntradas += paid;
-                pendEntradas += restante;
-                if (paid > 0) pagEntradasCount++;
-              } else if (t.type === "salida") {
-                pagSalidas += paid;
-                pendSalidas += restante;
-                if (paid > 0) pagSalidasCount++;
-              }
-            });
-            entradas = filteredType === "salida" ? 0 : pagEntradas;
-            salidas = filteredType === "entrada" ? 0 : pagSalidas;
-            entradasCount = filteredType === "salida" ? 0 : pagEntradasCount;
-            salidasCount = filteredType === "entrada" ? 0 : pagSalidasCount;
-            entradasPorPagar = filteredType === "salida" ? 0 : pendEntradas;
-            salidasPorPagar = filteredType === "entrada" ? 0 : pendSalidas;
-          } else {
-            // Modo "Todos": montos registrados de las transacciones.
-            entradas = filteredType === "salida" ? 0 : stats.totalEntradas;
-            salidas = filteredType === "entrada" ? 0 : stats.totalSalidas;
-            entradasCount = filteredType === "salida" ? 0 : stats.entradasCount;
-            salidasCount = filteredType === "entrada" ? 0 : stats.salidasCount;
-          }
+          const entradas = filteredType === "salida" ? 0 : activeStats.totalEntradas;
+          const salidas = filteredType === "entrada" ? 0 : activeStats.totalSalidas;
+          const entradasCount = filteredType === "salida" ? 0 : activeStats.entradasCount;
+          const salidasCount = filteredType === "entrada" ? 0 : activeStats.salidasCount;
 
           const summary = {
             entradas,
@@ -1004,20 +1167,55 @@ const Reportes = () => {
             totalTransactions: entradasCount + salidasCount,
             entradasCount,
             salidasCount,
-            // Solo en modo "pagos reales": saldo pendiente por registrar (Por pagar)
-            entradasPorPagar,
-            salidasPorPagar,
           };
 
-          return <SummaryCards summary={summary} currentMonthName={currentMonthName} />;
+          // En modo "Pagos reales": además del pagado (por fecha de pago), mostrar
+          // el "Por pagar" = saldo pendiente de las TRANSACCIONES del rango.
+          if (soloPagados) {
+            const parseLocal = (s) => {
+              if (!s) return null;
+              const [y, m, d] = s.split("-").map(Number);
+              return new Date(y, m - 1, d);
+            };
+            const rStart = parseLocal(filters.startDate);
+            const rEnd = parseLocal(filters.endDate);
+            if (rEnd) rEnd.setHours(23, 59, 59, 999);
+            let pendEntradas = 0;
+            let pendSalidas = 0;
+            (transactions || []).forEach((t) => {
+              if (rStart && rEnd) {
+                const d = t.date?.toDate ? t.date.toDate() : new Date(t.date);
+                if (isNaN(d.getTime()) || d < rStart || d > rEnd) return;
+              }
+              const amount = t.amount || 0;
+              const paid = t.totalPaid || 0;
+              const balance =
+                t.balance !== undefined && t.balance !== null
+                  ? t.balance
+                  : amount - paid;
+              const restante = Math.max(0, balance);
+              if (t.type === "entrada") pendEntradas += restante;
+              else if (t.type === "salida") pendSalidas += restante;
+            });
+            summary.entradasPorPagar = filteredType === "salida" ? 0 : pendEntradas;
+            summary.salidasPorPagar = filteredType === "entrada" ? 0 : pendSalidas;
+          }
+
+          return (
+            <SummaryCards
+              summary={summary}
+              currentMonthName={currentMonthName}
+              montosPagados={soloPagados}
+            />
+          );
         })()}
 
-        {stats && (
+        {activeStats && (
           <div className="space-y-6">
 
             {/* Tree Comparison Section - Comparativo por Árbol (Entrada vs Salida) */}
             <TreeComparisonSection
-              stats={stats}
+              stats={activeStats}
               currentMonthName={currentMonthName}
               calculateTreeComparison={calculateTreeComparison}
               formatCurrency={formatCurrency}
@@ -1025,15 +1223,15 @@ const Reportes = () => {
               subconcepts={subconcepts}
               generals={generals}
               providers={providers}
-              soloPagados={filters.montos === "pagados"}
+              soloPagados={false}
             />
 
             {/* Weekly Breakdown for Entradas - PRIMERO */}
             {(!getFilteredTransactionType() || getFilteredTransactionType() === 'entrada') && (
               <WeeklyBreakdownEntradas
-                stats={stats}
+                stats={activeStats}
                 currentMonthName={currentMonthName}
-                transactions={transactions}
+                transactions={activeTx}
                 generals={generals}
                 concepts={concepts}
                 subconcepts={subconcepts}
@@ -1043,16 +1241,17 @@ const Reportes = () => {
                 formatCurrency={formatCurrency}
                 getTreeBalanceByName={getTreeBalanceByName}
                 isAmboTree={isAmboTree}
-                soloPagados={filters.montos === "pagados"}
+                soloPagados={false}
+                montosPagados={soloPagados}
               />
             )}
 
             {/* Weekly Breakdown for Salidas - SEGUNDO */}
             {(!getFilteredTransactionType() || getFilteredTransactionType() === 'salida') && (
               <WeeklyBreakdownSalidas
-                stats={stats}
+                stats={activeStats}
                 currentMonthName={currentMonthName}
-                transactions={transactions}
+                transactions={activeTx}
                 generals={generals}
                 concepts={concepts}
                 subconcepts={subconcepts}
@@ -1062,7 +1261,8 @@ const Reportes = () => {
                 formatCurrency={formatCurrency}
                 getTreeBalanceByName={getTreeBalanceByName}
                 isAmboTree={isAmboTree}
-                soloPagados={filters.montos === "pagados"}
+                soloPagados={false}
+                montosPagados={soloPagados}
               />
             )}
 
@@ -1205,8 +1405,8 @@ const Reportes = () => {
           </div>
         )}
 
-        {/* Payment Status (for salidas) */}
-        {stats && getFilteredTransactionType() === 'salida' && stats.salidasCount > 0 && (
+        {/* Payment Status (for salidas) — sin sentido en modo Pagos reales */}
+        {!soloPagados && stats && getFilteredTransactionType() === 'salida' && stats.salidasCount > 0 && (
           <div className="bg-background rounded-lg border border-border p-6">
             <h3 className="text-lg font-semibold text-foreground flex items-center mb-4">
               <ClockIcon className="h-5 w-5 mr-2" />
@@ -1318,8 +1518,8 @@ const Reportes = () => {
           </div>
         )}
 
-        {/* Payment Status (for entradas) */}
-        {stats && getFilteredTransactionType() === 'entrada' && stats.entradasCount > 0 && (
+        {/* Payment Status (for entradas) — sin sentido en modo Pagos reales */}
+        {!soloPagados && stats && getFilteredTransactionType() === 'entrada' && stats.entradasCount > 0 && (
           <div className="bg-background rounded-lg border border-border p-6">
             <h3 className="text-lg font-semibold text-foreground flex items-center mb-4">
               <ClockIcon className="h-5 w-5 mr-2" />
@@ -1460,9 +1660,9 @@ const Reportes = () => {
         )}
 
         {/* General Breakdown */}
-        {stats && getFilteredTransactionType() && Object.keys(stats.generalBreakdown).length > 0 &&
-          Object.entries(stats.generalBreakdown).some(([general, data]) => 
-            getFilteredTransactionType() === 'entrada' ? data.entradas > 0 : data.salidas > 0
+        {activeStats && getFilteredTransactionType() && Object.keys(activeStats.generalBreakdown).length > 0 &&
+          Object.entries(activeStats.generalBreakdown).some(([general, data]) => 
+            getFilteredTransactionType() === 'entrada' ? (data.entradas > 0 || data.pendingEntradas > 0) : (data.salidas > 0 || data.pendingSalidas > 0)
           ) && (
             <div className="bg-background rounded-lg border border-border p-6">
               <div className="flex justify-between items-center mb-4">
@@ -1487,11 +1687,13 @@ const Reportes = () => {
                         </th>
                       )}
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Monto
+                        {soloPagados ? "Monto pagado" : "Monto"}
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Pagado
-                      </th>
+                      {!soloPagados && (
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Pagado
+                        </th>
+                      )}
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Por Pagar
                       </th>
@@ -1504,9 +1706,9 @@ const Reportes = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-background divide-y divide-border">
-                    {Object.entries(stats.generalBreakdown)
+                    {Object.entries(activeStats.generalBreakdown)
                       .filter(([general, data]) => 
-                        getFilteredTransactionType() === 'entrada' ? data.entradas > 0 : data.salidas > 0
+                        getFilteredTransactionType() === 'entrada' ? (data.entradas > 0 || data.pendingEntradas > 0) : (data.salidas > 0 || data.pendingSalidas > 0)
                       )
                       .map(([general, data]) => (
                         <tr key={general}>
@@ -1536,12 +1738,14 @@ const Reportes = () => {
                               : formatCurrency(data.salidas)
                             }
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
-                            {getFilteredTransactionType() === 'entrada'
-                              ? formatCurrency(data.paidEntradas || 0)
-                              : formatCurrency(data.paidSalidas || 0)
-                            }
-                          </td>
+                          {!soloPagados && (
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
+                              {getFilteredTransactionType() === 'entrada'
+                                ? formatCurrency(data.paidEntradas || 0)
+                                : formatCurrency(data.paidSalidas || 0)
+                              }
+                            </td>
+                          )}
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">
                             {getFilteredTransactionType() === 'entrada'
                               ? formatCurrency(data.pendingEntradas || 0)
@@ -1555,8 +1759,8 @@ const Reportes = () => {
                             getFilteredTransactionType() === 'entrada' ? 'text-green-600' : 'text-red-600'
                             }`}>
                             {getFilteredTransactionType() === 'entrada'
-                              ? formatPercentage(data.entradas, stats.totalEntradas)
-                              : formatPercentage(data.salidas, stats.totalSalidas)
+                              ? formatPercentage(data.entradas, activeStats.totalEntradas)
+                              : formatPercentage(data.salidas, activeStats.totalSalidas)
                             }
                           </td>
                         </tr>
@@ -1569,9 +1773,9 @@ const Reportes = () => {
           )}
 
         {/* Concept Breakdown */}
-        {stats && getFilteredTransactionType() && Object.keys(stats.conceptBreakdown).length > 0 &&
-          Object.entries(stats.conceptBreakdown).some(([concept, data]) => 
-            getFilteredTransactionType() === 'entrada' ? data.entradas > 0 : data.salidas > 0
+        {activeStats && getFilteredTransactionType() && Object.keys(activeStats.conceptBreakdown).length > 0 &&
+          Object.entries(activeStats.conceptBreakdown).some(([concept, data]) => 
+            getFilteredTransactionType() === 'entrada' ? (data.entradas > 0 || data.pendingEntradas > 0) : (data.salidas > 0 || data.pendingSalidas > 0)
           ) && (
             <div className="bg-background rounded-lg border border-border p-6">
               <div className="flex justify-between items-center mb-4">
@@ -1596,11 +1800,13 @@ const Reportes = () => {
                         </th>
                       )}
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Monto
+                        {soloPagados ? "Monto pagado" : "Monto"}
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Pagado
-                      </th>
+                      {!soloPagados && (
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Pagado
+                        </th>
+                      )}
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Por Pagar
                       </th>
@@ -1613,9 +1819,9 @@ const Reportes = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-background divide-y divide-border">
-                    {Object.entries(stats.conceptBreakdown)
+                    {Object.entries(activeStats.conceptBreakdown)
                       .filter(([concept, data]) => 
-                        getFilteredTransactionType() === 'entrada' ? data.entradas > 0 : data.salidas > 0
+                        getFilteredTransactionType() === 'entrada' ? (data.entradas > 0 || data.pendingEntradas > 0) : (data.salidas > 0 || data.pendingSalidas > 0)
                       )
                       .map(([concept, data]) => (
                         <tr key={concept}>
@@ -1645,12 +1851,14 @@ const Reportes = () => {
                               : formatCurrency(data.salidas)
                             }
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
-                            {getFilteredTransactionType() === 'entrada'
-                              ? formatCurrency(data.paidEntradas || 0)
-                              : formatCurrency(data.paidSalidas || 0)
-                            }
-                          </td>
+                          {!soloPagados && (
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
+                              {getFilteredTransactionType() === 'entrada'
+                                ? formatCurrency(data.paidEntradas || 0)
+                                : formatCurrency(data.paidSalidas || 0)
+                              }
+                            </td>
+                          )}
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">
                             {getFilteredTransactionType() === 'entrada'
                               ? formatCurrency(data.pendingEntradas || 0)
@@ -1664,8 +1872,8 @@ const Reportes = () => {
                             getFilteredTransactionType() === 'entrada' ? 'text-green-600' : 'text-red-600'
                             }`}>
                             {getFilteredTransactionType() === 'entrada'
-                              ? formatPercentage(data.entradas, stats.totalEntradas)
-                              : formatPercentage(data.salidas, stats.totalSalidas)
+                              ? formatPercentage(data.entradas, activeStats.totalEntradas)
+                              : formatPercentage(data.salidas, activeStats.totalSalidas)
                             }
                           </td>
                         </tr>
@@ -1678,9 +1886,9 @@ const Reportes = () => {
           )}
 
         {/* Subconcept Breakdown */}
-        {stats && getFilteredTransactionType() && Object.keys(stats.subconceptBreakdown).length > 0 &&
-          Object.entries(stats.subconceptBreakdown).some(([subconcept, data]) => 
-            getFilteredTransactionType() === 'entrada' ? data.entradas > 0 : data.salidas > 0
+        {activeStats && getFilteredTransactionType() && Object.keys(activeStats.subconceptBreakdown).length > 0 &&
+          Object.entries(activeStats.subconceptBreakdown).some(([subconcept, data]) => 
+            getFilteredTransactionType() === 'entrada' ? (data.entradas > 0 || data.pendingEntradas > 0) : (data.salidas > 0 || data.pendingSalidas > 0)
           ) && (
             <div className="bg-background rounded-lg border border-border p-6">
               <div className="flex justify-between items-center mb-4">
@@ -1705,11 +1913,13 @@ const Reportes = () => {
                         </th>
                       )}
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Monto
+                        {soloPagados ? "Monto pagado" : "Monto"}
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Pagado
-                      </th>
+                      {!soloPagados && (
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Pagado
+                        </th>
+                      )}
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Por Pagar
                       </th>
@@ -1722,9 +1932,9 @@ const Reportes = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-background divide-y divide-border">
-                    {Object.entries(stats.subconceptBreakdown)
+                    {Object.entries(activeStats.subconceptBreakdown)
                       .filter(([subconcept, data]) => 
-                        getFilteredTransactionType() === 'entrada' ? data.entradas > 0 : data.salidas > 0
+                        getFilteredTransactionType() === 'entrada' ? (data.entradas > 0 || data.pendingEntradas > 0) : (data.salidas > 0 || data.pendingSalidas > 0)
                       )
                       .map(([subconcept, data]) => (
                         <tr key={subconcept}>
@@ -1754,12 +1964,14 @@ const Reportes = () => {
                               : formatCurrency(data.salidas)
                             }
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
-                            {getFilteredTransactionType() === 'entrada'
-                              ? formatCurrency(data.paidEntradas || 0)
-                              : formatCurrency(data.paidSalidas || 0)
-                            }
-                          </td>
+                          {!soloPagados && (
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
+                              {getFilteredTransactionType() === 'entrada'
+                                ? formatCurrency(data.paidEntradas || 0)
+                                : formatCurrency(data.paidSalidas || 0)
+                              }
+                            </td>
+                          )}
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">
                             {getFilteredTransactionType() === 'entrada'
                               ? formatCurrency(data.pendingEntradas || 0)
@@ -1773,8 +1985,8 @@ const Reportes = () => {
                             getFilteredTransactionType() === 'entrada' ? 'text-green-600' : 'text-red-600'
                             }`}>
                             {getFilteredTransactionType() === 'entrada'
-                              ? formatPercentage(data.entradas, stats.totalEntradas)
-                              : formatPercentage(data.salidas, stats.totalSalidas)
+                              ? formatPercentage(data.entradas, activeStats.totalEntradas)
+                              : formatPercentage(data.salidas, activeStats.totalSalidas)
                             }
                           </td>
                         </tr>
@@ -1822,6 +2034,26 @@ const Reportes = () => {
             selectedBreakdownDetail.level === "general" ||
             selectedBreakdownDetail.level === "concepto";
 
+          // En modo Pagos reales las filas son pagos: se cuenta la "historia" completa
+          // (fecha de pago, de X · falta Y, fecha origen y estado de la transacción origen)
+          // y sobran las columnas Pagado/Por Pagar.
+          const showOrigin = rows.some((t) => t.isPayment);
+          const fmtDate = (d) => {
+            if (!d) return "-";
+            const dt = d?.toDate ? d.toDate() : new Date(d);
+            return isNaN(dt.getTime())
+              ? "-"
+              : dt.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+          };
+          const estadoInfo = (s) => {
+            const st = (s || "pendiente").toLowerCase();
+            if (st === "pagado" || st === "liquidado")
+              return { label: "Pagado", cls: "bg-green-100 text-green-800" };
+            if (st === "parcial")
+              return { label: "Parcial", cls: "bg-amber-100 text-amber-800" };
+            return { label: "Pendiente", cls: "bg-gray-100 text-gray-700" };
+          };
+
           return (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <div
@@ -1865,7 +2097,7 @@ const Reportes = () => {
                           <thead className="bg-gray-100 sticky top-0">
                             <tr>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                                Fecha
+                                {showOrigin ? "Fecha de pago" : "Fecha"}
                               </th>
                               {showConcepto && (
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
@@ -1878,20 +2110,34 @@ const Reportes = () => {
                                 </th>
                               )}
                               <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
-                                Monto
+                                {showOrigin ? "Monto pagado" : "Monto"}
                               </th>
-                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
-                                Pagado
-                              </th>
-                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
-                                Por Pagar
-                              </th>
+                              {showOrigin && (
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                  Fecha origen
+                                </th>
+                              )}
+                              {!showOrigin && (
+                                <>
+                                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                    Pagado
+                                  </th>
+                                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                    Por Pagar
+                                  </th>
+                                </>
+                              )}
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                                 Descripción
                               </th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                                 Proveedor
                               </th>
+                              {showOrigin && (
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                  Estado
+                                </th>
+                              )}
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
@@ -1935,13 +2181,29 @@ const Reportes = () => {
                                       }`}
                                     >
                                       {formatCurrency(montoDe(t))}
+                                      {t.isPayment && (
+                                        <div className="text-xs font-normal text-gray-500 mt-0.5">
+                                          de {formatCurrency(t.parentAmount || 0)}
+                                          {t.parentBalance > 0 && (
+                                            <span className="text-amber-600"> · falta {formatCurrency(t.parentBalance)}</span>
+                                          )}
+                                        </div>
+                                      )}
                                     </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-blue-600">
-                                      {formatCurrency(pagadoDe(t))}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-orange-600">
-                                      {formatCurrency(porPagarDe(t))}
-                                    </td>
+                                    {showOrigin ? (
+                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                        {fmtDate(t.parentDate)}
+                                      </td>
+                                    ) : (
+                                      <>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-blue-600">
+                                          {formatCurrency(pagadoDe(t))}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-orange-600">
+                                          {formatCurrency(porPagarDe(t))}
+                                        </td>
+                                      </>
+                                    )}
                                     <td
                                       className="px-4 py-3 text-sm text-gray-900 max-w-xs truncate"
                                       title={t.description || "Sin descripción"}
@@ -1951,6 +2213,18 @@ const Reportes = () => {
                                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                                       {providerName(t)}
                                     </td>
+                                    {showOrigin && (
+                                      <td className="px-4 py-3 whitespace-nowrap text-sm">
+                                        {(() => {
+                                          const est = estadoInfo(t.parentStatus);
+                                          return (
+                                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${est.cls}`}>
+                                              {est.label}
+                                            </span>
+                                          );
+                                        })()}
+                                      </td>
+                                    )}
                                   </tr>
                                 );
                               })}
@@ -1969,14 +2243,21 @@ const Reportes = () => {
                               >
                                 {formatCurrency(totMonto)}
                               </td>
-                              <td className="px-4 py-3 text-sm text-right text-blue-700">
-                                {formatCurrency(totPagado)}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-right text-orange-700">
-                                {formatCurrency(totPorPagar)}
-                              </td>
+                              {showOrigin ? (
+                                <td className="px-4 py-3"></td>
+                              ) : (
+                                <>
+                                  <td className="px-4 py-3 text-sm text-right text-blue-700">
+                                    {formatCurrency(totPagado)}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-right text-orange-700">
+                                    {formatCurrency(totPorPagar)}
+                                  </td>
+                                </>
+                              )}
                               <td className="px-4 py-3"></td>
                               <td className="px-4 py-3"></td>
+                              {showOrigin && <td className="px-4 py-3"></td>}
                             </tr>
                           </tfoot>
                         </table>
@@ -2003,7 +2284,7 @@ const Reportes = () => {
         })()}
 
         {/* Provider Breakdown (entradas o salidas según el tipo filtrado) */}
-        {stats && getFilteredTransactionType() && Object.keys(stats.providerBreakdown).length > 0 && (
+        {activeStats && getFilteredTransactionType() && Object.keys(activeStats.providerBreakdown).length > 0 && (
           <div className="bg-background rounded-lg border border-border p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-foreground">
@@ -2039,7 +2320,7 @@ const Reportes = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-background divide-y divide-border">
-                  {Object.entries(stats.providerBreakdown).map(
+                  {Object.entries(activeStats.providerBreakdown).map(
                     ([provider, data]) => {
                       const isEntrada = getFilteredTransactionType() === 'entrada';
                       return (
@@ -2060,7 +2341,7 @@ const Reportes = () => {
                           {data.count}
                         </td>
                         <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${isEntrada ? 'text-green-600' : 'text-red-600'}`}>
-                          {formatPercentage(data.amount, isEntrada ? stats.totalEntradas : stats.totalSalidas)}
+                          {formatPercentage(data.amount, isEntrada ? activeStats.totalEntradas : activeStats.totalSalidas)}
                         </td>
                       </tr>
                       );

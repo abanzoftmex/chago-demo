@@ -45,7 +45,8 @@ export const dashboardService = {
 
   // Igual que getMonthlyTrends (últimos 6 meses) pero en memoria desde un arreglo
   // ya cargado, evitando 6 consultas secuenciales a Firestore.
-  buildMonthlyTrends(transactions, referenceDate = new Date()) {
+  // soloPagados=true usa lo efectivamente pagado (totalPaid) en lugar de amount.
+  buildMonthlyTrends(transactions, referenceDate = new Date(), soloPagados = false) {
     const trends = [];
 
     for (let i = 5; i >= 0; i--) {
@@ -81,10 +82,13 @@ export const dashboardService = {
         if (ms < startMs || ms > endMs) return;
 
         monthData.transactionCount++;
+        const value = soloPagados
+          ? transaction.totalPaid || 0
+          : transaction.amount || 0;
         if (transaction.type === 'entrada') {
-          monthData.entradas += transaction.amount || 0;
+          monthData.entradas += value;
         } else if (transaction.type === 'salida') {
-          monthData.salidas += transaction.amount || 0;
+          monthData.salidas += value;
         }
       });
 

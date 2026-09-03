@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useRouter } from "next/router";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import TransactionForm from "../../../components/forms/TransactionForm";
@@ -6,7 +5,7 @@ import ProtectedRoute from "../../../components/auth/ProtectedRoute";
 import { useAuth } from "../../../context/AuthContextMultiTenant";
 import { useToast } from "../../../components/ui/Toast";
 
-const NuevaSalida = () => {
+const NuevaEntrada = () => {
   const router = useRouter();
   const { checkPermission } = useAuth();
   const toast = useToast();
@@ -15,14 +14,12 @@ const NuevaSalida = () => {
   const canManageTransactions = checkPermission("canManageTransactions");
 
   const handleSuccess = () => {
-    toast.success("Salida creada exitosamente");
-    // Redirect to the transactions list after successful creation
-    router.push("/admin/transacciones/salidas");
+    toast.success("Entrada creada exitosamente");
+    router.push("/admin/transacciones/entradas");
   };
 
   const handleCancel = () => {
-    // Go back to the previous page or to transactions list
-    router.push("/admin/transacciones/salidas");
+    router.push("/admin/transacciones/entradas");
   };
 
   if (!canManageTransactions) {
@@ -55,27 +52,27 @@ const NuevaSalida = () => {
       <AdminLayout>
         <div className="min-h-screen bg-gray-50 py-8">
           <div className="px-8">
-            {/* Cabecera consistente (fondo rojo claro para salidas) */}
-            <div className="rounded-lg border border-red-200 overflow-hidden mb-6">
-              <div className="flex items-center justify-between px-6 py-4 bg-red-100">
+            {/* Cabecera consistente (fondo verde claro para entradas) */}
+            <div className="rounded-lg border border-green-200 overflow-hidden mb-6">
+              <div className="flex items-center justify-between px-6 py-4 bg-green-100">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white/70 rounded-lg text-red-700">
+                  <div className="p-2 bg-white/70 rounded-lg text-green-700">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
                   </div>
                   <div>
-                    <h1 className="text-2xl font-bold text-red-800">
-                      Nueva Salida
+                    <h1 className="text-2xl font-bold text-green-800">
+                      Nueva Entrada
                     </h1>
-                    <p className="text-sm text-red-700/80 mt-0.5">
-                      Registra una nueva salida en el sistema
+                    <p className="text-sm text-green-700/80 mt-0.5">
+                      Registra una nueva entrada en el sistema
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={handleCancel}
-                  className="inline-flex items-center gap-2 px-4 py-2 border border-red-300 rounded-md text-sm font-medium text-red-800 bg-white hover:bg-red-50 transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-green-300 rounded-md text-sm font-medium text-green-800 bg-white hover:bg-green-50 transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -89,7 +86,7 @@ const NuevaSalida = () => {
             <div className="bg-white shadow-sm rounded-lg">
               <div className="px-6 py-6">
                 <TransactionForm
-                  type="salida"
+                  type="entrada"
                   onSuccess={handleSuccess}
                   onCancel={handleCancel}
                   className="max-w-none"
@@ -103,4 +100,4 @@ const NuevaSalida = () => {
   );
 };
 
-export default NuevaSalida;
+export default NuevaEntrada;
