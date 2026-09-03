@@ -6,7 +6,6 @@ export { conceptService } from './conceptService';
 export { descriptionService } from './descriptionService';
 export { subconceptService } from './subconceptService';
 export { paymentService } from './paymentService';
-export { aiAnalysisService } from './aiAnalysisService';
 export { logService } from './logService';
 
 // Service utilities

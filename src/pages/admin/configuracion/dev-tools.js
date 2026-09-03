@@ -13,7 +13,8 @@ const DevTools = () => {
   const [carryoverResult, setCarryoverResult] = useState(null);
   const [carryoverLoading, setCarryoverLoading] = useState(false);
   const [carryoverStatus, setCarryoverStatus] = useState(null);
-  const { user } = useAuth();
+  const { user, tenantInfo } = useAuth();
+  const tenantId = tenantInfo?.id;
   const toast = useToast();
 
   // Only show in development
@@ -71,7 +72,7 @@ const DevTools = () => {
       
       // Primero obtener el estado actual
       const now = new Date();
-      const status = await reportService.getCarryoverInfo(now.getFullYear(), now.getMonth() + 1);
+      const status = await reportService.getCarryoverInfo(now.getFullYear(), now.getMonth() + 1, tenantId);
       setCarryoverStatus(status);
       
       if (status.executed) {
@@ -93,7 +94,7 @@ const DevTools = () => {
       }
       
       // Ejecutar el arrastre
-      const result = await reportService.processMonthlyCarryover(user);
+      const result = await reportService.processMonthlyCarryover(user, tenantId);
       setCarryoverResult({
         success: true,
         message: result.message,
@@ -102,7 +103,7 @@ const DevTools = () => {
       });
       
       // Actualizar el estado
-      const newStatus = await reportService.getCarryoverInfo(now.getFullYear(), now.getMonth() + 1);
+      const newStatus = await reportService.getCarryoverInfo(now.getFullYear(), now.getMonth() + 1, tenantId);
       setCarryoverStatus(newStatus);
       
       toast.success("Arrastre mensual procesado exitosamente");
