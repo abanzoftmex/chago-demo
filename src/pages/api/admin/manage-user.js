@@ -1,8 +1,9 @@
 import admin, { assertAdminInitialized } from "../../../lib/firebase/firebaseAdmin";
 import { logUserStatusChange } from "../../../lib/server/logServer";
-import {
-  updateUserStatus,
-} from "../../../lib/services/roleService";
+// `getUserInfo` NO estaba importado y se llamaba igual: desactivar o activar
+// un usuario reventaba con ReferenceError. Al portarlo al Admin SDK se
+// arregla de paso.
+import { updateUserStatus, getUserInfo } from "../../../lib/server/usersServer";
 
 export default async function handler(req, res) {
   if (req.method !== "POST" && req.method !== "DELETE") {

@@ -5,7 +5,7 @@ import ProtectedRoute from "../../components/auth/ProtectedRoute";
 import CreateUserModal from "../../components/admin/CreateUserModal";
 import RolePermissionsModal from "../../components/admin/RolePermissionsModal";
 import UserList from "../../components/admin/UserList";
-import { getTenantUsers } from "../../lib/services/roleServiceMultiTenant";
+
 import { PlusIcon, AdjustmentsHorizontalIcon } from "@heroicons/react/24/outline";
 import Toast from "../../components/ui/Toast";
 
@@ -36,8 +36,16 @@ const UsersPage = () => {
       }
       
       console.log(`📋 Cargando usuarios del tenant: ${tenantInfo.id}`);
-      const result = await getTenantUsers(tenantInfo.id);
-      console.log("📊 Resultado getTenantUsers:", result);
+      // Al servidor: desde aquí solo se puede leer el propio documento de
+      // `/users`, y esta pantalla necesita el perfil de todos los miembros.
+      // El token dice quién pregunta; la ruta comprueba que pertenezca al
+      // tenant antes de devolver nada.
+      const token = await user.getIdToken();
+      const response = await fetch(`/api/admin/tenant-users?tenantId=${encodeURIComponent(tenantInfo.id)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = await response.json();
+      console.log("📊 Resultado tenant-users:", result);
       
       if (result.success) {
         console.log(`✅ Usuarios cargados: ${result.users.length}`);

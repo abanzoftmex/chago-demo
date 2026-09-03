@@ -32,3 +32,35 @@ export async function setUserRole(userId, role, userInfo = {}) {
     return { success: false, error: error.message };
   }
 }
+
+/** Activa o desactiva la cuenta de un usuario. */
+export async function updateUserStatus(userId, isActive) {
+  try {
+    await admin
+      .firestore()
+      .collection("users")
+      .doc(userId)
+      .update({ isActive, updatedAt: new Date() });
+    return { success: true };
+  } catch (error) {
+    console.error("[usersServer] Error actualizando estado del usuario:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Lee el documento de un usuario cualquiera.
+ *
+ * Desde el navegador esto solo puede hacerlo cada quien consigo mismo; leer el
+ * de otro es cosa de una ruta de API que ya haya comprobado quién pregunta.
+ */
+export async function getUserInfo(userId) {
+  try {
+    const snap = await admin.firestore().collection("users").doc(userId).get();
+    if (!snap.exists) return { success: false, error: "Usuario no encontrado" };
+    return { success: true, user: { id: snap.id, ...snap.data() } };
+  } catch (error) {
+    console.error("[usersServer] Error obteniendo información del usuario:", error);
+    return { success: false, error: error.message };
+  }
+}

@@ -2,7 +2,7 @@
  * Suite de reglas de Firestore contra el emulador.
  * Grupo 1: garantías de la integración POS (el motivo del punto 2).
  * Grupo 2: operación normal — que desplegar no rompa a los usuarios.
- * Grupo 3: lo que SÍ se rompe al desplegar (documentado como tal).
+ * Grupo 3: perfiles de /users — cada quien solo el suyo desde el navegador.
  */
 import { readFileSync } from "node:fs";
 import { initializeTestEnvironment, assertSucceeds, assertFails } from "@firebase/rules-unit-testing";
@@ -131,13 +131,14 @@ await t(G2, "la coleccion raiz de arrastre queda cerrada a todos", () => assertF
 await t(G2, "usuario lee su propio doc de users", () => assertSucceeds(getDoc(doc(asAdmin, "users", ADMIN))));
 
 // ── Grupo 3: lo que se rompe al desplegar ───────────────────────────────
-// Lo que TODAVIA impide desplegar: la administracion de usuarios y roles sigue
-// leyendo y escribiendo /users desde el navegador.
-const G3 = "ROMPE";
+// Los perfiles de /users solo los toca cada quien consigo mismo. La pantalla
+// de usuarios pide el directorio del tenant a /api/admin/tenant-users, que
+// comprueba el token y la pertenencia antes de devolver nada.
+const G3 = "Normal";
 await t(G3, "superadmin (sin Firebase Auth) NO puede listar /tenants", () => assertFails(getDocs(collection(anon, "tenants"))));
 await t(G3, "ni siquiera un admin autenticado puede listar /tenants", () => assertFails(getDocs(collection(asAdmin, "tenants"))));
-await t(G3, "admin NO puede listar /users", () => assertFails(getDocs(collection(asAdmin, "users"))));
-await t(G3, "admin NO puede escribir el doc de otro usuario", () => assertFails(setDoc(doc(asAdmin, "users", CONTA), { role: "viewer" }, { merge: true })));
+await t(G3, "nadie lista /users desde el navegador", () => assertFails(getDocs(collection(asAdmin, "users"))));
+await t(G3, "nadie escribe el doc de otro usuario desde el navegador", () => assertFails(setDoc(doc(asAdmin, "users", CONTA), { role: "viewer" }, { merge: true })));
 await t(G3, "nadie puede borrar un doc de /users", () => assertFails(deleteDoc(doc(asAdmin, "users", CONTA))));
 
 await testEnv.cleanup();
