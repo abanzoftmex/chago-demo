@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import RoleProtectedRoute from "../../../components/auth/RoleProtectedRoute";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import { settingsService } from "../../../lib/services/settingsService";
 import { useToast } from "../../../components/ui/Toast";
@@ -51,6 +52,7 @@ const CorreosNotificacion = () => {
   };
 
   return (
+    <RoleProtectedRoute requiredPermissions={["canManageSettings"]}>
     <AdminLayout
       title="Correos de notificación"
       breadcrumbs={[
@@ -123,6 +125,7 @@ const CorreosNotificacion = () => {
 
       {/* Toasts se muestran globalmente desde AdminLayout */}
     </AdminLayout>
+    </RoleProtectedRoute>
   );
 };
 

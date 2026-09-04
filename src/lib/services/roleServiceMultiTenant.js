@@ -378,6 +378,17 @@ export const canAccessRoute = (userRole, routePath, useTenantPermissions = true)
     "/admin/analisis-ia": "canViewAnalisisIA",
     "/admin/configuracion": "canManageSettings",
     "/admin/configuracion/correos-notificacion": "canManageSettings",
+    // El menú ya oculta toda la sección de Configuración a quien no tenga
+    // `canManageSettings`, pero una ruta que no esté en este mapa la deja
+    // pasar (ver el `return true` de abajo). Estas cuatro faltaban, así que
+    // se llegaba a ellas escribiendo la URL. Y no es solo cosmético:
+    // `firestore.rules` exige rol admin para escribir en `settings` y para
+    // LEER `logs`, así que un contador entraba a pantallas que no iban a
+    // funcionarle.
+    "/admin/configuracion/logo": "canManageSettings",
+    "/admin/configuracion/logs": "canManageSettings",
+    "/admin/configuracion/catalogos": "canManageSettings",
+    "/admin/configuracion/dev-tools": "canManageSettings",
     "/admin/usuarios": "canManageUsers",
   };
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import RoleProtectedRoute from "../../../components/auth/RoleProtectedRoute";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import { settingsService } from "../../../lib/services/settingsService";
 import { useToast } from "../../../components/ui/Toast";
@@ -59,6 +60,7 @@ const ConfiguracionLogo = () => {
   const displayLogo = preview || currentLogoUrl;
 
   return (
+    <RoleProtectedRoute requiredPermissions={["canManageSettings"]}>
     <AdminLayout
       title="Logo"
       breadcrumbs={[
@@ -144,6 +146,7 @@ const ConfiguracionLogo = () => {
         )}
       </div>
     </AdminLayout>
+    </RoleProtectedRoute>
   );
 };
 

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import RoleProtectedRoute from "../../../components/auth/RoleProtectedRoute";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import DeleteTransactionsModal from "../../../components/admin/DeleteTransactionsModal";
 import InitialExpenseModal from "../../../components/admin/InitialExpenseModal";
@@ -121,6 +122,7 @@ const DevTools = () => {
   };
 
   return (
+    <RoleProtectedRoute requiredPermissions={["canManageSettings"]}>
     <AdminLayout
       title="Herramientas de Desarrollo"
       breadcrumbs={[
@@ -354,6 +356,7 @@ const DevTools = () => {
         }}
       />
     </AdminLayout>
+    </RoleProtectedRoute>
   );
 };
 
