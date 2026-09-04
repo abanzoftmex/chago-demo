@@ -15,7 +15,7 @@ import {
 
 const MiPerfil = () => {
   const router = useRouter();
-  const { user, userRole, ROLES, updatePassword } = useAuth();
+  const { user, userRole, ROLES, TENANT_ROLES, updatePassword } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [passwordData, setPasswordData] = useState({
@@ -25,13 +25,33 @@ const MiPerfil = () => {
   });
   const toast = useToast();
 
+  /*
+    Esta pantalla solo conocía los roles LEGACY (`administrativo`,
+    `director_general`). Los tenants de hoy guardan `admin` / `contador` /
+    `viewer` en `tenants/{id}/members`, así que el administrador de un tenant
+    recién creado caía en el `default` y se veía "Sin rol / Sin permisos
+    asignados" aunque sus permisos reales estuvieran completos. Solo coincidía
+    `contador`, por llamarse igual en ambos esquemas.
+
+    Se cubren los dos, como ya hacen `Header.js` y `UserList.js`. Los literales
+    van al lado de la constante porque `ROLES`/`TENANT_ROLES` llegan del
+    contexto y son `undefined` en el primer render.
+  */
   const getRoleDisplayName = (role) => {
     switch (role) {
+      case TENANT_ROLES?.ADMIN:
+      case "admin":
       case ROLES?.ADMINISTRATIVO:
+      case "administrativo":
         return "Administrador";
-      case ROLES?.CONTADOR:
+      case TENANT_ROLES?.CONTADOR:
+      case "contador":
         return "Contador";
+      case TENANT_ROLES?.VIEWER:
+      case "viewer":
+        return "Visualizador";
       case ROLES?.DIRECTOR_GENERAL:
+      case "director_general":
         return "Director General";
       default:
         return "Sin rol";
@@ -40,11 +60,18 @@ const MiPerfil = () => {
 
   const getRoleDescription = (role) => {
     switch (role) {
+      case TENANT_ROLES?.ADMIN:
+      case "admin":
       case ROLES?.ADMINISTRATIVO:
+      case "administrativo":
         return "Acceso completo al sistema, gestión de usuarios y configuración";
-      case ROLES?.CONTADOR:
+      case TENANT_ROLES?.CONTADOR:
+      case "contador":
         return "Gestión de transacciones, reportes y análisis financiero";
+      case TENANT_ROLES?.VIEWER:
+      case "viewer":
       case ROLES?.DIRECTOR_GENERAL:
+      case "director_general":
         return "Visualización de reportes y análisis ejecutivo";
       default:
         return "Sin permisos asignados";
