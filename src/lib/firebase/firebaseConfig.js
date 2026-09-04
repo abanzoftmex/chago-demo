@@ -36,4 +36,28 @@ function initDb(firebaseApp) {
 export const db = initDb(app);
 export const storage = getStorage(app);
 
+/*
+  Ensayo contra los emuladores.
+
+  Solo se activa con `NEXT_PUBLIC_USE_EMULATOR=true`; sin esa variable —el caso
+  de producción y el del desarrollo normal— este bloque no hace nada.
+
+  Sirve para probar la aplicación con las reglas de `firestore.rules` PUESTAS
+  antes de desplegarlas. La suite de `npm run test:rules` comprueba las reglas
+  contra escrituras sintéticas; esto comprueba lo otro, que es distinto: que
+  cada pantalla real siga funcionando con ellas.
+*/
+if (process.env.NEXT_PUBLIC_USE_EMULATOR === "true" && typeof window !== "undefined" && !globalThis.__emuladoresConectados) {
+  globalThis.__emuladoresConectados = true;
+  // Import dinámico: así el código de los emuladores no entra en el bundle de
+  // producción, donde esta rama nunca se ejecuta.
+  Promise.all([import("firebase/auth"), import("firebase/firestore")]).then(
+    ([{ connectAuthEmulator }, { connectFirestoreEmulator }]) => {
+      connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+      connectFirestoreEmulator(db, "127.0.0.1", 8080);
+      console.log("🧪 Conectado a los emuladores de Auth (9099) y Firestore (8080)");
+    }
+  );
+}
+
 export default app;
