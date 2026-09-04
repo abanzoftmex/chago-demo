@@ -141,6 +141,77 @@ await t(G3, "nadie lista /users desde el navegador", () => assertFails(getDocs(c
 await t(G3, "nadie escribe el doc de otro usuario desde el navegador", () => assertFails(setDoc(doc(asAdmin, "users", CONTA), { role: "viewer" }, { merge: true })));
 await t(G3, "nadie puede borrar un doc de /users", () => assertFails(deleteDoc(doc(asAdmin, "users", CONTA))));
 
+// ── Grupo 4: FLUJOS reales ──────────────────────────────────────────────
+//
+// Los grupos de arriba prueban las reglas contra escrituras pensadas para
+// probarlas. Este prueba lo otro, que es distinto y es donde han aparecido los
+// problemas: que los documentos que los SERVICIOS escriben de verdad —con sus
+// campos, tal como los arma el código— pasen la regla que les toca.
+//
+// El `createdBy` que faltaba en `transactionService` habría roto la captura de
+// entradas y salidas para todos los usuarios, y ningún caso de los otros
+// grupos lo habría visto: probaban la regla, no lo que el código manda.
+//
+// Cuando cambie la forma de un documento en un servicio, hay que cambiarla
+// aquí. Es el precio de tener la comprobación, y sale barato comparado con
+// enterarse en producción.
+const G4 = "Flujos";
+
+// transactionService.create — TransactionForm, y también los recurrentes.
+const txReal = {
+  type: "salida", generalId: "gLock", conceptId: "cFree", subconceptId: "sSinCampo",
+  description: "Gasto capturado a mano", amount: 340, date: new Date(),
+  providerId: "", division: "general",
+  createdBy: CONTA, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+  status: "pendiente", payments: [], totalPaid: 0, balance: 340,
+};
+await t(G4, "contador captura una salida como la manda el servicio", () => assertSucceeds(addDoc(collection(asConta, `tenants/${T}/transacciones`), txReal)));
+await t(G4, "viewer NO puede capturar", () => assertFails(addDoc(collection(asViewer, `tenants/${T}/transacciones`), { ...txReal, createdBy: VIEWER })));
+
+// paymentService.create + transactionService.updatePaymentStatus.
+await t(G4, "contador registra un pago", () => assertSucceeds(addDoc(collection(asConta, `tenants/${T}/payments`), {
+  transactionId: "txEdit", amount: 100, date: new Date(), method: "transferencia",
+  attachments: [], createdAt: serverTimestamp(),
+})));
+await t(G4, "y el pago actualiza el saldo de la transacción", () => assertSucceeds(updateDoc(doc(asConta, `tenants/${T}/transacciones`, "txEdit"), {
+  totalPaid: 100, balance: 240, status: "parcial",
+  updatedBy: CONTA, updatedAt: serverTimestamp(),
+})));
+
+// Catálogos: conceptService / providerService / subconceptService.
+await t(G4, "contador crea un concepto", () => assertSucceeds(addDoc(collection(asConta, `tenants/${T}/concepts`), {
+  name: "Fletes", type: "salida", generalId: "gLock", createdAt: serverTimestamp(), isActive: true,
+})));
+await t(G4, "contador crea un proveedor", () => assertSucceeds(addDoc(collection(asConta, `tenants/${T}/proveedores`), {
+  name: "Proveedor Nuevo", createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+})));
+
+// recurringExpenseService.create.
+await t(G4, "contador crea un recurrente", () => assertSucceeds(addDoc(collection(asConta, `tenants/${T}/recurringExpenses`), {
+  description: "Renta", amount: 9000, type: "salida", frequency: "monthly",
+  generalId: "gLock", conceptId: "cFree", subconceptId: "sSinCampo",
+  createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+  isActive: true, lastGenerated: null, generatedDates: [], generatedMonths: [],
+})));
+
+// logService.create — lo escribe cualquier miembro al operar.
+await t(G4, "contador deja constancia en la bitácora", () => assertSucceeds(addDoc(collection(asConta, `tenants/${T}/logs`), {
+  action: "create", entityType: "transaction", entityId: "txEdit",
+  userId: CONTA, userName: "Carlos", tenantId: T, details: "creó un gasto",
+  timestamp: serverTimestamp(),
+})));
+await t(G4, "y NO puede leerla: la bitácora es de administradores", () => assertFails(getDocs(collection(asConta, `tenants/${T}/logs`))));
+await t(G4, "el admin sí la lee", () => assertSucceeds(getDocs(collection(asAdmin, `tenants/${T}/logs`))));
+
+// settingsService — el logo y los correos de notificación.
+await t(G4, "admin guarda los correos de notificación", () => assertSucceeds(setDoc(doc(asAdmin, `tenants/${T}/settings`, "emails"), {
+  accountantEmails: ["conta@negocio.mx"], updatedAt: serverTimestamp(),
+}, { merge: true })));
+await t(G4, "contador NO los guarda — por eso Configuración es solo de admin", () => assertFails(setDoc(doc(asConta, `tenants/${T}/settings`, "emails"), {
+  accountantEmails: ["otro@negocio.mx"],
+}, { merge: true })));
+await t(G4, "pero cualquier miembro los LEE (los usa el formulario al notificar)", () => assertSucceeds(getDoc(doc(asViewer, `tenants/${T}/settings`, "emails"))));
+
 await testEnv.cleanup();
 
 let group = "";
