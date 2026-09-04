@@ -211,6 +211,7 @@ await t(G4, "contador NO los guarda — por eso Configuración es solo de admin"
   accountantEmails: ["otro@negocio.mx"],
 }, { merge: true })));
 await t(G4, "pero cualquier miembro los LEE (los usa el formulario al notificar)", () => assertSucceeds(getDoc(doc(asViewer, `tenants/${T}/settings`, "emails"))));
+await t(G4, "la configuracion RAIZ queda cerrada: los correos son de cada tenant", () => assertFails(getDoc(doc(asAdmin, "settings", "emails"))));
 
 await testEnv.cleanup();
 

@@ -304,6 +304,16 @@ service cloud.firestore {
       allow write: if isAuthenticated() && !hasUserTenant();
     }
 
+    // ===== CONFIGURACIÓN, LEGACY EN LA RAÍZ =====
+    //
+    // El logo y los correos de notificación viven ahora DENTRO de cada tenant
+    // (`tenants/{tenantId}/settings`). Los correos estaban aquí, en un único
+    // documento raíz: quien lo hubiera configurado habría puesto a su contador
+    // a recibir los gastos de los otros 23 negocios.
+    match /settings/{settingId} {
+      allow read, write: if false;
+    }
+
     // ===== ARRASTRE MENSUAL, LEGACY EN LA RAÍZ =====
     //
     // El arrastre vive ahora DENTRO de cada tenant (ver la regla de

@@ -7,9 +7,21 @@ const SETTINGS_COLLECTION = "settings";
 const EMAILS_DOC_ID = "emails";
 
 export const settingsService = {
-  async getEmails() {
+  /*
+    Los correos de notificación son DE CADA TENANT.
+
+    Vivían en un documento raíz `settings/emails`, uno solo para los 24: quien
+    lo configurara habría puesto a su contador a recibir los gastos de todos
+    los demás negocios. El logo, en cambio, siempre estuvo bajo el tenant
+    (`getLogo`), así que esto era una asimetría, no una decisión.
+
+    Sin `tenantId` se devuelve vacío en vez de leer la raíz: no hay a quién
+    notificar, y leer ahí solo daría un error de permisos.
+  */
+  async getEmails(tenantId) {
+    if (!tenantId) return { adminEmails: [], accountantEmails: [] };
     try {
-      const ref = doc(db, SETTINGS_COLLECTION, EMAILS_DOC_ID);
+      const ref = doc(db, "tenants", tenantId, SETTINGS_COLLECTION, EMAILS_DOC_ID);
       const snap = await getDoc(ref);
       if (snap.exists()) {
         const data = snap.data();
@@ -35,9 +47,10 @@ export const settingsService = {
     }
   },
 
-  async saveEmails({ adminEmails, accountantEmails }) {
+  async saveEmails({ adminEmails, accountantEmails }, tenantId) {
+    if (!tenantId) throw new Error("Tenant ID es requerido para guardar los correos");
     try {
-      const ref = doc(db, SETTINGS_COLLECTION, EMAILS_DOC_ID);
+      const ref = doc(db, "tenants", tenantId, SETTINGS_COLLECTION, EMAILS_DOC_ID);
       const normalizedAdmin = (
         Array.isArray(adminEmails)
           ? adminEmails
@@ -78,9 +91,10 @@ export const settingsService = {
 
   async getLogo(tenantId) {
     try {
-      const brandingRef = tenantId
-        ? doc(db, "tenants", tenantId, "settings", "branding")
-        : doc(db, SETTINGS_COLLECTION, "branding");
+      // Sin tenantId ya no se cae a la raíz: ese documento existe de la etapa
+      // anterior, pero las reglas lo niegan y solo daría un error de permisos.
+      if (!tenantId) throw new Error("Tenant ID es requerido para el logo");
+      const brandingRef = doc(db, "tenants", tenantId, "settings", "branding");
       const snap = await getDoc(brandingRef);
       if (snap.exists()) {
         return snap.data().logoUrl || null;
@@ -110,9 +124,10 @@ export const settingsService = {
       const snapshot = await uploadBytes(storageRef, file, metadata);
       const url = await getDownloadURL(snapshot.ref);
 
-      const brandingRef = tenantId
-        ? doc(db, "tenants", tenantId, "settings", "branding")
-        : doc(db, SETTINGS_COLLECTION, "branding");
+      // Sin tenantId ya no se cae a la raíz: ese documento existe de la etapa
+      // anterior, pero las reglas lo niegan y solo daría un error de permisos.
+      if (!tenantId) throw new Error("Tenant ID es requerido para el logo");
+      const brandingRef = doc(db, "tenants", tenantId, "settings", "branding");
 
       await setDoc(brandingRef, { logoUrl: url, updatedAt: serverTimestamp() }, { merge: true });
       await mutate(["logo", tenantId], url, false);

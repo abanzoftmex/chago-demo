@@ -3,6 +3,7 @@ import RoleProtectedRoute from "../../../components/auth/RoleProtectedRoute";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import { settingsService } from "../../../lib/services/settingsService";
 import { useToast } from "../../../components/ui/Toast";
+import { useAuth } from "../../../context/AuthContextMultiTenant";
 
 const CorreosNotificacion = () => {
   const [adminInput, setAdminInput] = useState("");
@@ -10,13 +11,19 @@ const CorreosNotificacion = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const toast = useToast();
+  const { tenantInfo } = useAuth();
+  const tenantId = tenantInfo?.id;
 
+  // Depende de `tenantId`, que llega DESPUÉS de que resuelva la sesión: con la
+  // lista de dependencias vacía, la carga corría con `tenantId` indefinido y
+  // la pantalla se quedaba en blanco para siempre.
   useEffect(() => {
+    if (!tenantId) return;
     const load = async () => {
       try {
         setLoading(true);
         const { adminEmails, accountantEmails } =
-          await settingsService.getEmails();
+          await settingsService.getEmails(tenantId);
         setAdminInput((adminEmails || []).join(", "));
         setAccountantInput((accountantEmails || []).join(", "));
       } catch (error) {
@@ -27,7 +34,7 @@ const CorreosNotificacion = () => {
       }
     };
     load();
-  }, []);
+  }, [tenantId]);
 
   const parseEmails = (value) =>
     value
@@ -42,7 +49,7 @@ const CorreosNotificacion = () => {
       await settingsService.saveEmails({
         adminEmails: parseEmails(adminInput),
         accountantEmails: parseEmails(accountantInput),
-      });
+      }, tenantId);
       toast.success("Correos actualizados");
     } catch (error) {
       toast.error(error.message || "Error al guardar");

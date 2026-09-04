@@ -395,7 +395,7 @@ const TransactionForm = ({
         // If it's an expense (salida), notify accountant
         if (transactionData.type === "salida") {
           try {
-                const { accountantEmails } = await settingsService.getEmails();
+                const { accountantEmails } = await settingsService.getEmails(tenantInfo?.id);
                 const recipients = Array.isArray(accountantEmails)
                   ? accountantEmails
                   : [];

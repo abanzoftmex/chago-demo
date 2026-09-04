@@ -72,7 +72,7 @@ export const paymentService = {
       try {
         // Get transaction details
         const transaction = await transactionService.getById(paymentData.transactionId, tenantId);
-        const { adminEmails } = await settingsService.getEmails();
+        const { adminEmails } = await settingsService.getEmails(tenantId);
         const recipients = Array.isArray(adminEmails) ? adminEmails : [];
 
         if (recipients.length > 0) {
