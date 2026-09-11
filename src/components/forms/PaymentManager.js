@@ -25,6 +25,9 @@ const PaymentManager = ({
   const tenantId = useMemo(() => tenantInfo?.id, [tenantInfo?.id]);
   const canDeletePayments = checkPermission ? checkPermission("canDeletePayments") : false;
   const canRegisterPayments = !['director', 'director_general'].includes(userRole);
+  // Una transacción del punto de venta ya trae el pago que la salda; se corrige
+  // desde el POS, nunca registrando o editando pagos aquí.
+  const isPosLocked = transaction?.locked === true;
 
   const providerContactEmails = useMemo(() => {
     const contacts = Array.isArray(provider?.contacts) ? provider.contacts : [];
@@ -570,7 +573,7 @@ const PaymentManager = ({
               </span>
             )}
           </h3>
-          {canRegisterPayments && paymentSummary && paymentSummary.balance > 0 && (
+          {canRegisterPayments && !isPosLocked && paymentSummary && paymentSummary.balance > 0 && (
             <button
               onClick={() => setShowForm(!showForm)}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
@@ -714,9 +717,16 @@ const PaymentManager = ({
                     <div className="flex-1">
                       <div className="flex items-center space-x-4">
                         <div>
-                          <p className="text-lg font-semibold text-gray-900">
-                            {formatCurrency(payment.amount)}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className={`text-lg font-semibold text-gray-900 ${payment.voided ? "line-through opacity-60" : ""}`}>
+                              {formatCurrency(payment.amount)}
+                            </p>
+                            {payment.voided && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-700">
+                                Anulado
+                              </span>
+                            )}
+                          </div>
                           <p className="text-sm text-gray-500">
                             {formatDate(payment.date)}
                           </p>
@@ -768,7 +778,7 @@ const PaymentManager = ({
                     </div>
 
                     <div className="ml-4 flex items-center gap-2">
-                      {canRegisterPayments && (
+                      {canRegisterPayments && !payment.locked && (
                         <button
                           onClick={() => handleEditPayment(payment)}
                           className="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors"
@@ -780,7 +790,7 @@ const PaymentManager = ({
                           Editar
                         </button>
                       )}
-                      {canDeletePayments && (
+                      {canDeletePayments && !payment.locked && (
                         <button
                           onClick={() => handleDeletePayment(payment)}
                           className="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition-colors"

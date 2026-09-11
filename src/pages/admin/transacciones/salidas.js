@@ -12,7 +12,7 @@ import { conceptService } from "../../../lib/services/conceptService";
 import { providerService } from "../../../lib/services/providerService";
 import { generalService } from "../../../lib/services/generalService";
 import { subconceptService } from "../../../lib/services/subconceptService";
-import { paymentService } from "../../../lib/services/paymentService";
+import { paymentService, sumActivePayments } from "../../../lib/services/paymentService";
 import {
   formatDateIsoLocal,
   parseTransactionCsvDate,
@@ -299,7 +299,7 @@ const SolicitudesPago = () => {
     // Fallback: calcular desde paymentsMap
     const totalAmount = transaction.amount || 0;
     const payments = paymentsMap[transaction.id] || [];
-    const paidAmount = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+    const paidAmount = sumActivePayments(payments);
     return Math.max(0, totalAmount - paidAmount);
   };
 
@@ -310,7 +310,7 @@ const SolicitudesPago = () => {
     }
     // Fallback: calcular desde paymentsMap
     const payments = paymentsMap[transaction.id] || [];
-    return payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+    return sumActivePayments(payments);
   };
 
   const getInitialExpenseBadge = (transaction) => {

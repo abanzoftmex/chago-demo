@@ -5,10 +5,16 @@
  * original se cancela allá. Nunca se borra — se marca `voided:true`, deja
  * rastro de que existió y por qué se anuló. Mismo Bearer auth que el resto
  * de esta integración.
+ *
+ * Su pago corre la misma suerte: se marca anulado, no se borra. Las
+ * transacciones anteriores a que la integración creara el pago pueden no
+ * tenerlo todavía — entonces solo se anula la transacción, y el script de
+ * regularización crea después el pago ya anulado.
  */
 
 import admin, { assertAdminInitialized } from "../../../../../lib/firebase/firebaseAdmin";
 import { verifyPosIntegrationToken, extractBearerToken } from "../../../../../lib/server/posIntegrationService";
+import { posPaymentId } from "../../../../../lib/server/posTransactionWriter";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -28,7 +34,8 @@ export default async function handler(req, res) {
   if (!verification.ok) return res.status(401).json({ error: verification.error });
 
   try {
-    const docRef = admin.firestore().collection(`tenants/${chagoTenantId}/transacciones`).doc(id);
+    const db = admin.firestore();
+    const docRef = db.collection(`tenants/${chagoTenantId}/transacciones`).doc(id);
     const snap = await docRef.get();
 
     if (!snap.exists) return res.status(404).json({ error: "Transacción no encontrada" });
@@ -40,16 +47,28 @@ export default async function handler(req, res) {
       // entrada de una venta que para la salida de una compra de almacén.
       return res.status(409).json({ error: "Esta transacción no fue creada por punto-de-venta" });
     }
-    if (data.voided) {
+
+    const paymentRef = db.collection(`tenants/${chagoTenantId}/payments`).doc(posPaymentId(id));
+    const paymentSnap = await paymentRef.get();
+    const paymentPending = paymentSnap.exists && paymentSnap.data().voided !== true;
+
+    // Una transacción ya anulada con su pago todavía vivo no es un reintento
+    // inofensivo: es media anulación, y el pago seguiría sumando. Se completa.
+    if (data.voided && !paymentPending) {
       return res.status(200).json({ ok: true, alreadyVoided: true });
     }
 
-    await docRef.update({
+    const voidFields = {
       voided: true,
       voidedAt: admin.firestore.FieldValue.serverTimestamp(),
       voidReason: reason || "Movimiento cancelado en punto de venta",
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    };
+    const batch = db.batch();
+    if (!data.voided) {
+      batch.update(docRef, { ...voidFields, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    }
+    if (paymentPending) batch.update(paymentRef, voidFields);
+    await batch.commit();
 
     return res.status(200).json({ ok: true });
   } catch (error) {

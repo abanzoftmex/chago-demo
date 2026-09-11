@@ -24,6 +24,7 @@ import admin, { assertAdminInitialized } from "../../../lib/firebase/firebaseAdm
 import { verifyPosIntegrationToken, extractBearerToken } from "../../../lib/server/posIntegrationService";
 import { ensurePurchaseBranch, ensureProductSubconcept } from "../../../lib/server/posCatalog";
 import {
+  createPosTransactionWithPayment,
   findPosTransactionByExternalId,
   posTransactionBase,
   POS_KIND_PURCHASE,
@@ -109,7 +110,8 @@ export default async function handler(req, res) {
       .filter(Boolean)
       .join(" · ");
 
-    const docRef = await db.collection(`tenants/${chagoTenantId}/transacciones`).add({
+    // Nace junto con el pago que la salda — ver `createPosTransactionWithPayment`.
+    const docRef = await createPosTransactionWithPayment(db, chagoTenantId, {
       ...posTransactionBase({ amount, externalId, date, posKind: POS_KIND_PURCHASE }),
       type: "salida",
       generalId: purchaseGeneralId,

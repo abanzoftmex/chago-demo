@@ -8,7 +8,7 @@ import { transactionService } from "../../../../lib/services/transactionService"
 import { conceptService } from "../../../../lib/services/conceptService";
 import { subconceptService } from "../../../../lib/services/subconceptService";
 import { providerService } from "../../../../lib/services/providerService";
-import { paymentService } from "../../../../lib/services/paymentService";
+import { paymentService, sumActivePayments } from "../../../../lib/services/paymentService";
 import { logService } from "../../../../lib/services/logService";
 import { generalService } from "../../../../lib/services/generalService";
 import {
@@ -351,7 +351,7 @@ const TransactionDetail = () => {
     if (!transaction || !payments || !Array.isArray(payments)) return { paid: 0, remaining: 0, progress: 0 };
 
     const totalAmount = transaction.amount || 0;
-    const paidAmount = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+    const paidAmount = sumActivePayments(payments);
     const remainingAmount = Math.max(0, totalAmount - paidAmount);
     const progress = totalAmount > 0 ? Math.min(100, (paidAmount / totalAmount) * 100) : 0;
 

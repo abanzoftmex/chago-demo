@@ -214,11 +214,17 @@ service cloud.firestore {
       // ===== SUBCOLECCIÓN: PAGOS =====
 
       // Pagos parciales de una transacción — paymentService.js
+      //
+      // Un pago con locked:true lo creó la integración con punto de venta
+      // (Admin SDK) junto con la venta o compra que salda. Mismo criterio que
+      // su transacción: no se edita ni se borra desde aquí — quitarlo dejaría
+      // la transacción con saldo pendiente y fuera del reporte de pagos. Si la
+      // venta se cancela en el POS, el pago se anula por ese camino.
       match /payments/{paymentId} {
         allow read: if canReadTenantData(tenantId);
         allow create: if canManageDataInTenant(tenantId);
-        allow update: if canManageDataInTenant(tenantId);
-        allow delete: if canDeleteTenantData(tenantId);
+        allow update: if canManageDataInTenant(tenantId) && resource.data.get('locked', false) != true;
+        allow delete: if canDeleteTenantData(tenantId) && resource.data.get('locked', false) != true;
       }
 
       // ===== SUBCOLECCIÓN: GASTOS RECURRENTES =====

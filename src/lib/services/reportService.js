@@ -52,6 +52,7 @@ export function expandPaymentsToSyntheticTx(payments, transactionsById) {
 
   const synthetic = [];
   payments.forEach((p) => {
+    if (p.voided === true) return; // anulado por el punto de venta: rastro, no dinero
     const tx = getTx(p.transactionId);
     if (!tx) return; // pago huérfano (transacción eliminada)
     const amount = p.amount || 0;

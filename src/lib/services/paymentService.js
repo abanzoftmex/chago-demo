@@ -36,6 +36,16 @@ const getPaymentsCollection = (tenantId = null) => {
 const COLLECTION_NAME = "payments";
 const STORAGE_PATH = "payment-attachments";
 
+/**
+ * Lo que de verdad se cobró o pagó en una lista de pagos.
+ *
+ * Un pago anulado (`voided:true`) lo marcó así el punto de venta al cancelar la
+ * venta o el surtido que saldaba. Se conserva como rastro, pero ya no es dinero
+ * que se movió, así que no suma — en ningún total que se calcule desde pagos.
+ */
+export const sumActivePayments = (payments) =>
+  (payments || []).reduce((sum, payment) => (payment?.voided === true ? sum : sum + (payment?.amount || 0)), 0);
+
 export const paymentService = {
   // Create a new payment
   async create(paymentData, files = [], tenantId = null) {
@@ -404,10 +414,7 @@ export const paymentService = {
       const payments = await this.getByTransaction(transactionId, tenantId);
 
       // Calculate total paid
-      const totalPaid = payments.reduce(
-        (sum, payment) => sum + payment.amount,
-        0
-      );
+      const totalPaid = sumActivePayments(payments);
 
       // Get transaction to get total amount
       const transaction = await transactionService.getById(transactionId, tenantId);
@@ -479,10 +486,7 @@ export const paymentService = {
       const payments = await this.getByTransaction(transactionId, tenantId);
       const transaction = await transactionService.getById(transactionId, tenantId);
 
-      const totalPaid = payments.reduce(
-        (sum, payment) => sum + payment.amount,
-        0
-      );
+      const totalPaid = sumActivePayments(payments);
       const balance = transaction.amount - totalPaid;
 
       return {

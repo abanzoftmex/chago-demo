@@ -43,6 +43,7 @@ await testEnv.withSecurityRulesDisabled(async (ctx) => {
   await setDoc(doc(db, `tenants/${T}/concepts`, "cLock"), { name: "Ventas POS", generalId: "gLock", type: "entrada", ...locked });
   await setDoc(doc(db, `tenants/${T}/subconcepts`, "sLock"), { name: "Efectivo", conceptId: "cLock", ...locked });
   await setDoc(doc(db, `tenants/${T}/transacciones`, "txLock"), { amount: 100, conceptId: "cLock", ...locked });
+  await setDoc(doc(db, `tenants/${T}/payments`, "pos_txLock"), { transactionId: "txLock", amount: 100, date: new Date(), attachments: [], voided: false, ...locked });
   // Rama de compras.
   await setDoc(doc(db, `tenants/${T}/concepts`, "cCompras"), { name: "Compras POS", generalId: "pos_general_compras", type: "salida", ...locked });
   await setDoc(doc(db, `tenants/${T}/subconcepts`, "pos_prod_665f"), { name: "Coca 600", conceptId: "cCompras", posProductId: "665f", posProductName: "Coca 600", ...locked });
@@ -51,6 +52,7 @@ await testEnv.withSecurityRulesDisabled(async (ctx) => {
   await setDoc(doc(db, `tenants/${T}/transacciones`, "txFree"), { amount: 50, conceptId: "cFree" });
   // Catálogo "de siempre": documentos que nunca tuvieron el campo `locked`.
   await setDoc(doc(db, `tenants/${T}/transacciones`, "txEdit"), { amount: 5, conceptId: "cFree" });
+  await setDoc(doc(db, `tenants/${T}/payments`, "pagoSinCampo"), { transactionId: "txEdit", amount: 5, date: new Date(), attachments: [] });
   await setDoc(doc(db, `tenants/${T}/concepts`, "cSinCampo"), { name: "Viejo", generalId: "gLock" });
   await setDoc(doc(db, `tenants/${T}/concepts`, "cMover"), { name: "Mover", generalId: "otro" });
   await setDoc(doc(db, `tenants/${T}/generals`, "gSinCampo"), { name: "General viejo", type: "salida" });
@@ -73,6 +75,10 @@ await t(G1, "admin SÍ puede renombrar el General bloqueado", () => assertSuccee
 await t(G1, "admin NO puede mover el subconcepto (cambiar conceptId)", () => assertFails(updateDoc(doc(asAdmin, `tenants/${T}/subconcepts`, "sLock"), { conceptId: "cFree" })));
 await t(G1, "admin NO puede borrar la transacción del POS", () => assertFails(deleteDoc(doc(asAdmin, `tenants/${T}/transacciones`, "txLock"))));
 await t(G1, "admin NO puede editar el monto de la transacción del POS", () => assertFails(updateDoc(doc(asAdmin, `tenants/${T}/transacciones`, "txLock"), { amount: 1, updatedBy: ADMIN, updatedAt: serverTimestamp() })));
+// El pago que salda la transacción del POS: quitarlo o cambiarle el monto la
+// dejaría con saldo pendiente y fuera del reporte de pagos reales.
+await t(G1, "contador NO puede editar el monto del pago del POS", () => assertFails(updateDoc(doc(asConta, `tenants/${T}/payments`, "pos_txLock"), { amount: 1 })));
+await t(G1, "admin NO puede borrar el pago del POS", () => assertFails(deleteDoc(doc(asAdmin, `tenants/${T}/payments`, "pos_txLock"))));
 
 // ── Rama de compras ─────────────────────────────────────────────────────
 // El `type` de cada General sostiene su rama: si se pudiera cambiar desde el
@@ -116,6 +122,8 @@ await t(G2, "viewer NO borra conceptos", () => assertFails(deleteDoc(doc(asViewe
 // integración. Si `resource.data.locked` se lee a pelo, la regla revienta.
 await t(G2, "contador edita transacción sin campo `locked`", () => assertSucceeds(updateDoc(doc(asConta, `tenants/${T}/transacciones`, "txEdit"), { amount: 99, updatedBy: CONTA, updatedAt: serverTimestamp() })));
 await t(G2, "admin borra concepto sin campo `locked`", () => assertSucceeds(deleteDoc(doc(asAdmin, `tenants/${T}/concepts`, "cSinCampo"))));
+await t(G2, "contador edita pago sin campo `locked`", () => assertSucceeds(updateDoc(doc(asConta, `tenants/${T}/payments`, "pagoSinCampo"), { amount: 4 })));
+await t(G2, "admin borra pago sin campo `locked`", () => assertSucceeds(deleteDoc(doc(asAdmin, `tenants/${T}/payments`, "pagoSinCampo"))));
 await t(G2, "admin borra general sin campo `locked`", () => assertSucceeds(deleteDoc(doc(asAdmin, `tenants/${T}/generals`, "gSinCampo"))));
 await t(G2, "admin borra subconcepto sin campo `locked`", () => assertSucceeds(deleteDoc(doc(asAdmin, `tenants/${T}/subconcepts`, "sSinCampo"))));
 await t(G2, "contador recuelga un concepto suyo sin campo `locked`", () => assertSucceeds(updateDoc(doc(asConta, `tenants/${T}/concepts`, "cMover"), { generalId: "gLock" })));

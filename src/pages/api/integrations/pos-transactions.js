@@ -21,6 +21,7 @@
 import admin, { assertAdminInitialized } from "../../../lib/firebase/firebaseAdmin";
 import { verifyPosIntegrationToken, extractBearerToken } from "../../../lib/server/posIntegrationService";
 import {
+  createPosTransactionWithPayment,
   findPosTransactionByExternalId,
   posTransactionBase,
   POS_KIND_SALE,
@@ -98,7 +99,6 @@ export default async function handler(req, res) {
 
   try {
     const db = admin.firestore();
-    const transaccionesRef = db.collection(`tenants/${chagoTenantId}/transacciones`);
 
     // Idempotencia: una venta ya recibida antes no se duplica. La colección la
     // comparten ventas y compras, así que un `externalId` repetido que
@@ -123,7 +123,9 @@ export default async function handler(req, res) {
       externalFolio: folio || null,
     };
 
-    const docRef = await transaccionesRef.add(transactionData);
+    // Nace junto con el pago que la salda: sin él, chago-demo la mostraba
+    // "pagada" con saldo pendiente y el reporte de pagos reales no la veía.
+    const docRef = await createPosTransactionWithPayment(db, chagoTenantId, transactionData);
 
     if (ticketPdfBase64) {
       try {
