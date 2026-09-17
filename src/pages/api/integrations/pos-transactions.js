@@ -11,6 +11,11 @@
  * necesario porque punto-de-venta reintenta envíos que no confirmaron a
  * tiempo.
  *
+ * Pago dividido: si llega `payments` con más de un método, la venta se
+ * registra como una transacción por método —cada una en su subconcepto— y
+ * todas agrupadas (ver `createPosTransactionGroupWithPayments`). Sin
+ * `payments`, o con uno solo, funciona como siempre.
+ *
  * "El que manda es el que envía": la transacción nace con `locked:true` y
  * `origen:'pos_sync'`. La UI de chago-demo debe ocultar edición/eliminación
  * sobre eso, y `firestore.rules` (cambio a desplegar aparte) se lo niega a
@@ -21,7 +26,7 @@
 import admin, { assertAdminInitialized } from "../../../lib/firebase/firebaseAdmin";
 import { verifyPosIntegrationToken, extractBearerToken } from "../../../lib/server/posIntegrationService";
 import {
-  createPosTransactionWithPayment,
+  createPosTransactionGroupWithPayments,
   findPosTransactionByExternalId,
   posTransactionBase,
   POS_KIND_SALE,
@@ -73,6 +78,7 @@ export default async function handler(req, res) {
     externalId,
     amount,
     paymentMethod,
+    payments,
     folio,
     date,
     description,
@@ -90,8 +96,36 @@ export default async function handler(req, res) {
   if (!verification.ok) return res.status(401).json({ error: verification.error });
 
   const { integration } = verification;
-  const subconceptId = integration.subconceptIds?.[paymentMethod];
-  if (!integration.generalId || !integration.conceptId || !subconceptId) {
+  const amountNum = parseFloat(amount);
+
+  /*
+    Las partes de la venta: una por método de pago. Un punto de venta sin pago
+    dividido —o uno viejo que no manda `payments`— produce una sola, con el
+    método y el monto de siempre.
+
+    Si llega el desglose tiene que cuadrar con el monto: una diferencia querría
+    decir que en chago-demo entraría otro dinero del que se cobró.
+  */
+  const lineas = Array.isArray(payments)
+    ? payments
+      .map((p) => ({ method: String(p?.method || ""), amount: Math.round((parseFloat(p?.amount) || 0) * 100) / 100 }))
+      .filter((p) => p.amount > 0)
+    : [];
+  const partes = lineas.length > 1 ? lineas : [{ method: paymentMethod, amount: amountNum }];
+
+  const metodoInvalido = partes.find((p) => !VALID_PAYMENT_METHODS.includes(p.method));
+  if (metodoInvalido) {
+    return res.status(400).json({ error: `paymentMethod debe ser uno de: ${VALID_PAYMENT_METHODS.join(", ")}` });
+  }
+  if (partes.length > 1) {
+    const suma = partes.reduce((s, p) => s + p.amount, 0);
+    if (Math.abs(suma - amountNum) > 0.01) {
+      return res.status(400).json({ error: `El desglose de pagos (${suma.toFixed(2)}) no cuadra con el monto (${amountNum.toFixed(2)})` });
+    }
+  }
+
+  const sinSubconcepto = partes.find((p) => !integration.subconceptIds?.[p.method]);
+  if (!integration.generalId || !integration.conceptId || sinSubconcepto) {
     return res.status(409).json({
       error: "Este tenant no tiene el catálogo de Ventas POS activado — vuelve a guardar el vínculo en Torre de Control",
     });
@@ -109,23 +143,30 @@ export default async function handler(req, res) {
       if ((existing.data().posKind || POS_KIND_SALE) !== POS_KIND_SALE) {
         return res.status(409).json({ error: "Ese externalId ya lo usa otro movimiento del punto de venta" });
       }
-      return res.status(200).json({ chagoTransactionId: existing.id, alreadyExisted: true });
+      // Si fue un pago dividido, lo que conoce punto-de-venta es la principal
+      return res.status(200).json({
+        chagoTransactionId: existing.data().posSplitGroup || existing.id,
+        alreadyExisted: true,
+      });
     }
 
-    const amountNum = parseFloat(amount);
-    const transactionData = {
-      ...posTransactionBase({ amount: amountNum, externalId, date, posKind: POS_KIND_SALE }),
+    const base = description || `Venta POS · Folio ${folio || externalId}`;
+    const transactionParts = partes.map((p) => ({
+      ...posTransactionBase({ amount: p.amount, externalId, date, posKind: POS_KIND_SALE }),
       type: "entrada",
       generalId: integration.generalId,
       conceptId: integration.conceptId,
-      subconceptId,
-      description: description || `Venta POS · Folio ${folio || externalId}`,
+      subconceptId: integration.subconceptIds[p.method],
+      // En un pago dividido cada parte dice qué es, para que al verlas juntas
+      // en la lista se entienda que son la misma venta
+      description: partes.length > 1 ? `${base} · ${p.method} (pago dividido)` : base,
       externalFolio: folio || null,
-    };
+    }));
 
-    // Nace junto con el pago que la salda: sin él, chago-demo la mostraba
-    // "pagada" con saldo pendiente y el reporte de pagos reales no la veía.
-    const docRef = await createPosTransactionWithPayment(db, chagoTenantId, transactionData);
+    // Nacen junto con el pago que las salda: sin él, chago-demo las mostraba
+    // "pagadas" con saldo pendiente y el reporte de pagos reales no las veía.
+    const refs = await createPosTransactionGroupWithPayments(db, chagoTenantId, transactionParts);
+    const docRef = refs[0];
 
     if (ticketPdfBase64) {
       try {
@@ -138,7 +179,10 @@ export default async function handler(req, res) {
       }
     }
 
-    return res.status(201).json({ chagoTransactionId: docRef.id });
+    return res.status(201).json({
+      chagoTransactionId: docRef.id,
+      ...(refs.length > 1 && { chagoTransactionIds: refs.map((r) => r.id) }),
+    });
   } catch (error) {
     console.error("❌ Error creando entrada desde POS:", error);
     return res.status(500).json({ error: "Error interno del servidor", message: error.message });

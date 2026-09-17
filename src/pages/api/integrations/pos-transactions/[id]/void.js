@@ -10,11 +10,14 @@
  * transacciones anteriores a que la integración creara el pago pueden no
  * tenerlo todavía — entonces solo se anula la transacción, y el script de
  * regularización crea después el pago ya anulado.
+ *
+ * Una venta con pago dividido son varias transacciones (una por método); se
+ * anulan todas juntas, llegue el id de la principal o el de cualquier parte.
  */
 
 import admin, { assertAdminInitialized } from "../../../../../lib/firebase/firebaseAdmin";
 import { verifyPosIntegrationToken, extractBearerToken } from "../../../../../lib/server/posIntegrationService";
-import { posPaymentId } from "../../../../../lib/server/posTransactionWriter";
+import { posPaymentId, posTransactionsToVoid } from "../../../../../lib/server/posTransactionWriter";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -48,26 +51,37 @@ export default async function handler(req, res) {
       return res.status(409).json({ error: "Esta transacción no fue creada por punto-de-venta" });
     }
 
-    const paymentRef = db.collection(`tenants/${chagoTenantId}/payments`).doc(posPaymentId(id));
-    const paymentSnap = await paymentRef.get();
-    const paymentPending = paymentSnap.exists && paymentSnap.data().voided !== true;
-
-    // Una transacción ya anulada con su pago todavía vivo no es un reintento
-    // inofensivo: es media anulación, y el pago seguiría sumando. Se completa.
-    if (data.voided && !paymentPending) {
-      return res.status(200).json({ ok: true, alreadyVoided: true });
-    }
-
     const voidFields = {
       voided: true,
       voidedAt: admin.firestore.FieldValue.serverTimestamp(),
       voidReason: reason || "Movimiento cancelado en punto de venta",
     };
+
+    // La transacción y, si fue un pago dividido, el resto de su grupo
+    const transacciones = await posTransactionsToVoid(db, chagoTenantId, snap);
     const batch = db.batch();
-    if (!data.voided) {
-      batch.update(docRef, { ...voidFields, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    let pendientes = 0;
+
+    for (const tx of transacciones) {
+      const paymentRef = db.collection(`tenants/${chagoTenantId}/payments`).doc(posPaymentId(tx.id));
+      const paymentSnap = await paymentRef.get();
+      const paymentPending = paymentSnap.exists && paymentSnap.data().voided !== true;
+
+      // Una transacción ya anulada con su pago todavía vivo no es un reintento
+      // inofensivo: es media anulación, y el pago seguiría sumando. Se completa.
+      if (!tx.data().voided) {
+        batch.update(tx.ref, { ...voidFields, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+        pendientes++;
+      }
+      if (paymentPending) {
+        batch.update(paymentRef, voidFields);
+        pendientes++;
+      }
     }
-    if (paymentPending) batch.update(paymentRef, voidFields);
+
+    if (pendientes === 0) {
+      return res.status(200).json({ ok: true, alreadyVoided: true });
+    }
     await batch.commit();
 
     return res.status(200).json({ ok: true });

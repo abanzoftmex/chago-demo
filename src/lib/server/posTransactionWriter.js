@@ -95,10 +95,13 @@ export function posTransactionBase({ amount, externalId, date, posKind }) {
  * que esto corrige, y un pago sin transacción sería un huérfano en reportes.
  */
 export async function createPosTransactionWithPayment(db, tenantId, transactionData) {
-  const txRef = transaccionesRef(db, tenantId).doc();
-  const batch = db.batch();
-  batch.create(txRef, transactionData);
-  batch.create(paymentsRef(db, tenantId).doc(posPaymentId(txRef.id)), {
+  const [txRef] = await createPosTransactionGroupWithPayments(db, tenantId, [transactionData]);
+  return txRef;
+}
+
+/** El pago que salda una transacción del POS, por su monto y con su fecha. */
+function posPaymentDoc(txRef, transactionData) {
+  return {
     transactionId: txRef.id,
     amount: transactionData.amount,
     date: transactionData.date,
@@ -108,7 +111,59 @@ export async function createPosTransactionWithPayment(db, tenantId, transactionD
     locked: true,
     voided: false,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+}
+
+/**
+ * Una venta del POS cobrada con VARIOS métodos (pago dividido).
+ *
+ * En chago-demo el método de pago no vive en el pago: decide el SUBCONCEPTO de
+ * la transacción («Ventas POS · Efectivo», «Ventas POS · Débito»). Una
+ * transacción tiene un solo subconcepto, así que una venta de 500 cobrada 300
+ * en efectivo y 200 con tarjeta no cabe en una: se contaría entera como
+ * efectivo en todo reporte por subconcepto. Se registra como una transacción
+ * por método, cada una con su pago.
+ *
+ * Las transacciones de la misma venta quedan agrupadas por `posSplitGroup`, que
+ * es el id de la PRIMERA —la principal—. Punto-de-venta guarda un solo id por
+ * venta y es ese: con él la idempotencia devuelve la principal y la anulación
+ * encuentra al grupo entero. Todo va en una sola escritura: una venta a medias
+ * cuadraría mal en los dos lados.
+ *
+ * Con una sola transacción se comporta exactamente como antes y no escribe los
+ * campos de grupo.
+ *
+ * @param {Array<object>} parts  el `transactionData` de cada parte, en orden
+ * @returns {Promise<Array<DocumentReference>>} las referencias, la principal primero
+ */
+export async function createPosTransactionGroupWithPayments(db, tenantId, parts) {
+  const refs = parts.map(() => transaccionesRef(db, tenantId).doc());
+  const grupo = parts.length > 1 ? refs[0].id : null;
+  const batch = db.batch();
+
+  parts.forEach((data, i) => {
+    const txData = grupo
+      ? { ...data, posSplitGroup: grupo, posSplitPart: i + 1, posSplitParts: parts.length }
+      : data;
+    batch.create(refs[i], txData);
+    batch.create(paymentsRef(db, tenantId).doc(posPaymentId(refs[i].id)), posPaymentDoc(refs[i], txData));
   });
+
   await batch.commit();
-  return txRef;
+  return refs;
+}
+
+/**
+ * Las transacciones que se anulan juntas con `transactionSnap`: todo su grupo
+ * si fue un pago dividido, o solo ella. La principal siempre va incluida,
+ * aunque la consulta tarde en verla.
+ */
+export async function posTransactionsToVoid(db, tenantId, transactionSnap) {
+  const grupo = transactionSnap.data().posSplitGroup;
+  if (!grupo) return [transactionSnap];
+  const found = await transaccionesRef(db, tenantId)
+    .where("posSplitGroup", "==", grupo)
+    .get();
+  const docs = found.docs.filter((d) => d.data().origen === "pos_sync");
+  return docs.some((d) => d.id === transactionSnap.id) ? docs : [transactionSnap, ...docs];
 }
