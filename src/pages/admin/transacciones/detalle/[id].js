@@ -440,7 +440,7 @@ const TransactionDetail = () => {
 
     setDeletingFile(true);
     try {
-      await transactionService.removeAttachment(id, fileToDelete.fileName, user);
+      await transactionService.removeAttachment(id, fileToDelete.fileName, user, tenantId);
 
       // Actualizar el estado local
       setTransaction(prev => ({
@@ -470,7 +470,7 @@ const TransactionDetail = () => {
   const handleUploadFiles = async (files) => {
     setUploadingFiles(true);
     try {
-      const newAttachments = await transactionService.addAttachments(id, files, user);
+      const newAttachments = await transactionService.addAttachments(id, files, user, tenantId);
 
       // Actualizar el estado local
       setTransaction(prev => ({
