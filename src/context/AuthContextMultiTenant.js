@@ -3,7 +3,7 @@
  * Mantiene compatibilidad con el sistema anterior
  */
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import {
   signInWithEmailAndPassword,
   signOut,
@@ -76,8 +76,15 @@ export const AuthProvider = ({ children }) => {
   const [tenantLoading, setTenantLoading] = useState(false);
   const [isLegacyUser, setIsLegacyUser] = useState(false);
 
-  // Estados de actividad
-  const [lastActivity, setLastActivity] = useState(Date.now());
+  // Marca de la última actividad del usuario.
+  //
+  // Va en una ref, no en estado: la actualiza cada mousemove, y como estado
+  // re-renderizaba el provider raíz —es decir, la aplicación entera— varias
+  // veces por segundo. De paso rompía su propio propósito: el intervalo que
+  // comprueba la inactividad dependía de este valor, así que se cancelaba y se
+  // recreaba en cada movimiento del ratón y nunca llegaba a cumplir un ciclo,
+  // con lo que el auto logout no se disparaba jamás.
+  const lastActivityRef = useRef(Date.now());
 
   // Auto logout después de 2 horas de inactividad
   const INACTIVITY_TIMEOUT = 2 * 60 * 60 * 1000; // 2 horas en milisegundos
@@ -342,7 +349,7 @@ export const AuthProvider = ({ children }) => {
    * Actualizar actividad del usuario
    */
   const updateActivity = () => {
-    setLastActivity(Date.now());
+    lastActivityRef.current = Date.now();
   };
 
   // Verificar inactividad y auto logout
@@ -351,14 +358,17 @@ export const AuthProvider = ({ children }) => {
 
     const checkInactivity = () => {
       const now = Date.now();
-      if (now - lastActivity > INACTIVITY_TIMEOUT) {
+      if (now - lastActivityRef.current > INACTIVITY_TIMEOUT) {
         logout();
       }
     };
 
     const interval = setInterval(checkInactivity, 60000); // Verificar cada minuto
     return () => clearInterval(interval);
-  }, [user, lastActivity]);
+    // Solo depende de `user`: la marca de actividad se lee de la ref, así que el
+    // intervalo se monta una vez por sesión y sobrevive a la actividad.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   // Escuchar eventos de actividad
   useEffect(() => {
@@ -394,7 +404,7 @@ export const AuthProvider = ({ children }) => {
       setUser(user);
       setLoading(false);
       if (user) {
-        setLastActivity(Date.now());
+        lastActivityRef.current = Date.now();
         loadUserRole(user.uid);
       } else {
         setUserRoleState(null);

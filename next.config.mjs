@@ -2,48 +2,25 @@
 const nextConfig = {
   reactStrictMode: false, // Deshabilitado para demo
 
-  // Configuración de headers para cache
   async headers() {
     return [
       {
-        // Archivos estáticos de Next.js (JS, CSS)
+        /*
+          Todo lo que Next.js emite bajo /_next/static lleva un hash en el nombre
+          del fichero: si el contenido cambia, cambia la URL. Por eso se cachea
+          para siempre.
+
+          Aquí antes había `max-age=3600, must-revalidate`, que anulaba el
+          `immutable` que Next pone por defecto. El efecto no era solo más
+          peticiones: un cliente podía quedarse hasta una hora con el HTML y el
+          manifest viejos y pedir chunks que ya no existían en el servidor, lo
+          que revienta la navegación con un ChunkLoadError.
+        */
         source: "/_next/static/(.*)",
         headers: [
           {
             key: "Cache-Control",
-            // Cache por 1 hora, revalidar después
-            value: "public, max-age=3600, stale-while-revalidate=86400",
-          },
-        ],
-      },
-      {
-        // Chunks de JavaScript específicos
-        source: "/_next/static/chunks/(.*)",
-        headers: [
-          {
-            key: "Cache-Control",
-            // Cache por 1 hora, forzar revalidación
-            value: "public, max-age=3600, must-revalidate",
-          },
-        ],
-      },
-      {
-        // Páginas compiladas
-        source: "/_next/static/chunks/pages/(.*)",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=3600, must-revalidate",
-          },
-        ],
-      },
-      {
-        // Archivos JavaScript en general
-        source: "/(.*).js",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=3600, must-revalidate",
+            value: "public, max-age=31536000, immutable",
           },
         ],
       },
@@ -60,19 +37,14 @@ const nextConfig = {
     ];
   },
 
-  // Configuración de build ID para invalidar cache con cada deploy
-  // SOLO EN PRODUCCIÓN - En desarrollo causa problemas con HMR
-  generateBuildId: async () => {
-    // En desarrollo, usar el build ID por defecto de Next.js
-    if (process.env.NODE_ENV === 'development') {
-      return null; // Next.js usará su propio sistema de HMR
-    }
+  /*
+    Sin `generateBuildId`: Next.js genera un id único por build.
 
-    // En producción, usar timestamp para invalidar cache
-    const now = new Date();
-    const hour = Math.floor(now.getTime() / (1000 * 60 * 60));
-    return `build-${hour}`;
-  },
+    Antes se usaba `build-${hora}`, lo que significaba que dos despliegues dentro
+    de la misma hora compartían id. Next lo usa para las rutas /_next/data/<id>/,
+    así que un cliente con la página abierta pedía datos con un id que ya
+    apuntaba a otro build.
+  */
 
   // Optimizaciones adicionales
   compiler: {

@@ -174,17 +174,22 @@ const SolicitudesPago = () => {
       setGenerals(generalsData);
       setSubconcepts(subconceptsData);
 
-      // Cargar pagos de todas las transacciones en paralelo
-      const paymentsResults = await Promise.all(
-        transactionsData.map(t =>
-          paymentService.getByTransaction(t.id, tenantId).catch(() => [])
-        )
+      // El mapa de pagos es solo un respaldo: la transacción ya guarda
+      // `balance` y `totalPaid`, y getRemainingAmount/getPaidAmount los
+      // prefieren. Así que se piden pagos únicamente de las que no los tienen
+      // —registros anteriores a esos campos— y en bloques, no con una consulta
+      // por transacción: con el mes lleno eran cientos de peticiones a la vez.
+      const sinTotales = transactionsData.filter(
+        (t) => t.balance == null || t.totalPaid == null
       );
-      const paymentsData = {};
-      transactionsData.forEach((t, i) => {
-        paymentsData[t.id] = paymentsResults[i] || [];
-      });
-      setPaymentsMap(paymentsData);
+      setPaymentsMap(
+        sinTotales.length > 0
+          ? await paymentService.getByTransactions(
+              sinTotales.map((t) => t.id),
+              tenantId
+            )
+          : {}
+      );
     } catch (error) {
       console.error("Error loading transactions:", error);
       notifyError("Error al cargar las transacciones");

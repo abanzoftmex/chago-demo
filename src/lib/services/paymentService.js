@@ -245,6 +245,66 @@ export const paymentService = {
     }
   },
 
+  /**
+   * Pagos de VARIAS transacciones de una vez.
+   *
+   * Las listas de entradas y salidas llamaban a `getByTransaction` dentro de un
+   * `Promise.all` sobre la lista entera: con el mes lleno eran cientos de
+   * consultas simultáneas contra Firestore, que satura la conexión y hace que la
+   * pantalla parezca desconectada.
+   *
+   * Aquí se agrupa en bloques de 30 (el máximo que admite el operador `in`), lo
+   * que deja el coste en ceil(N/30) consultas. Sin `orderBy`: el orden no
+   * importa para sumar y evitarlo ahorra un índice compuesto.
+   *
+   * @param {string[]} transactionIds
+   * @param {string|null} tenantId
+   * @returns {Promise<Record<string, Array>>} mapa transactionId -> pagos
+   */
+  async getByTransactions(transactionIds, tenantId = null) {
+    const mapa = {};
+    const ids = [...new Set((transactionIds || []).filter(Boolean))];
+    if (ids.length === 0) return mapa;
+
+    ids.forEach((id) => {
+      mapa[id] = [];
+    });
+
+    const TAMANO_BLOQUE = 30;
+    const bloques = [];
+    for (let i = 0; i < ids.length; i += TAMANO_BLOQUE) {
+      bloques.push(ids.slice(i, i + TAMANO_BLOQUE));
+    }
+
+    const collectionPath = getPaymentsCollection(tenantId);
+    await Promise.all(
+      bloques.map(async (bloque) => {
+        try {
+          const snapshot = await getDocs(
+            query(
+              collection(db, collectionPath),
+              where("transactionId", "in", bloque)
+            )
+          );
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            // El bloque viene de `in`, así que transactionId siempre está en el
+            // mapa; el guard es por si un documento llega sin el campo.
+            if (mapa[data.transactionId]) {
+              mapa[data.transactionId].push({ id: docSnap.id, ...data });
+            }
+          });
+        } catch (error) {
+          // Igual que getByTransaction: un bloque que falla deja esas
+          // transacciones sin pagos en lugar de tumbar la lista entera.
+          console.error("Error getting payments by transactions:", error);
+        }
+      })
+    );
+
+    return mapa;
+  },
+
   // Update payment
   async update(id, updateData, newFiles = [], tenantId = null) {
     try {
