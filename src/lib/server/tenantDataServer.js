@@ -36,10 +36,37 @@ export const listProviders = (tenantId) => listActive(tenantId, "proveedores");
  * ingreso o un gasto en el momento en que se anularon, y un resumen que las
  * contara daría cifras que no cuadran con las que ve el usuario en pantalla.
  */
-export async function listTransactions(tenantId, { limit } = {}) {
-  let query = db().collection(`tenants/${tenantId}/transacciones`).orderBy("createdAt", "desc");
-  if (limit) query = query.limit(limit);
+/**
+ * Transacciones de un tenant, por rango de fechas o por volumen.
+ *
+ * Con `startDate`/`endDate` el corte es contable: se traen TODAS las del
+ * periodo y no se aplica limite. Sin rango —consultas historicas— se cae al
+ * limite por volumen, ordenando por fecha de captura.
+ *
+ * El limite a secas no sirve para responder "cuanto llevo este mes": recorta
+ * por orden de captura, sin relacion con el periodo, y una salida de marzo
+ * registrada ayer cuenta como reciente.
+ *
+ * @returns {Promise<{transactions: Array, truncated: boolean}>}
+ */
+export async function listTransactions(tenantId, { limit, startDate, endDate } = {}) {
+  const col = db().collection(`tenants/${tenantId}/transacciones`);
+
+  const porRango = Boolean(startDate && endDate);
+  let query = porRango
+    ? col.where("date", ">=", startDate).where("date", "<=", endDate).orderBy("date", "desc")
+    : col.orderBy("createdAt", "desc");
+
+  if (!porRango && limit) query = query.limit(limit);
 
   const snap = await query.get();
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((t) => t.voided !== true);
+  const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+  return {
+    transactions: docs.filter((t) => t.voided !== true),
+    // Se calcula ANTES de descartar las anuladas. Al reves, una sola anulada
+    // dejaba el recuento por debajo del limite y el aviso de "vista parcial"
+    // desaparecia sobre un dato que si estaba recortado.
+    truncated: !porRango && Boolean(limit) && docs.length >= limit,
+  };
 }

@@ -84,7 +84,7 @@ function determineQueryLimit(question) {
 }
 
 // Función para obtener información sobre el alcance del análisis
-function getAnalysisScope(limit, actualTransactions) {
+function getAnalysisScope(limit, actualTransactions, truncated, periodo) {
   const limitTypes = {
     [QUERY_LIMITS.quick]: "rápido",
     [QUERY_LIMITS.monthly]: "mensual",
@@ -94,15 +94,15 @@ function getAnalysisScope(limit, actualTransactions) {
   };
 
   const limitType = limitTypes[limit] || "personalizado";
-  const isLimited = limit && actualTransactions >= limit;
 
   return {
-    limitApplied: limit,
+    limitApplied: truncated ? limit : null,
     limitType,
     transactionsAnalyzed: actualTransactions,
-    isLimited,
-    coverage: isLimited ? "parcial" : "completo",
-    message: `Transacciones analizadas para llegar a la respuesta: ${actualTransactions}${isLimited ? " (vista parcial)" : ""}`,
+    isLimited: truncated,
+    periodo,
+    coverage: truncated ? "parcial" : "completo",
+    message: `${actualTransactions} transacciones de ${periodo}${truncated ? " (vista parcial)" : ""}`,
   };
 }
 
@@ -145,15 +145,25 @@ export default async function handler(req, res) {
 
     console.log("Query analysis:", queryAnalysis);
 
-    // Obtener todos los datos del sistema para el análisis completo
-    const [transactions, concepts, providers, generals, subconcepts] =
+    // El análisis de la pregunta va ANTES de leer: de él sale el rango de
+    // fechas con el que se acota la consulta. Con rango no hace falta límite,
+    // porque el recorte ya es el periodo y no un número arbitrario.
+    const questionAnalysis = analyzeQuestion(enhancedQuestion);
+    const rango = rangoDelPeriodo(questionAnalysis);
+
+    const [transaccionesLeidas, concepts, providers, generals, subconcepts] =
       await Promise.all([
-        listTransactions(tenantId, { limit: transactionLimit }),
+        listTransactions(
+          tenantId,
+          rango ? rango : { limit: transactionLimit }
+        ),
         listConcepts(tenantId),
         listProviders(tenantId),
         listGenerals(tenantId),
         listSubconcepts(tenantId),
       ]);
+
+    const transactions = transaccionesLeidas.transactions;
 
     // Agregar información de divisiones (datos estáticos)
     const divisions = DIVISIONS;
@@ -183,9 +193,6 @@ export default async function handler(req, res) {
       querySpecificData
     );
 
-    // Análisis inteligente de la pregunta para determinar filtros
-    const questionAnalysis = analyzeQuestion(enhancedQuestion);
-
     // Filtrar datos según el análisis de la pregunta
     const filteredData = filterDataByQuestion(financialData, questionAnalysis);
 
@@ -208,7 +215,9 @@ export default async function handler(req, res) {
     // Añadir información sobre el alcance del análisis
     const analysisScope = getAnalysisScope(
       transactionLimit,
-      transactions.length
+      transactions.length,
+      transaccionesLeidas.truncated,
+      periodoLegible(questionAnalysis)
     );
 
     console.log("Final response to send:", response);
@@ -312,7 +321,7 @@ function prepareFinancialData(transactions, concepts, providers, subconcepts = [
   const filterByDate = (days) => {
     const cutoffDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
     return transactions.filter((t) => {
-      const transactionDate = t.date.toDate
+      const transactionDate = t.date?.toDate
         ? t.date.toDate()
         : new Date(t.date);
       return transactionDate >= cutoffDate;
@@ -361,7 +370,7 @@ function prepareFinancialData(transactions, concepts, providers, subconcepts = [
           id: t.id,
           amount: t.amount,
           description: t.description,
-          date: t.date.toDate ? t.date.toDate() : new Date(t.date),
+          date: t.date?.toDate ? t.date.toDate() : new Date(t.date),
           providerId: t.providerId,
         })),
         porcentaje: 0, // Se calculará después
@@ -397,7 +406,7 @@ function prepareFinancialData(transactions, concepts, providers, subconcepts = [
           id: t.id,
           amount: t.amount,
           description: t.description,
-          date: t.date.toDate ? t.date.toDate() : new Date(t.date),
+          date: t.date?.toDate ? t.date.toDate() : new Date(t.date),
           conceptId: t.conceptId,
         })),
         porcentaje: totalGastos > 0 ? (total / totalGastos) * 100 : 0,
@@ -427,7 +436,7 @@ function prepareFinancialData(transactions, concepts, providers, subconcepts = [
         id: t.id,
         amount: t.amount,
         description: t.description,
-        date: t.date.toDate ? t.date.toDate() : new Date(t.date),
+        date: t.date?.toDate ? t.date.toDate() : new Date(t.date),
         conceptId: t.conceptId,
       })),
       porcentaje: totalGastos > 0 ? (total / totalGastos) * 100 : 0,
@@ -674,7 +683,28 @@ function analyzeQuestion(question) {
       questionLower.includes("anual")
     ) {
       analysis.timeframe = "current_year";
+    } else if (
+      questionLower.includes("tendencia") ||
+      questionLower.includes("evolución") ||
+      questionLower.includes("histórico") ||
+      questionLower.includes("historico") ||
+      questionLower.includes("siempre") ||
+      questionLower.includes("todo el tiempo") ||
+      questionLower.includes("desde el inicio")
+    ) {
+      analysis.timeframe = "all";
     }
+  }
+
+  // Sin periodo explicito, el mes en curso.
+  //
+  // Antes quedaba en null y filterDataByQuestion no filtraba por fecha: la
+  // respuesta sumaba las N transacciones capturadas mas recientemente, un
+  // conjunto sin significado contable que ademas cambiaba de tamaño segun las
+  // palabras de la pregunta ("balance actual" traia 100, "balance" 500). De ahi
+  // que la misma pregunta diera dos cifras distintas.
+  if (!analysis.timeframe) {
+    analysis.timeframe = "current_month";
   }
 
   // Análisis de métricas solicitadas (entradas/salidas: plural y singular)
@@ -730,12 +760,98 @@ function analyzeQuestion(question) {
   return analysis;
 }
 
+const MESES_ES = [
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
+];
+
+/**
+ * El periodo en palabras, para decirlo en la respuesta.
+ *
+ * Nombra el mes y el año de verdad ("septiembre de 2025") en vez de "mes
+ * actual": quien lee la respuesta dias despues, o la reenvia, tiene que poder
+ * saber a que se referia sin adivinarlo.
+ */
+function periodoLegible(questionAnalysis) {
+  const tf = questionAnalysis?.timeframe;
+  const hoy = new Date();
+
+  if (tf === "current_month") {
+    return `${MESES_ES[hoy.getMonth()]} de ${hoy.getFullYear()}`;
+  }
+  if (tf === "specific_month" && questionAnalysis.specificMonth != null) {
+    const y = questionAnalysis.specificYear || hoy.getFullYear();
+    return `${MESES_ES[questionAnalysis.specificMonth]} de ${y}`;
+  }
+  if (tf === "current_week") return "la semana en curso";
+  if (tf === "last_2_months") return "los últimos 2 meses";
+  if (tf === "current_year") return `el año ${hoy.getFullYear()}`;
+  if (tf === "all") return "todo el historial";
+  return "el periodo consultado";
+}
+
+/**
+ * Rango de fechas del periodo, para acotar la consulta a Firestore.
+ * Devuelve null cuando el periodo no tiene limites (historico).
+ */
+function rangoDelPeriodo(questionAnalysis) {
+  const tf = questionAnalysis?.timeframe;
+  const hoy = new Date();
+  const finDeDia = (d) =>
+    new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+
+  if (tf === "current_month") {
+    return {
+      startDate: new Date(hoy.getFullYear(), hoy.getMonth(), 1),
+      endDate: finDeDia(new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0)),
+    };
+  }
+  if (tf === "specific_month" && questionAnalysis.specificMonth != null) {
+    const y = questionAnalysis.specificYear || hoy.getFullYear();
+    const m = questionAnalysis.specificMonth;
+    return {
+      startDate: new Date(y, m, 1),
+      endDate: finDeDia(new Date(y, m + 1, 0)),
+    };
+  }
+  if (tf === "current_week") {
+    const inicio = new Date(hoy);
+    inicio.setDate(hoy.getDate() - hoy.getDay());
+    inicio.setHours(0, 0, 0, 0);
+    return { startDate: inicio, endDate: finDeDia(hoy) };
+  }
+  if (tf === "last_2_months") {
+    return {
+      startDate: new Date(hoy.getFullYear(), hoy.getMonth() - 2, 1),
+      endDate: finDeDia(hoy),
+    };
+  }
+  if (tf === "current_year") {
+    return {
+      startDate: new Date(hoy.getFullYear(), 0, 1),
+      endDate: finDeDia(new Date(hoy.getFullYear(), 11, 31)),
+    };
+  }
+  return null;
+}
+
 function timeFrameLabel(questionAnalysis) {
   const tf = questionAnalysis?.timeframe;
   if (tf === "current_month") return "mes actual";
   if (tf === "current_week") return "semana en curso";
   if (tf === "last_2_months") return "últimos 2 meses";
   if (tf === "current_year") return "año en curso";
+  if (tf === "all") return "todo el historial";
   if (tf === "specific_month" && questionAnalysis.specificMonth != null) {
     const months = [
       "enero",
@@ -1194,6 +1310,11 @@ IMPORTANTE: Esta es una consulta NUEVA y ÚNICA. NO reutilices respuestas anteri
 DATOS FINANCIEROS FILTRADOS PARA ESTA CONSULTA (${timeFrameText[cleanedData.periodo] || "período solicitado"}):
 ${JSON.stringify(cleanedData, null, 2)}
 
+PERIODO (obligatorio):
+- Los datos de arriba corresponden EXCLUSIVAMENTE a ${periodoLegible(questionAnalysis)}. No son el histórico.
+- Di el periodo de forma explícita en la primera frase de tu respuesta, con el nombre del mes y el año.
+- No lo llames "total" ni "balance total" salvo que el periodo sea todo el historial.
+
 PRIORIDAD SOBRE RESÚMENES GENÉRICOS (obligatorio):
 - Revisa "filtrosAplicados": si tipoMovimiento es "solo_entradas" o "solo_salidas", NO mezcles el otro tipo en totales ni en narrativa.
 - Si "filtrosAplicados.searchTerms" no está vacío, las transacciones YA están filtradas por descripción, subconcepto, concepto o proveedor que contengan esos términos. Responde con el total de ESE subconjunto y lista o tabla relevante.
@@ -1648,14 +1769,17 @@ function generateFallbackResponse(question, filteredData, questionAnalysis) {
   // Respuesta genérica final
   const dataTotal = metricas;
   const topConcepto = gastosPorConcepto[0];
+  // El periodo se nombra siempre: sin él, dos preguntas sobre distintos rangos
+  // devuelven cifras distintas sin nada que explique la diferencia.
+  const periodo = periodoLegible(questionAnalysis);
 
   return {
-    text: `Aquí tienes un resumen general: Gastos totales: **${formatCurrency(dataTotal.totalGastos)}**, Ingresos totales: **${formatCurrency(dataTotal.totalIngresos)}**, Balance: **${formatCurrency(dataTotal.balance)}**. ${topConcepto ? `Tu mayor gasto es en **${topConcepto.concepto}** (${Math.round(topConcepto.porcentaje)}%).` : ""} ¿Te gustaría saber algo más específico?`,
+    text: `Resumen de **${periodo}**: Gastos: **${formatCurrency(dataTotal.totalGastos)}**, Ingresos: **${formatCurrency(dataTotal.totalIngresos)}**, Balance: **${formatCurrency(dataTotal.balance)}**. ${topConcepto ? `Tu mayor gasto es en **${topConcepto.concepto}** (${Math.round(topConcepto.porcentaje)}%).` : ""} ¿Te gustaría saber algo más específico?`,
     data: {
       metrics: {
-        "Gastos Totales": dataTotal.totalGastos,
-        "Ingresos Totales": dataTotal.totalIngresos,
-        "Balance Total": dataTotal.balance,
+        [`Gastos · ${periodo}`]: dataTotal.totalGastos,
+        [`Ingresos · ${periodo}`]: dataTotal.totalIngresos,
+        [`Balance · ${periodo}`]: dataTotal.balance,
       },
       percentages: gastosPorConcepto.slice(0, 3).map((item) => ({
         label: item.concepto,

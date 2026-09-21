@@ -323,7 +323,8 @@ const FinancialChatbotV2 = () => {
                   }`}
               />
               <span>
-                {data.analysisScope.transactionsAnalyzed} transacciones analizadas
+                {data.analysisScope.transactionsAnalyzed} transacciones
+                {data.analysisScope.periodo ? ` de ${data.analysisScope.periodo}` : " analizadas"}
                 {data.analysisScope.isLimited && " (vista parcial)"}
               </span>
             </div>
