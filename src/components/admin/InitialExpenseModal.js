@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { transactionService } from "../../lib/services/transactionService";
 import { useToast } from "../ui/Toast";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/AuthContextMultiTenant";
 
 const InitialExpenseModal = ({ isOpen, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
@@ -29,7 +29,7 @@ const InitialExpenseModal = ({ isOpen, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const toast = useToast();
-  const { user } = useAuth();
+  const { user, tenantInfo } = useAuth();
 
   const formatNumberWithCommas = (value) => {
     if (value === null || value === undefined || value === '') {
@@ -137,7 +137,15 @@ const InitialExpenseModal = ({ isOpen, onClose, onSuccess }) => {
         providerId: null
       };
       
-      await transactionService.createInitialExpense(transactionData, user);
+      // Sin tenantId, createInitialExpense escribe en la colección raíz
+      // 'transactions' en lugar de tenants/{id}/transactions: el gasto queda
+      // fuera de la empresa y no aparece en ninguna pantalla.
+      const tenantId = tenantInfo?.id;
+      if (!tenantId) {
+        throw new Error("No se pudo determinar la empresa activa");
+      }
+
+      await transactionService.createInitialExpense(transactionData, user, tenantId);
       
       toast.success("Gasto inicial creado exitosamente");
       

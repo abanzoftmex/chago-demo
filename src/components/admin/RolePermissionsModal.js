@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/AuthContextMultiTenant";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ROLE_PERMISSIONS, ROLES } from "../../lib/services/roleService";
 import PermissionCheckbox from "./PermissionCheckbox";
@@ -7,7 +7,8 @@ import { db } from "../../lib/firebase/firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
 
 const RolePermissionsModal = ({ onClose }) => {
-  const { user, userRole } = useAuth();
+  // userRole se destructuraba sin usarse; solo hace falta el usuario para el token.
+  const { user } = useAuth();
   const [permissions, setPermissions] = useState({});
   const [selectedRole, setSelectedRole] = useState(ROLES.ADMINISTRATIVO);
   const [loading, setLoading] = useState(false);
