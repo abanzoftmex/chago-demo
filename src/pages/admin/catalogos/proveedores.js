@@ -51,7 +51,7 @@ const Proveedores = () => {
     } else {
       const searchLower = searchTerm.toLowerCase();
       const filtered = providers.filter(provider => 
-        provider.name.toLowerCase().includes(searchLower) ||
+        (provider.name || "").toLowerCase().includes(searchLower) ||
         (provider.rfc && provider.rfc.toLowerCase().includes(searchLower)) ||
         (provider.phone && provider.phone.includes(searchTerm)) ||
         (provider.address && provider.address.toLowerCase().includes(searchLower))

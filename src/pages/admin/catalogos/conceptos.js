@@ -120,7 +120,7 @@ export default function ConceptosPage() {
   const filteredConcepts = concepts.filter((concept) => {
     const matchesGeneralFilter = filterGeneral === "all" || concept.generalId === filterGeneral;
     const matchesTypeFilter = filterType === "all" || concept.type === filterType;
-    const matchesSearch = concept.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (concept.name || "").toLowerCase().includes(searchTerm.toLowerCase());
     return matchesGeneralFilter && matchesTypeFilter && matchesSearch;
   });
 

@@ -91,7 +91,7 @@ const DescriptionModal = ({
 
   const getConceptName = (conceptId) => {
     const concept = concepts.find(c => c.id === conceptId);
-    return concept ? concept.name : '';
+    return concept?.name || '';
   };
 
   if (!isOpen) return null;

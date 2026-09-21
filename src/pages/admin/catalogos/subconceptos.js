@@ -128,7 +128,7 @@ export default function SubconceptosPage() {
     return subconcepts.filter((subconcept) => {
       const matchesConceptFilter =
         filterConcept === "all" || subconcept.conceptId === filterConcept;
-      const matchesSearch = subconcept.name.toLowerCase().includes(term);
+      const matchesSearch = (subconcept.name || "").toLowerCase().includes(term);
       return matchesConceptFilter && matchesSearch;
     });
   }, [subconcepts, filterConcept, searchTerm]);

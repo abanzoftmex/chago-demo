@@ -43,10 +43,17 @@ export const treeSelectStyles = {
 
 // Filtro que mantiene SIEMPRE visible la opción "Agregar nuevo…", aunque el
 // usuario esté buscando; el resto se filtra por coincidencia de texto.
+// El label se normaliza a String antes de compararlo: react-select lo toma tal
+// cual del catálogo, así que un registro sin nombre (importaciones CSV viejas,
+// altas automáticas del punto de venta, documentos a medio escribir) llegaba
+// aquí como undefined. Como filterOption corre DURANTE el render, ese
+// .toLowerCase() tumbaba el árbol entero en cuanto alguien escribía en el
+// buscador del desplegable.
 export const keepCreateFilter = (candidate, input) => {
-  if (candidate.data?.__isCreate) return true;
+  if (candidate?.data?.__isCreate) return true;
   if (!input) return true;
-  return candidate.label.toLowerCase().includes(input.toLowerCase());
+  const label = candidate?.label == null ? "" : String(candidate.label);
+  return label.toLowerCase().includes(input.toLowerCase());
 };
 
 // Portal a document.body para que el menú no se recorte dentro de contenedores

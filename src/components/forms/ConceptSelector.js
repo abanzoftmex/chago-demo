@@ -112,7 +112,7 @@ const ConceptSelector = forwardRef(({
 
   const options = concepts.map((concept) => ({
     value: concept.id,
-    label: concept.name,
+    label: concept.name || "(sin nombre)",
   }));
   const allOptions = [
     ...options,

@@ -318,12 +318,11 @@ const Historial = () => {
             return (
               (transaction.description &&
                 transaction.description.toLowerCase().includes(searchLower)) ||
-              (concept && concept.name.toLowerCase().includes(searchLower)) ||
-              (subconcept &&
-                subconcept.name.toLowerCase().includes(searchLower)) ||
-              (provider && provider.name.toLowerCase().includes(searchLower)) ||
-              (general && general.name.toLowerCase().includes(searchLower)) ||
-              transaction.amount.toString().includes(searchLower)
+              (concept?.name || "").toLowerCase().includes(searchLower) ||
+              (subconcept?.name || "").toLowerCase().includes(searchLower) ||
+              (provider?.name || "").toLowerCase().includes(searchLower) ||
+              (general?.name || "").toLowerCase().includes(searchLower) ||
+              String(transaction.amount ?? "").includes(searchLower)
             );
           });
         }
@@ -453,7 +452,7 @@ const Historial = () => {
     }
     
     const concept = concepts.find((c) => c.id === conceptId);
-    return concept ? concept.name : "N/A";
+    return concept?.name || "N/A";
   };
 
   const getProviderName = (providerId, transaction = null) => {
@@ -464,7 +463,7 @@ const Historial = () => {
     
     if (!providerId) return "N/A";
     const provider = providers.find((p) => p.id === providerId);
-    return provider ? provider.name : "N/A";
+    return provider?.name || "N/A";
   };
 
   const getGeneralName = (generalId, transaction = null) => {
@@ -475,7 +474,7 @@ const Historial = () => {
     
     if (!generalId) return "N/A";
     const general = generals.find((g) => g.id === generalId);
-    return general ? general.name : "N/A";
+    return general?.name || "N/A";
   };
 
   const getSubconceptName = (subconceptId, transaction = null) => {
@@ -486,7 +485,7 @@ const Historial = () => {
     
     if (!subconceptId) return "N/A";
     const subconcept = subconcepts.find((s) => s.id === subconceptId);
-    return subconcept ? subconcept.name : "N/A";
+    return subconcept?.name || "N/A";
   };
 
   // Muestra la jerarquía en dos filas:

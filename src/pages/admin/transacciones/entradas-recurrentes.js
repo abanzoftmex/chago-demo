@@ -93,23 +93,23 @@ const EntradasRecurrentes = () => {
 
   const getConceptName = (conceptId) => {
     const concept = concepts.find((c) => c.id === conceptId);
-    return concept ? concept.name : "N/A";
+    return concept?.name || "N/A";
   };
 
   const getSubconceptName = (subconceptId) => {
     const subconcept = subconcepts.find((s) => s.id === subconceptId);
-    return subconcept ? subconcept.name : "N/A";
+    return subconcept?.name || "N/A";
   };
 
   const getProviderName = (providerId) => {
     if (!providerId) return "N/A";
     const provider = providers.find((p) => p.id === providerId);
-    return provider ? provider.name : "N/A";
+    return provider?.name || "N/A";
   };
 
   const getGeneralName = (generalId) => {
     const general = generals.find((g) => g.id === generalId);
-    return general ? general.name : "N/A";
+    return general?.name || "N/A";
   };
 
   const formatCurrency = (amount) => {

@@ -183,25 +183,25 @@ const LogsPage = () => {
   function getGeneralName(id) {
     if (!id) return 'No definido';
     const general = generals.find(g => g.id === id);
-    return general ? general.name : `General ${id}`;
+    return general?.name || `General ${id}`;
   }
 
   function getConceptName(id) {
     if (!id) return 'No definido';
     const concept = concepts.find(c => c.id === id);
-    return concept ? concept.name : `Concepto ${id}`;
+    return concept?.name || `Concepto ${id}`;
   }
 
   function getSubconceptName(id) {
     if (!id) return 'No definido';
     const subconcept = subconcepts.find(s => s.id === id);
-    return subconcept ? subconcept.name : `Sub-concepto ${id}`;
+    return subconcept?.name || `Sub-concepto ${id}`;
   }
 
   function getProviderName(id) {
     if (!id) return 'No definido';
     const provider = providers.find(p => p.id === id);
-    return provider ? provider.name : `Proveedor ${id}`;
+    return provider?.name || `Proveedor ${id}`;
   }
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);

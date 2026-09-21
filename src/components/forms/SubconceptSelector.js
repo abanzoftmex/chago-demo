@@ -95,7 +95,10 @@ const SubconceptSelector = forwardRef(({
     );
   }
 
-  const options = subconcepts.map((s) => ({ value: s.id, label: s.name }));
+  const options = subconcepts.map((s) => ({
+    value: s.id,
+    label: s.name || "(sin nombre)",
+  }));
   const allOptions = [
     ...options,
     { value: CREATE_NEW, label: "＋ Agregar nuevo subconcepto", __isCreate: true },

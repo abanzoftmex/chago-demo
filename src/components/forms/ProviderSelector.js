@@ -98,10 +98,13 @@ const ProviderSelector = forwardRef(({
     );
   }
 
-  const options = providers.map((provider) => ({
-    value: provider.id,
-    label: provider.rfc ? `${provider.name} - ${provider.rfc}` : provider.name,
-  }));
+  const options = providers.map((provider) => {
+    const nombre = provider.name || "(sin nombre)";
+    return {
+      value: provider.id,
+      label: provider.rfc ? `${nombre} - ${provider.rfc}` : nombre,
+    };
+  });
   const allOptions = [
     ...options,
     { value: CREATE_NEW, label: "＋ Agregar nuevo proveedor", __isCreate: true },

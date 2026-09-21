@@ -89,7 +89,7 @@ export default function SubconceptCsvImportModal({ isOpen, onClose, onSuccess })
 
   const getGeneralName = (generalId) => {
     const general = generals.find(g => g.id === generalId);
-    return general ? general.name : 'General no encontrado';
+    return general?.name || 'General no encontrado';
   };
 
   const handleImport = async () => {

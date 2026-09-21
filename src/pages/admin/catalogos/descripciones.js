@@ -82,7 +82,7 @@ export default function DescripcionesPage() {
   };
 
   const filteredDescriptions = descriptions.filter((description) => {
-    const matchesSearch = description.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (description.name || "").toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
   });
 

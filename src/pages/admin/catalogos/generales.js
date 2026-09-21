@@ -111,7 +111,7 @@ export default function GeneralesPage() {
 
   const filteredGenerals = useMemo(() => generals.filter((general) => {
     const matchesFilter = filter === "all" || general.type === filter;
-    const matchesSearch = general.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (general.name || "").toLowerCase().includes(searchTerm.toLowerCase());
     return matchesFilter && matchesSearch;
   }), [generals, filter, searchTerm]);
 
