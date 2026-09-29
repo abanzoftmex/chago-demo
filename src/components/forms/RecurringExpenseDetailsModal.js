@@ -103,7 +103,7 @@ const RecurringExpenseDetailsModal = ({ type = "salida", expense, isOpen, onClos
 
           {/* Expense Summary */}
           <div className="px-6 py-4 bg-gray-50 border-b">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div>
                 <p className="text-sm font-medium text-gray-500">Monto</p>
                 <p className="text-lg font-semibold text-gray-900">{formatCurrency(expense.amount)}</p>
@@ -124,6 +124,14 @@ const RecurringExpenseDetailsModal = ({ type = "salida", expense, isOpen, onClos
               <div>
                 <p className="text-sm font-medium text-gray-500">Meses Generados</p>
                 <p className="text-lg font-semibold text-gray-900">{monthsHistory.length}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Vigente hasta</p>
+                {expense.endDate ? (
+                  <p className="text-sm font-semibold text-amber-700">{formatDate(expense.endDate)}</p>
+                ) : (
+                  <p className="text-sm text-gray-400">Sin vencimiento</p>
+                )}
               </div>
             </div>
             {expense.description && (

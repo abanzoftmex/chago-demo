@@ -80,6 +80,23 @@ export async function generatePendingTransactions(tenantId, user) {
     const startDate = toDate(expense.startDate);
 
     if (startDate && startDate > hoy) continue;
+
+    // Auto-expirar si tiene endDate y ya pasó la fecha de vencimiento
+    if (expense.endDate) {
+      const endDate = toDate(expense.endDate);
+      if (endDate && hoy > endDate) {
+        await db()
+          .collection(`tenants/${tenantId}/recurringExpenses`)
+          .doc(expense.id)
+          .update({
+            isActive: false,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        console.log(`[recurringServer] Auto-expired recurring ${expense.id} (endDate: ${formatDateKey(endDate)})`);
+        continue;
+      }
+    }
+
     if (!shouldGenerateForDate(hoy, frequency, generatedDates, startDate)) continue;
 
     const transactionData = {

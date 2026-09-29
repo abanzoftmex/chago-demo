@@ -361,6 +361,7 @@ const GastosRecurrentes = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" style={{ maxWidth: '230px' }}>Concepto</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Proveedor</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Frecuencia</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Vence</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Monto</th>
                         {/* <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">División</th> */}
                         <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Acciones</th>
@@ -416,6 +417,18 @@ const GastosRecurrentes = () => {
                                 ( <div className="flex items-center"><CalendarIcon className="w-3 h-3 mr-1" /><span>Mensual</span></div> )
                               }
                             </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                            {expense.endDate ? (
+                              <span className="text-amber-700 font-medium">
+                                {(() => {
+                                  const d = expense.endDate.toDate ? expense.endDate.toDate() : new Date(expense.endDate);
+                                  return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+                                })()}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-xs">Sin vencimiento</span>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
                             {formatCurrency(expense.amount)}
@@ -489,6 +502,14 @@ const GastosRecurrentes = () => {
                                 ( <div className="flex items-center"><CalendarIcon className="w-3 h-3 mr-1" /><span>Mensual</span></div> )
                                 }
                               </span>
+                              {expense.endDate && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                                  Vence: {(() => {
+                                    const d = expense.endDate.toDate ? expense.endDate.toDate() : new Date(expense.endDate);
+                                    return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+                                  })()}
+                                </span>
+                              )}
                             </div>
                             <Switch
                               enabled={expense.isActive}

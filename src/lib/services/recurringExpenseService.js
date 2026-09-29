@@ -51,6 +51,7 @@ export const recurringExpenseService = {
         // Keep backward compatibility
         generatedMonths: expenseData.generatedMonths || [],
         frequency: expenseData.frequency || 'monthly', // Default to monthly for backward compatibility
+        endDate: expenseData.endDate || null, // Fecha de vencimiento opcional
       });
 
       return { id: docRef.id, ...expenseData, type: expenseData.type || "salida" };
@@ -142,6 +143,16 @@ export const recurringExpenseService = {
         if (startDate && startDate > today) {
           console.log(`Skipping recurring item ${expense.id} - start date is in the future`);
           continue;
+        }
+
+        // Auto-expirar si tiene endDate y ya pasó la fecha de vencimiento
+        if (expense.endDate) {
+          const endDate = expense.endDate.toDate ? expense.endDate.toDate() : new Date(expense.endDate);
+          if (endDate && !isNaN(endDate.getTime()) && today > endDate) {
+            await this.update(expense.id, { isActive: false }, tenantId);
+            console.log(`Auto-expired recurring ${expense.id} (endDate passed)`);
+            continue;
+          }
         }
 
         // Check if we should generate based on frequency

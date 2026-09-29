@@ -47,6 +47,7 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
     division: "general",
     frequency: "monthly", // New field for frequency
     startDate: formatDateKey(new Date()), // When to start generating (fecha local, sin corrimiento UTC)
+    endDate: "", // Fecha de vencimiento opcional (vacío = sin vencimiento)
     isActive: true
   });
 
@@ -126,6 +127,11 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
             division: expense.division || "general",
             frequency: expense.frequency || "monthly",
             startDate: dateStr,
+            endDate: (() => {
+              if (!expense.endDate) return "";
+              const endObj = expense.endDate.toDate ? expense.endDate.toDate() : new Date(expense.endDate);
+              return !isNaN(endObj.getTime()) ? formatDateKey(endObj) : "";
+            })(),
             isActive: expense.isActive !== undefined ? expense.isActive : true
           });
         }
@@ -250,6 +256,10 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
       newErrors.startDate = "La fecha de inicio es requerida";
     }
 
+    if (formData.endDate && formData.startDate && formData.endDate <= formData.startDate) {
+      newErrors.endDate = "La fecha de fin debe ser posterior a la fecha de inicio";
+    }
+
     return newErrors;
   };
 
@@ -295,6 +305,7 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
           division: "general",
           frequency: "monthly",
           startDate: formatDateKey(new Date()),
+          endDate: "",
           isActive: true,
         });
       }
@@ -332,6 +343,8 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
       frequency: formData.frequency,
       // Ancla a mediodía: evita que en México (UTC-6) se guarde el día anterior.
       startDate: new Date(formData.startDate + "T12:00:00"),
+      // Fecha de vencimiento opcional: si se establece, el recurrente se auto-desactiva.
+      endDate: formData.endDate ? new Date(formData.endDate + "T12:00:00") : null,
       isActive: formData.isActive,
     };
 
@@ -553,8 +566,8 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
           </div>
         </div>
 
-        {/* Segunda fila: Frecuencia / Fecha de inicio / Monto */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Segunda fila: Frecuencia / Fecha de inicio / Monto / Vigente hasta */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label htmlFor="frequency" className="block text-sm font-medium text-gray-700 mb-2">
               Frecuencia *
@@ -628,6 +641,30 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
             </div>
             {errors.amount && (
               <p className="mt-1 text-sm text-red-600">{errors.amount}</p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-2">
+              Vigente hasta
+            </label>
+            <input
+              type="date"
+              id="endDate"
+              name="endDate"
+              value={formData.endDate}
+              onChange={handleInputChange}
+              min={formData.startDate || undefined}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${focusRingClass} ${
+                errors.endDate ? "border-red-300" : "border-gray-300"
+              }`}
+              disabled={loading}
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Opcional. Se desactiva automáticamente en esta fecha.
+            </p>
+            {errors.endDate && (
+              <p className="mt-1 text-sm text-red-600">{errors.endDate}</p>
             )}
           </div>
         </div>
@@ -709,6 +746,17 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
                   return (
                     <p className="text-sm font-semibold text-blue-900 mt-1">
                       Primera generación: {fmt(nextMonthlyGenerationDate(start))}
+                    </p>
+                  );
+                })()}
+                {formData.endDate && (() => {
+                  const end = new Date(formData.endDate + "T12:00:00");
+                  if (isNaN(end.getTime())) return null;
+                  const fmtEnd = (d) =>
+                    d.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
+                  return (
+                    <p className="text-sm font-semibold text-amber-700 mt-2">
+                      ⏰ Se desactivará automáticamente el {fmtEnd(end)}
                     </p>
                   );
                 })()}
