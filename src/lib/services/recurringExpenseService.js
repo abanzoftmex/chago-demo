@@ -33,7 +33,7 @@ const getDocRef = (tenantId, id) => {
 // La fecha del negocio y la regla de "cuándo toca generar" viven en
 // `lib/recurring/schedule`, compartidas con el módulo de servidor que usa el
 // cron. Escritas dos veces, acabarían discrepando.
-import { getMexicoDate, formatDateKey, shouldGenerateForDate, monthlyBackfillDates } from "../recurring/schedule";
+import { getMexicoDate, formatDateKey, shouldGenerateForDate, monthlyBackfillDates, haVencido } from "../recurring/schedule";
 
 export const recurringExpenseService = {
   // Create a new recurring expense
@@ -145,14 +145,11 @@ export const recurringExpenseService = {
           continue;
         }
 
-        // Auto-expirar si tiene endDate y ya pasó la fecha de vencimiento
-        if (expense.endDate) {
-          const endDate = expense.endDate.toDate ? expense.endDate.toDate() : new Date(expense.endDate);
-          if (endDate && !isNaN(endDate.getTime()) && today > endDate) {
-            await this.update(expense.id, { isActive: false }, tenantId);
-            console.log(`Auto-expired recurring ${expense.id} (endDate passed)`);
-            continue;
-          }
+        // Auto-expirar cuando la vigencia ya pasó (endDate inclusivo).
+        if (haVencido(expense.endDate, today)) {
+          await this.update(expense.id, { isActive: false }, tenantId);
+          console.log(`Auto-expired recurring ${expense.id} (endDate passed)`);
+          continue;
         }
 
         // Check if we should generate based on frequency

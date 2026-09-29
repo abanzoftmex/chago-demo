@@ -661,7 +661,7 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
               disabled={loading}
             />
             <p className="mt-1 text-xs text-gray-500">
-              Opcional. Se desactiva automáticamente en esta fecha.
+              Opcional. Último día vigente: genera ese día y se desactiva después.
             </p>
             {errors.endDate && (
               <p className="mt-1 text-sm text-red-600">{errors.endDate}</p>
@@ -756,7 +756,7 @@ const RecurringExpenseForm = ({ type = "salida", expenseId = null, onSuccess, cl
                     d.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
                   return (
                     <p className="text-sm font-semibold text-amber-700 mt-2">
-                      ⏰ Se desactivará automáticamente el {fmtEnd(end)}
+                      ⏰ Último día vigente: {fmtEnd(end)}. Después se desactiva solo.
                     </p>
                   );
                 })()}

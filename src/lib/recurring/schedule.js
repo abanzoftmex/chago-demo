@@ -30,6 +30,25 @@ export function formatDateKey(date) {
 }
 
 /**
+ * ¿Ya venció el recurrente en `currentDate`?
+ *
+ * `endDate` es INCLUSIVO: "vigente hasta el 31" genera el 31 y deja de estar
+ * activo el 1. Es como se lee la etiqueta del formulario.
+ *
+ * Compara por llave 'YYYY-MM-DD', no por instante. Comparando fechas completas,
+ * el resultado dependia de la hora: el formulario ancla endDate al mediodia, el
+ * cron pasa a medianoche de Mexico y el navegador cuando el usuario abre la
+ * pantalla, asi que un recurrente podia vencer un dia antes o despues segun
+ * quien llegara primero. La llave no tiene hora, asi que no hay nada que
+ * dependa del momento del dia.
+ */
+export function haVencido(endDate, currentDate) {
+  const fin = toDate(endDate);
+  if (!fin || isNaN(fin.getTime())) return false;
+  return formatDateKey(currentDate) > formatDateKey(fin);
+}
+
+/**
  * ¿Toca generar en `currentDate`?
  *
  * Lo primero que se comprueba es si ya se generó para esa fecha exacta: es lo

@@ -14,7 +14,7 @@
  */
 
 import admin from "../firebase/firebaseAdmin";
-import { getMexicoDate, formatDateKey, shouldGenerateForDate, toDate } from "../recurring/schedule";
+import { getMexicoDate, formatDateKey, shouldGenerateForDate, toDate, haVencido } from "../recurring/schedule";
 
 const db = () => admin.firestore();
 
@@ -81,20 +81,17 @@ export async function generatePendingTransactions(tenantId, user) {
 
     if (startDate && startDate > hoy) continue;
 
-    // Auto-expirar si tiene endDate y ya pasó la fecha de vencimiento
-    if (expense.endDate) {
-      const endDate = toDate(expense.endDate);
-      if (endDate && hoy > endDate) {
-        await db()
-          .collection(`tenants/${tenantId}/recurringExpenses`)
-          .doc(expense.id)
-          .update({
-            isActive: false,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          });
-        console.log(`[recurringServer] Auto-expired recurring ${expense.id} (endDate: ${formatDateKey(endDate)})`);
-        continue;
-      }
+    // Auto-expirar cuando la vigencia ya pasó (endDate inclusivo).
+    if (haVencido(expense.endDate, hoy)) {
+      await db()
+        .collection(`tenants/${tenantId}/recurringExpenses`)
+        .doc(expense.id)
+        .update({
+          isActive: false,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      console.log(`[recurringServer] Auto-expired recurring ${expense.id} (endDate: ${formatDateKey(toDate(expense.endDate))})`);
+      continue;
     }
 
     if (!shouldGenerateForDate(hoy, frequency, generatedDates, startDate)) continue;
