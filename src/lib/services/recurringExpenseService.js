@@ -33,7 +33,7 @@ const getDocRef = (tenantId, id) => {
 // La fecha del negocio y la regla de "cuándo toca generar" viven en
 // `lib/recurring/schedule`, compartidas con el módulo de servidor que usa el
 // cron. Escritas dos veces, acabarían discrepando.
-import { getMexicoDate, formatDateKey, shouldGenerateForDate, monthlyBackfillDates, haVencido } from "../recurring/schedule";
+import { getMexicoDate, formatDateKey, fechaDeNegocio, shouldGenerateForDate, monthlyBackfillDates, haVencido } from "../recurring/schedule";
 
 export const recurringExpenseService = {
   // Create a new recurring expense
@@ -164,7 +164,7 @@ export const recurringExpenseService = {
             subconceptId: expense.subconceptId,
             description: `${expense.description} (Recurrente)`,
             amount: expense.amount,
-            date: today,
+            date: fechaDeNegocio(todayKey),
             providerId: expense.providerId,
             division: expense.division,
             isRecurring: true,

@@ -21,6 +21,21 @@ export function getMexicoDate() {
   return new Date(mexicoDateStr);
 }
 
+/**
+ * El instante que se guarda como `date` de una transacción del día `dateKey`
+ * ('YYYY-MM-DD'): mediodía en México, la misma ancla que usan los formularios.
+ *
+ * `getMexicoDate()` NO sirve para guardarse: es la hora de pared de México
+ * metida en un Date del reloj local. En Vercel (UTC) el cron de las 00:00 de
+ * México producía 2026-10-01T00:00Z, que en México es el 30 de septiembre a
+ * las 18:00 — la transacción caía en el mes anterior y no aparecía en el mes
+ * en que se generó. México no tiene horario de verano desde 2022, así que el
+ * desfase -06:00 es fijo.
+ */
+export function fechaDeNegocio(dateKey) {
+  return new Date(`${dateKey}T12:00:00-06:00`);
+}
+
 /** 'YYYY-MM-DD' — la llave con la que se registra lo ya generado. */
 export function formatDateKey(date) {
   const year = date.getFullYear();

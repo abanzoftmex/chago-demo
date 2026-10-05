@@ -14,7 +14,7 @@
  */
 
 import admin from "../firebase/firebaseAdmin";
-import { getMexicoDate, formatDateKey, shouldGenerateForDate, toDate, haVencido } from "../recurring/schedule";
+import { getMexicoDate, formatDateKey, fechaDeNegocio, shouldGenerateForDate, toDate, haVencido } from "../recurring/schedule";
 
 const db = () => admin.firestore();
 
@@ -103,7 +103,7 @@ export async function generatePendingTransactions(tenantId, user) {
       subconceptId: expense.subconceptId,
       description: `${expense.description} (Recurrente)`,
       amount: expense.amount,
-      date: hoy,
+      date: fechaDeNegocio(hoyKey),
       providerId: expense.providerId,
       division: expense.division,
       isRecurring: true,
