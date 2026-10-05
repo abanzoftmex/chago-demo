@@ -1,5 +1,5 @@
 # Rediseño del Chatbot Financiero - Estilo ChatGPT/OpenAI
-A-6
+A-7
 ## 🎨 Cambios Principales
 
 ### 1. **Layout Completamente Nuevo**
