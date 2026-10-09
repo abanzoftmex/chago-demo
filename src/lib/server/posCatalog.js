@@ -73,6 +73,30 @@ export function catalogRefs(db, tenantId) {
 }
 
 /**
+ * Las rutas de los documentos del catálogo de VENTAS a los que apunta
+ * `posIntegration` y que ya no existen (vacío = todo en su lugar).
+ *
+ * `posIntegration` guarda solo los ids; los documentos viven en subcolecciones
+ * del tenant. "Limpiar datos" y restaurar un respaldo anterior al vínculo
+ * borran esas subcolecciones y dejan el documento raíz —con los ids— intacto.
+ * Sin esta comprobación las ventas se aceptan, el POS las da por enviadas y
+ * quedan colgando de un General que no existe.
+ *
+ * Una sola ronda (`getAll`): el General, el Concepto y el subconcepto de cada
+ * método de pago que trae la venta.
+ */
+export async function missingSalesCatalog(db, tenantId, integration, methods) {
+  const { generalsRef, conceptsRef, subconceptsRef } = catalogRefs(db, tenantId);
+  const refs = [
+    generalsRef.doc(integration.generalId),
+    conceptsRef.doc(integration.conceptId),
+    ...[...new Set(methods)].map((method) => subconceptsRef.doc(integration.subconceptIds[method])),
+  ];
+  const snaps = await db.getAll(...refs);
+  return snaps.filter((snap) => !snap.exists).map((snap) => snap.ref.path);
+}
+
+/**
  * Deja lista la rama de COMPRAS y devuelve `{ purchaseGeneralId, purchaseConceptId }`.
  *
  * Las compras cuelgan de su PROPIO General, separado del de ventas. Antes

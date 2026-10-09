@@ -108,6 +108,18 @@ export function BackupConfirmDialog({ action, onClose, onConfirm, working }) {
           <DialogDescription>{meta.description}</DialogDescription>
         </DialogHeader>
 
+        {tenant?.posLinked && (mode === "wipe" || mode === "restore") && (
+          <div className="mt-4 flex gap-2.5 rounded-2xl border border-destructive/25 bg-destructive/5 px-4 py-3 text-[13px] text-foreground">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" strokeWidth={1.8} />
+            <p>
+              Este tenant está vinculado al <span className="font-semibold">punto de venta</span>.{" "}
+              {mode === "wipe"
+                ? "Al limpiar se borra también el catálogo de Ventas POS: después hay que volver a guardar el vínculo en Torre de Control del POS. Mientras tanto las ventas quedan en espera, no se pierden."
+                : "Si el respaldo no incluye el catálogo de Ventas POS (por ejemplo, es anterior al vínculo), hay que volver a guardar el vínculo en Torre de Control del POS. Mientras tanto las ventas quedan en espera, no se pierden."}
+            </p>
+          </div>
+        )}
+
         {backup && (
           <div className="mt-4 rounded-2xl border border-border/70 bg-accent/50 px-4 py-3">
             <div className="flex flex-wrap items-center gap-2.5">

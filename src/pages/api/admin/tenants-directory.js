@@ -59,6 +59,9 @@ export default async function handler(req, res) {
         id: tenantDoc.id,
         ownerUid: adminUid,
         nombreEmpresa: tenantData.nombreEmpresa || "Sin nombre",
+        // Solo el booleano: el resto de posIntegration (hash del token, ids) no
+        // tiene por qué viajar al navegador. Lo usa el aviso de limpiar/restaurar.
+        posLinked: tenantData.posIntegration?.enabled === true,
         adminEmail,
         adminName,
         // ISO porque JSON no lleva Date; el cliente lo reconstruye.
