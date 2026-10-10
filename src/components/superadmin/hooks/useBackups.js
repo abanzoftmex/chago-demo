@@ -148,6 +148,9 @@ export function useBackups({ setResult }) {
               `Documentos eliminados: ${data.deletedDocs}`,
               `Copia de seguridad previa: ${data.backup.backupId} (${data.backup.totalDocs} documentos)`,
               "Los usuarios se conservaron.",
+              ...(data.posLinked
+                ? ["Vinculado al punto de venta: vuelve a guardar el vínculo en Torre de Control del POS para recrear el catálogo de Ventas POS. Mientras tanto las ventas quedan en espera."]
+                : []),
             ],
           });
         } else if (action.mode === "restore") {
@@ -158,6 +161,9 @@ export function useBackups({ setResult }) {
               `Documentos restaurados: ${data.restoredDocs}`,
               `Copia del estado previo: ${data.safetyBackup.backupId}`,
               "Los usuarios actuales se conservaron.",
+              ...(data.posLinked
+                ? ["Vinculado al punto de venta: si el respaldo no traía el catálogo de Ventas POS, vuelve a guardar el vínculo en Torre de Control del POS."]
+                : []),
             ],
           });
         } else {

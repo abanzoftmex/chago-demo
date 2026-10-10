@@ -264,7 +264,8 @@ export const createBackup = async (tenantId, { type = "manual", note = null } = 
  */
 export const wipeTenantData = async (tenantId) => {
   const firestore = admin.firestore();
-  const { tenantRef } = await getTenantRef(tenantId);
+  const { tenantRef, tenantSnap } = await getTenantRef(tenantId);
+  const posIntegration = tenantSnap.data().posIntegration || null;
 
   const collectionRefs = await tenantRef.listCollections();
   const deletedCollections = {};
@@ -277,9 +278,20 @@ export const wipeTenantData = async (tenantId) => {
     deletedCollections[collectionRef.id] = countSnap.data().count;
   }
 
+  // El documento raíz se conserva, y con él `posIntegration`: los ids del
+  // catálogo de ventas quedan apuntando a documentos que acaban de borrarse
+  // (el receptor lo detecta y responde 409), y `purchaseReadyAt` —el memo que
+  // le dice al endpoint de compras que su rama ya está lista— quedaría mintiendo.
+  // Se invalida para que la próxima compra reconstruya la rama sola; es
+  // idempotente, así que tras restaurar un respaldo que sí la traía no cambia nada.
+  if (posIntegration?.purchaseReadyAt) {
+    await tenantRef.update({ "posIntegration.purchaseReadyAt": null });
+  }
+
   const deletedDocs = Object.values(deletedCollections).reduce((sum, count) => sum + count, 0);
 
-  return { tenantId, deletedDocs, deletedCollections };
+  // `posLinked` es para que la pantalla avise que el vínculo hay que volver a guardarlo.
+  return { tenantId, deletedDocs, deletedCollections, posLinked: posIntegration?.enabled === true };
 };
 
 /**
@@ -343,7 +355,7 @@ export const restoreBackup = async (backupId) => {
   // Verifica que el tenant siga existiendo antes de tocar nada
   await getTenantRef(tenantId);
 
-  await wipeTenantData(tenantId);
+  const { posLinked } = await wipeTenantData(tenantId);
 
   const firestore = admin.firestore();
   const writer = firestore.bulkWriter();
@@ -365,7 +377,7 @@ export const restoreBackup = async (backupId) => {
 
   await writer.close();
 
-  return { tenantId, backupId, restoredDocs, restoredCollections };
+  return { tenantId, backupId, restoredDocs, restoredCollections, posLinked };
 };
 
 /**

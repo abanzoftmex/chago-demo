@@ -31,6 +31,7 @@ import {
   posTransactionBase,
   POS_KIND_SALE,
 } from "../../../lib/server/posTransactionWriter";
+import { missingSalesCatalog } from "../../../lib/server/posCatalog";
 import crypto from "crypto";
 
 export const config = {
@@ -147,6 +148,19 @@ export default async function handler(req, res) {
       return res.status(200).json({
         chagoTransactionId: existing.data().posSplitGroup || existing.id,
         alreadyExisted: true,
+      });
+    }
+
+    // Los ids de posIntegration pueden apuntar a documentos que ya no están
+    // (limpieza o restauración del tenant). Aceptar la venta así la dejaría
+    // colgando de un General inexistente y el POS la daría por enviada. Con un
+    // 409 queda en espera y el cron la reintenta hasta que se vuelva a guardar
+    // el vínculo en Torre de Control, que recrea el catálogo.
+    const faltantes = await missingSalesCatalog(db, chagoTenantId, integration, partes.map((p) => p.method));
+    if (faltantes.length > 0) {
+      console.warn(`⚠️ Venta POS rechazada: faltan documentos del catálogo en ${chagoTenantId}:`, faltantes);
+      return res.status(409).json({
+        error: "El catálogo de Ventas POS de este tenant ya no existe (¿se limpió o restauró el tenant?) — vuelve a guardar el vínculo en Torre de Control",
       });
     }
 
