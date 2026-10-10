@@ -17,6 +17,7 @@
     "simulate-october": "node scripts/simulate-october-2025.cjs simulate",
     "simulate-help": "node scripts/simulate-september-2025-clean.cjs help",
     "test:rules": "firebase emulators:exec --only firestore --project demo-chago \"node tests/rules/firestore.rules.test.mjs\"",
+    "test:integracion": "firebase emulators:exec --only firestore --project demo-chago \"node --test tests/integracion/pos-catalogo.test.mjs\"",
     "emu": "firebase emulators:start --only auth,firestore --project chago-demo",
     "seed:emulador": "node scripts/seed-emulador.cjs"
   },
