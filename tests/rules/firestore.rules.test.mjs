@@ -108,7 +108,11 @@ const G2 = "Normal";
 await t(G2, "viewer lee transacciones", () => assertSucceeds(getDocs(collection(asViewer, `tenants/${T}/transacciones`))));
 await t(G2, "viewer NO crea transacciones", () => assertFails(addDoc(collection(asViewer, `tenants/${T}/transacciones`), { amount: 1, createdBy: VIEWER, createdAt: serverTimestamp() })));
 await t(G2, "contador crea transacción (con createdBy/createdAt)", () => assertSucceeds(addDoc(collection(asConta, `tenants/${T}/transacciones`), { amount: 10, createdBy: CONTA, createdAt: serverTimestamp() })));
-await t(G2, "contador NO crea transacción sin createdAt del servidor", () => assertFails(addDoc(collection(asConta, `tenants/${T}/transacciones`), { amount: 10, createdBy: CONTA, createdAt: new Date() })));
+// La hora la fabrica el cliente. Se usa una de AYER, no `new Date()`: contra el emulador local
+// el reloj del cliente y el del servidor son el mismo, y si la petición llegaba dentro del mismo
+// milisegundo las dos horas coincidían y la regla (`createdAt == request.time`) la aceptaba.
+// Era una prueba intermitente (fallaba sola, casi siempre en la primera corrida), no una regla floja.
+await t(G2, "contador NO crea transacción sin createdAt del servidor", () => assertFails(addDoc(collection(asConta, `tenants/${T}/transacciones`), { amount: 10, createdBy: CONTA, createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000) })));
 // Los dos campos que el servicio tiene que poner desde la sesion de Firebase:
 // `updatePaymentStatus` llega hasta aqui sin usuario, asi que sacarlos de un
 // parametro dejaria esas escrituras denegadas.
