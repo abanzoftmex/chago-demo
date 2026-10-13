@@ -1,4 +1,11 @@
 import admin, { assertAdminInitialized } from "../../../lib/firebase/firebaseAdmin";
+import {
+  verificarAdminDeTenant,
+  estadoDeCuenta,
+  CODIGO_ACCESO_COMPARTIDO,
+  MENSAJE_ACCESO_COMPARTIDO,
+  MENSAJE_CUENTA_COMPARTIDA,
+} from "../../../lib/server/accesoCompartido";
 
 const TENANT_ROLES = {
   ADMIN: "admin",
@@ -42,44 +49,17 @@ export default async function handler(req, res) {
     const normalizedEmail =
       typeof email === "string" && email.trim() ? email.trim().toLowerCase() : null;
 
-    // Verify the token and get user info
-    let currentUser;
+    // Quien pregunta: administrador ACTIVO de este negocio. Sin atajo para los
+    // negocios de un solo miembro (ver `verificarAdminDeTenant`).
+    let permiso;
     try {
-      currentUser = await admin.auth().verifyIdToken(currentUserToken);
-      console.log("✅ Token verificado para usuario:", currentUser.email);
-    } catch (error) {
-      console.error("❌ Error verificando token:", error);
-      return res.status(401).json({ message: "Token inválido" });
-    }
-
-    // Verify current user is admin of the tenant
-    try {
-      const membersSnapshot = await admin
-        .firestore()
-        .collection("tenants")
-        .doc(tenantId)
-        .collection("members")
-        .get();
-
-      const memberCount = membersSnapshot.size;
-
-      if (memberCount <= 1) {
-        console.log("✅ Usuario master (único en el tenant), permisos omitidos");
-      } else {
-        const memberDoc = membersSnapshot.docs.find((d) => d.id === currentUser.uid);
-        if (!memberDoc) {
-          return res.status(403).json({ message: "No eres miembro de este tenant" });
-        }
-        const memberData = memberDoc.data();
-        if (memberData.role !== TENANT_ROLES.ADMIN) {
-          return res.status(403).json({ message: "Solo los administradores pueden actualizar usuarios" });
-        }
-        console.log("✅ Usuario verificado como admin del tenant");
-      }
+      permiso = await verificarAdminDeTenant(currentUserToken, tenantId);
     } catch (error) {
       console.error("❌ Error verificando permisos:", error);
       return res.status(500).json({ message: "Error verificando permisos" });
     }
+    if (!permiso.ok) return res.status(permiso.status).json({ message: permiso.mensaje });
+    const currentUser = permiso.decoded;
 
     // Verify the user being updated exists and is part of the tenant
     const targetMemberDoc = await admin
@@ -94,12 +74,32 @@ export default async function handler(req, res) {
       return res.status(404).json({ message: "Usuario no encontrado en este tenant" });
     }
 
+    // Un acceso que dio Abanzoft no lo edita el negocio, ni siquiera su rol.
+    const cuenta = await estadoDeCuenta(userId, tenantId);
+    if (cuenta.vinculadoAqui) {
+      return res.status(403).json({ message: MENSAJE_ACCESO_COMPARTIDO, codigo: CODIGO_ACCESO_COMPARTIDO });
+    }
+
     // Validate role if provided
     if (role && !Object.values(TENANT_ROLES).includes(role)) {
       return res.status(400).json({ message: "Rol inválido" });
     }
 
     const authUser = await admin.auth().getUser(userId);
+
+    // Correo, contraseña y nombre son de la CUENTA de Firebase, la misma en todos
+    // los negocios de la persona: si entra a más de uno, los cambia Abanzoft. El
+    // rol, en cambio, es de este negocio y sí se puede cambiar. Se compara con lo
+    // que ya tiene para que reenviar el formulario sin tocar nada no cuente.
+    if (cuenta.compartida) {
+      const cambiaLaCuenta =
+        Boolean(password) ||
+        (normalizedEmail && normalizedEmail !== authUser.email?.toLowerCase()) ||
+        (displayName && displayName !== authUser.displayName);
+      if (cambiaLaCuenta) {
+        return res.status(403).json({ message: MENSAJE_CUENTA_COMPARTIDA, codigo: CODIGO_ACCESO_COMPARTIDO });
+      }
+    }
 
     if (normalizedEmail) {
       try {

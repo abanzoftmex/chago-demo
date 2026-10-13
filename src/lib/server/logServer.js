@@ -85,6 +85,29 @@ export async function logUserStatusChange({ user, userId, userData, action, prev
   });
 }
 
+/**
+ * Alta o baja de un acceso compartido (una persona de otro negocio que Abanzoft
+ * deja entrar a este). Queda en la bitácora del negocio, firmada por quien la
+ * hizo, porque es el rastro con el que el administrador se entera de que alguien
+ * más puede ver sus datos.
+ */
+export async function logAccesoCompartido({ tenantId, accion, userId, userData, operador = "Abanzoft" }) {
+  const quienEs = userData?.displayName || userData?.email || "una persona";
+  const otorgado = accion === "grant";
+  return createLog({
+    action: otorgado ? "create" : "delete",
+    entityType: "user",
+    entityId: userId,
+    entityData: userData,
+    userId: "system",
+    userName: operador,
+    tenantId,
+    details: otorgado
+      ? `${operador} dio acceso compartido a ${quienEs} (${userData?.role || "sin rol"})`
+      : `${operador} quitó el acceso compartido de ${quienEs}`,
+  });
+}
+
 export async function logUserUpdate({ user, userId, userData, previousData, tenantId = null }) {
   const actor = quien(user);
   const objetivo = userData?.displayName || userData?.email || previousData?.displayName || "Usuario sin nombre";

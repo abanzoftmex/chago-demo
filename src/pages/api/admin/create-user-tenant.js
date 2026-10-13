@@ -1,4 +1,5 @@
 import admin, { assertAdminInitialized } from "../../../lib/firebase/firebaseAdmin";
+import { verificarAdminDeTenant, membresiasDe, soloActivas } from "../../../lib/server/accesoCompartido";
 
 const TENANT_ROLES = {
   ADMIN: "admin",
@@ -34,50 +35,17 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: "ID de tenant requerido" });
     }
 
-    // Verify the token and get user info
-    let currentUser;
+    // Quien pregunta: administrador ACTIVO de este negocio. Sin atajo para los
+    // negocios de un solo miembro (ver `verificarAdminDeTenant`).
+    let permiso;
     try {
-      currentUser = await admin.auth().verifyIdToken(currentUserToken);
-      console.log("✅ Token verificado para usuario:", currentUser.email);
-    } catch (error) {
-      console.error("❌ Error verificando token:", error);
-      return res.status(401).json({ message: "Token inválido" });
-    }
-
-    // Verify current user is admin of the tenant
-    try {
-      const membersSnapshot = await admin
-        .firestore()
-        .collection("tenants")
-        .doc(tenantId)
-        .collection("members")
-        .get();
-
-      const memberCount = membersSnapshot.size;
-
-      if (memberCount <= 1) {
-        // Solo hay un usuario registrado → es el master, se omite verificación de rol
-        console.log("✅ Usuario master (único en el tenant), permisos omitidos");
-      } else {
-        const memberDoc = membersSnapshot.docs.find((d) => d.id === currentUser.uid);
-
-        if (!memberDoc) {
-          console.error("❌ Usuario no es miembro del tenant");
-          return res.status(403).json({ message: "No eres miembro de este tenant" });
-        }
-
-        const memberData = memberDoc.data();
-        if (memberData.role !== TENANT_ROLES.ADMIN) {
-          console.error("❌ Usuario no es admin del tenant, rol:", memberData.role);
-          return res.status(403).json({ message: "Solo los administradores pueden crear usuarios" });
-        }
-
-        console.log("✅ Usuario verificado como admin del tenant");
-      }
+      permiso = await verificarAdminDeTenant(currentUserToken, tenantId);
     } catch (error) {
       console.error("❌ Error verificando permisos:", error);
       return res.status(500).json({ message: "Error verificando permisos" });
     }
+    if (!permiso.ok) return res.status(permiso.status).json({ message: permiso.mensaje });
+    const currentUser = permiso.decoded;
 
     // Validate input
     if (!email) {
@@ -96,6 +64,20 @@ export default async function handler(req, res) {
       // Try to get user by email
       userRecord = await admin.auth().getUserByEmail(email);
       console.log("✅ Usuario ya existe en Firebase Auth:", userRecord.uid);
+
+    // Sumar a este negocio una cuenta que ya entra a OTRO la volvería una cuenta de
+    // varios negocios, y eso lo decide Abanzoft desde la consola de superadmin: un
+    // negocio no puede darle a nadie acceso a los datos de otro ni encadenar las
+    // cuentas de otros negocios al suyo. Una cuenta sin ningún negocio sí se puede
+    // volver a dar de alta aquí, como siempre.
+    const enOtrosNegocios = soloActivas(await membresiasDe(userRecord.uid)).filter((m) => m.tenantId !== tenantId);
+    if (enOtrosNegocios.length > 0) {
+      return res.status(409).json({
+        message:
+          "Ese correo ya pertenece a otro negocio. El acceso a varios negocios lo da Abanzoft desde la consola de superadmin.",
+        codigo: "CUENTA_EN_OTRO_NEGOCIO",
+      });
+    }
 
       // Check if user is already a member of this tenant
       const existingMemberDoc = await admin

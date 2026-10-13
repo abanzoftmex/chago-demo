@@ -1,20 +1,14 @@
 import admin from "firebase-admin";
 import { logUserUpdate } from "../../../lib/server/logServer";
-
-// Initialize Firebase Admin SDK (only if not already initialized)
-if (!admin.apps.length) {
-  try {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-      }),
-    });
-  } catch (error) {
-    console.error("Firebase admin initialization error:", error);
-  }
-}
+import {
+  membresiasDe,
+  esCuentaCompartida,
+  CODIGO_ACCESO_COMPARTIDO,
+  MENSAJE_CUENTA_COMPARTIDA,
+} from "../../../lib/server/accesoCompartido";
+// Inicializa el Admin SDK con la misma configuración que antes tenía esta ruta por
+// su cuenta, pero pasando por el freno del ensayo con emuladores (ver ese módulo).
+import "../../../lib/firebase/firebaseAdmin";
 
 export default async function handler(req, res) {
   if (req.method !== "PUT") {
@@ -91,6 +85,13 @@ export default async function handler(req, res) {
 
     if (!role) {
       return res.status(400).json({ message: "Rol requerido" });
+    }
+
+    // Ruta del sistema anterior (la pantalla ya no la llama). Cambia la CUENTA de
+    // Firebase, así que no puede tocar una que entra a varios negocios: eso lo
+    // hace Abanzoft desde la consola de superadmin.
+    if (userId !== currentUser.uid && esCuentaCompartida(await membresiasDe(userId))) {
+      return res.status(403).json({ message: MENSAJE_CUENTA_COMPARTIDA, codigo: CODIGO_ACCESO_COMPARTIDO });
     }
 
     // Get target user data before updating (for logging)

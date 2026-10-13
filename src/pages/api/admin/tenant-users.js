@@ -69,6 +69,12 @@ export default async function handler(req, res) {
           (userSnap.exists ? userSnap.data().displayName : null) || memberData.displayName || null,
         tenantRole: memberData.role,
         tenantStatus: memberData.status,
+        // Un acceso que dio Abanzoft: la pantalla lo muestra sin acciones, y el
+        // servidor lo niega de todos modos (ver `lib/server/accesoCompartido`).
+        vinculadoAqui: Boolean(memberData.vinculadoPor),
+        // La cuenta entra a más de un negocio: correo, contraseña y estado de la
+        // cuenta no se editan desde aquí.
+        cuentaCompartida: userSnap.exists ? userSnap.data().accesoCompartido === true : false,
       });
     }
 

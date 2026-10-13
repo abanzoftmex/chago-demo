@@ -4,6 +4,14 @@ import { logUserStatusChange } from "../../../lib/server/logServer";
 // un usuario reventaba con ReferenceError. Al portarlo al Admin SDK se
 // arregla de paso.
 import { updateUserStatus, getUserInfo } from "../../../lib/server/usersServer";
+import {
+  verificarAdminDeTenant,
+  estadoDeCuenta,
+  quitarDeTenant,
+  CODIGO_ACCESO_COMPARTIDO,
+  MENSAJE_ACCESO_COMPARTIDO,
+  MENSAJE_CUENTA_COMPARTIDA,
+} from "../../../lib/server/accesoCompartido";
 
 export default async function handler(req, res) {
   if (req.method !== "POST" && req.method !== "DELETE") {
@@ -15,52 +23,17 @@ export default async function handler(req, res) {
   try {
     const { userId, action, currentUserToken, tenantId } = req.body;
 
-    // Verify the current user is authenticated and has admin permissions
-    if (!currentUserToken) {
-      return res.status(401).json({ message: "Token de autenticación requerido" });
-    }
-
-    if (!tenantId) {
-      return res.status(400).json({ message: "ID de tenant requerido" });
-    }
-
-    // Verify the token
-    let currentUser;
+    // Quien pregunta: administrador ACTIVO de este negocio. Sin atajo para los
+    // negocios de un solo miembro (ver `verificarAdminDeTenant`).
+    let permiso;
     try {
-      currentUser = await admin.auth().verifyIdToken(currentUserToken);
-    } catch (error) {
-      return res.status(401).json({ message: "Token inválido" });
-    }
-
-    // Verify current user is admin of the tenant (same logic as create-user-tenant)
-    try {
-      const membersSnapshot = await admin
-        .firestore()
-        .collection("tenants")
-        .doc(tenantId)
-        .collection("members")
-        .get();
-
-      const memberCount = membersSnapshot.size;
-
-      if (memberCount <= 1) {
-        console.log("✅ Usuario master (único en el tenant), permisos omitidos");
-      } else {
-        const memberDoc = membersSnapshot.docs.find((d) => d.id === currentUser.uid);
-
-        if (!memberDoc) {
-          return res.status(403).json({ message: "No eres miembro de este tenant" });
-        }
-
-        const memberData = memberDoc.data();
-        if (memberData.role !== "admin") {
-          return res.status(403).json({ message: "Solo los administradores pueden gestionar usuarios" });
-        }
-      }
+      permiso = await verificarAdminDeTenant(currentUserToken, tenantId);
     } catch (error) {
       console.error("Error verificando permisos:", error);
       return res.status(500).json({ message: "Error verificando permisos" });
     }
+    if (!permiso.ok) return res.status(permiso.status).json({ message: permiso.mensaje });
+    const currentUser = permiso.decoded;
 
     // Prevent modifying yourself
     if (currentUser.uid === userId) {
@@ -72,9 +45,27 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: "ID de usuario requerido" });
     }
 
+    // La persona tiene que ser de ESTE negocio. Antes no se comprobaba: bastaba ser
+    // administrador de cualquier negocio para deshabilitar o borrar la cuenta de
+    // cualquier uid, de cualquier otro negocio.
+    const cuenta = await estadoDeCuenta(userId, tenantId);
+    if (!cuenta.aqui) {
+      return res.status(404).json({ message: "Usuario no encontrado en este tenant" });
+    }
+    // Un acceso que dio Abanzoft no lo toca el negocio: ni deshabilitarlo ni borrarlo.
+    if (cuenta.vinculadoAqui) {
+      return res.status(403).json({ message: MENSAJE_ACCESO_COMPARTIDO, codigo: CODIGO_ACCESO_COMPARTIDO });
+    }
+
     // Handle different actions
     switch (req.method) {
       case "POST":
+        // Deshabilitar y habilitar actúan sobre la CUENTA de Firebase, que es la
+        // misma en todos los negocios de la persona: un negocio no decide eso.
+        if (cuenta.compartida && (action === "disable" || action === "enable")) {
+          return res.status(403).json({ message: MENSAJE_CUENTA_COMPARTIDA, codigo: CODIGO_ACCESO_COMPARTIDO });
+        }
+
         if (action === "disable") {
           // Get user data before disabling for logging
           const userDataBefore = await getUserInfo(userId);
@@ -149,6 +140,16 @@ export default async function handler(req, res) {
         break;
 
       case "DELETE":
+        // Si la cuenta entra a otros negocios, borrarla aquí se la quitaría en
+        // todos: se le quita solo ESTE negocio y su cuenta sigue donde estaba.
+        if (cuenta.compartida) {
+          await quitarDeTenant(tenantId, userId);
+          return res.status(200).json({
+            message: "Se quitó del negocio. Su cuenta sigue activa en otros negocios.",
+            cuentaConservada: true,
+          });
+        }
+
         // Delete user from Firebase Auth
         await admin.auth().deleteUser(userId);
 
