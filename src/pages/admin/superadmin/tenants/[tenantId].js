@@ -25,6 +25,7 @@ import SuperAdminLayout from "../../../../components/superadmin/SuperAdminLayout
 import { useSuperAdmin } from "../../../../components/superadmin/SuperAdminContext";
 import { useBackups } from "../../../../components/superadmin/hooks/useBackups";
 import { BackupConfirmDialog } from "../../../../components/superadmin/BackupConfirmDialog";
+import { AccesoCompartidoCard } from "../../../../components/superadmin/AccesoCompartidoCard";
 import {
   Card,
   CardContent,
@@ -529,6 +530,14 @@ function TenantDetailContent() {
                   )}
                 </CardContent>
               </Card>
+
+              {/* Acceso compartido: una persona, varios negocios */}
+              <AccesoCompartidoCard
+                tenantId={tenantId}
+                onResult={setResult}
+                onSessionExpired={sessionExpired}
+                style={{ animationDelay: "0.245s" }}
+              />
 
               {/* Zona de riesgo */}
               <Card className="sa-rise border-destructive/25" style={{ animationDelay: "0.26s" }}>

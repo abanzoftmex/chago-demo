@@ -6,6 +6,8 @@ import {
   BellIcon, 
   ChevronRightIcon,
   UserCircleIcon,
+  BuildingOfficeIcon,
+  CheckIcon,
   ArrowRightOnRectangleIcon,
   ChevronDoubleLeftIcon,
   ChevronDoubleRightIcon
@@ -13,7 +15,9 @@ import {
 
 const Header = ({ title, breadcrumbs = [], onMenuClick, onToggleCollapse, sidebarCollapsed, isMobile }) => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const { user, logout, userRole, ROLES, TENANT_ROLES } = useAuth();
+  const { user, logout, userRole, ROLES, TENANT_ROLES, tenantInfo, misNegocios, cambiarNegocio } = useAuth();
+  // Solo quien entra a más de un negocio tiene algo que elegir.
+  const variosNegocios = Array.isArray(misNegocios) && misNegocios.length > 1;
   const userMenuRef = useRef(null);
   const router = useRouter();
   
@@ -148,6 +152,7 @@ const Header = ({ title, breadcrumbs = [], onMenuClick, onToggleCollapse, sideba
                 </div>
                 <div className="text-xs text-gray-500">
                   {getRoleDisplayName(userRole)}
+                  {variosNegocios && tenantInfo?.nombreEmpresa ? ` · ${tenantInfo.nombreEmpresa}` : ""}
                 </div>
               </div>
             </button>
@@ -156,6 +161,44 @@ const Header = ({ title, breadcrumbs = [], onMenuClick, onToggleCollapse, sideba
             {userMenuOpen && (
               <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
                 <div className="py-2">
+                  {variosNegocios && (
+                    <div className="mb-2 border-b border-gray-100 pb-2">
+                      <div className="px-4 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        Mis negocios
+                      </div>
+                      {misNegocios.map((negocio) => {
+                        const activo = negocio.id === tenantInfo?.id;
+                        return (
+                          <button
+                            key={negocio.id}
+                            onClick={() => {
+                              setUserMenuOpen(false);
+                              cambiarNegocio(negocio.id);
+                            }}
+                            disabled={activo}
+                            className={`flex items-center justify-between w-full px-4 py-2 text-sm transition-colors ${
+                              activo
+                                ? "bg-gray-50 font-medium text-gray-900 cursor-default"
+                                : "text-gray-700 hover:bg-gray-50"
+                            }`}
+                          >
+                            <span className="flex min-w-0 items-center">
+                              <BuildingOfficeIcon className="h-4 w-4 mr-3 shrink-0" />
+                              <span className="truncate">{negocio.nombre}</span>
+                            </span>
+                            {activo ? (
+                              <CheckIcon className="h-4 w-4 shrink-0 text-primary" />
+                            ) : (
+                              <span className="ml-2 shrink-0 text-xs text-gray-400">
+                                {getRoleDisplayName(negocio.role)}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   <button
                     onClick={handleProfileClick}
                     className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"

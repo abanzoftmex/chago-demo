@@ -14,6 +14,8 @@ import {
   EmailAuthProvider,
 } from "firebase/auth";
 import { auth } from "../lib/firebase/firebaseConfig";
+import { resolverNegocioActivo } from "../lib/services/negociosService";
+import { guardarNegocio, esCambioDeNegocioAjeno } from "../lib/negocioActivo";
 
 // Importar servicios multi-tenant
 import {
@@ -40,7 +42,6 @@ import {
   ROLES,
   loadRolePermissionsFromFirestore,
   reloadRolePermissions,
-  requirePermission,
 } from "../lib/services/roleServiceMultiTenant";
 
 const AuthContext = createContext({
@@ -76,6 +77,10 @@ export const AuthProvider = ({ children }) => {
   const [tenantLoading, setTenantLoading] = useState(false);
   const [isLegacyUser, setIsLegacyUser] = useState(false);
 
+  // Los negocios a los que entra la persona, para el selector del menú de usuario.
+  // Es `null` en las cuentas de un solo negocio —casi todas—: no hay nada que elegir.
+  const [misNegocios, setMisNegocios] = useState(null);
+
   // Marca de la última actividad del usuario.
   //
   // Va en una ref, no en estado: la actualiza cada mousemove, y como estado
@@ -98,20 +103,41 @@ export const AuthProvider = ({ children }) => {
       setUserRoleState(null);
       setTenantInfo(null);
       setIsLegacyUser(false);
+      setMisNegocios(null);
       return;
     }
 
     setRoleLoading(true);
     setTenantLoading(true);
-    
+
     try {
       // Intentar cargar como usuario multi-tenant
       try {
         console.log(`🔍 Cargando información multi-tenant para usuario: ${userId}`);
-        const tenantId = await getUserTenantId(userId);
-        console.log(`📍 TenantId encontrado: ${tenantId}`);
-        
-        const tenantRole = await getUserTenantRole(tenantId, userId);
+        // El negocio "de casa": el de siempre. Para casi todas las cuentas es el único.
+        const propio = await getUserTenantId(userId);
+        console.log(`📍 TenantId encontrado: ${propio}`);
+
+        // Las cuentas que entran a varios negocios eligen cuál; el resto sale de aquí
+        // con el suyo, sin una llamada de más (ver `negociosService`).
+        const usuarioFirebase = auth.currentUser?.uid === userId ? auth.currentUser : null;
+        const { tenantId: elegido, negocios } = usuarioFirebase
+          ? await resolverNegocioActivo(usuarioFirebase, propio)
+          : { tenantId: propio, negocios: null };
+
+        let tenantId = elegido;
+        let tenantRole;
+        try {
+          tenantRole = await getUserTenantRole(tenantId, userId);
+        } catch (errorDeRol) {
+          // Si el elegido ya no le sirve (se lo quitaron entre que se listó y ahora),
+          // se entra al de casa en vez de tratarlo como usuario del sistema anterior.
+          if (tenantId === propio) throw errorDeRol;
+          console.warn(`⚠️ El negocio ${tenantId} ya no le sirve; se entra al de casa`);
+          tenantId = propio;
+          tenantRole = await getUserTenantRole(tenantId, userId);
+        }
+        setMisNegocios(negocios);
         console.log(`👤 Rol en tenant: ${tenantRole}`);
         
         const tenantInfoResult = await getTenantInfo(tenantId);
@@ -143,12 +169,14 @@ export const AuthProvider = ({ children }) => {
         setUserRoleState(legacyRole || TENANT_ROLES.VIEWER);
         setTenantInfo(null);
         setIsLegacyUser(true);
+        setMisNegocios(null);
       }
     } catch (error) {
       console.error("Error loading user role and tenant:", error);
       setUserRoleState(TENANT_ROLES.VIEWER); // Rol por defecto más restrictivo
       setTenantInfo(null);
       setIsLegacyUser(true);
+      setMisNegocios(null);
     } finally {
       setRoleLoading(false);
       setTenantLoading(false);
@@ -179,6 +207,7 @@ export const AuthProvider = ({ children }) => {
       setUserRoleState(null);
       setTenantInfo(null);
       setIsLegacyUser(false);
+      setMisNegocios(null);
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
@@ -341,8 +370,37 @@ export const AuthProvider = ({ children }) => {
       }
       return { success: true };
     } else {
-      return await requirePermission(user.uid, permission);
+      // El rol que cuenta es el del negocio ACTIVO (`userRole`). `requirePermission(uid)`
+      // solo sabe mirar el negocio "de casa", que para una persona de varios negocios
+      // puede no ser en el que está trabajando.
+      if (!hasPermission(userRole, permission, true)) {
+        return {
+          success: false,
+          error: "No tienes permisos para realizar esta operación",
+          code: "INSUFFICIENT_PERMISSIONS"
+        };
+      }
+      return { success: true };
     }
+  };
+
+  /**
+   * Cambiar de negocio. Solo entre los que el servidor dijo que la persona tiene.
+   *
+   * Recarga en el tablero en vez de cambiar el estado en caliente: cada pantalla
+   * guarda datos del negocio en el que se abrió (listas, filtros, un id en la
+   * URL), y dejar alguno vivo al cambiar sería mostrar datos de un negocio con la
+   * etiqueta de otro. Es el mismo criterio del punto de venta.
+   */
+  const cambiarNegocio = (tenantId) => {
+    if (!user || !misNegocios?.some((n) => n.id === tenantId)) {
+      return { success: false, error: "Ese negocio no está entre los tuyos" };
+    }
+    if (tenantId === tenantInfo?.id) return { success: true };
+
+    guardarNegocio(window.localStorage, user.uid, tenantId);
+    window.location.assign("/admin/dashboard");
+    return { success: true };
   };
 
   /**
@@ -398,6 +456,18 @@ export const AuthProvider = ({ children }) => {
     };
   }, [user]);
 
+  // Si la misma cuenta cambia de negocio en OTRA pestaña, esta recarga: dos pestañas
+  // de una cuenta en negocios distintos acabarían escribiendo datos de uno en la
+  // pantalla del otro. Solo lo escuchan las cuentas que tienen más de un negocio.
+  useEffect(() => {
+    if (!user || !misNegocios) return;
+    const alCambiar = (evento) => {
+      if (esCambioDeNegocioAjeno(evento, user.uid)) window.location.reload();
+    };
+    window.addEventListener("storage", alCambiar);
+    return () => window.removeEventListener("storage", alCambiar);
+  }, [user, misNegocios]);
+
   // Escuchar cambios en el estado de autenticación
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -410,6 +480,7 @@ export const AuthProvider = ({ children }) => {
         setUserRoleState(null);
         setTenantInfo(null);
         setIsLegacyUser(false);
+        setMisNegocios(null);
       }
     });
 
@@ -428,6 +499,8 @@ export const AuthProvider = ({ children }) => {
     tenantInfo,
     tenantLoading,
     isLegacyUser,
+    misNegocios,
+    cambiarNegocio,
 
     // Funciones de autenticación
     login,

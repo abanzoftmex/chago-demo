@@ -114,6 +114,14 @@ const UserList = ({ users, currentUserId, onUserUpdated, onEditUser }) => {
                           Tú
                         </span>
                       )}
+                      {userData.vinculadoAqui && (
+                        <span
+                          className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800"
+                          title="Una persona de Abanzoft con acceso a este negocio. No se edita ni se elimina desde aquí."
+                        >
+                          Acceso compartido
+                        </span>
+                      )}
                     </div>
                     <div className="mt-2 flex items-center text-sm text-gray-500">
                       <p className="truncate">{userData.email}</p>
@@ -141,7 +149,13 @@ const UserList = ({ users, currentUserId, onUserUpdated, onEditUser }) => {
                     )}
                   </div>
 
-                  {(userData.id !== currentUserId || tenantInfo?.role === safeRoles.ADMIN) && (
+                  {userData.vinculadoAqui && (
+                    <span className="text-xs text-gray-500 whitespace-nowrap">
+                      Lo administra Abanzoft
+                    </span>
+                  )}
+
+                  {!userData.vinculadoAqui && (userData.id !== currentUserId || tenantInfo?.role === safeRoles.ADMIN) && (
                     <div className="flex items-center space-x-2">
                       <button
                         onClick={() => onEditUser(userData)}
@@ -151,6 +165,9 @@ const UserList = ({ users, currentUserId, onUserUpdated, onEditUser }) => {
                         <PencilIcon className="h-5 w-5" />
                       </button>
 
+                      {/* Habilitar/deshabilitar actúa sobre la cuenta de Firebase, que es la misma en
+                          todos los negocios de la persona: si entra a más de uno, no se decide aquí. */}
+                      {!userData.cuentaCompartida && (
                       <div className="flex items-center space-x-1">
                         <button
                           onClick={() =>
@@ -191,6 +208,7 @@ const UserList = ({ users, currentUserId, onUserUpdated, onEditUser }) => {
                           {userData.isActive !== false ? "Desactivar" : "Activar"}
                         </span>
                       </div>
+                      )}
 
                       <button
                         onClick={() =>
