@@ -2,21 +2,9 @@ import admin from "firebase-admin";
 import { ROLES } from "../../../lib/services/roleService";
 import { setUserRole } from "../../../lib/server/usersServer";
 import { logUserCreation } from "../../../lib/server/logServer";
-
-// Initialize Firebase Admin SDK (only if not already initialized)
-if (!admin.apps.length) {
-  try {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-      }),
-    });
-  } catch (error) {
-    console.error("Firebase admin initialization error:", error);
-  }
-}
+// Inicializa el Admin SDK con la misma configuración que antes tenía esta ruta por
+// su cuenta, pero pasando por el freno del ensayo con emuladores (ver ese módulo).
+import "../../../lib/firebase/firebaseAdmin";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {

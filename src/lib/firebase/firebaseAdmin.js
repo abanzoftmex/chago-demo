@@ -1,6 +1,27 @@
 import admin from "firebase-admin";
 
-if (!admin.apps.length) {
+/*
+  Freno para el ensayo con emuladores.
+
+  `NEXT_PUBLIC_USE_EMULATOR=true` solo redirige el NAVEGADOR a los emuladores. Las
+  rutas de servidor usan este Admin SDK con las credenciales de `.env.local`, que
+  son las de producción: si el servidor de desarrollo arranca sin
+  `FIRESTORE_EMULATOR_HOST` y `FIREBASE_AUTH_EMULATOR_HOST`, un "ensayo" escribiría
+  —cuentas, accesos, borrados— en la base real. Aquí se prefiere que falle.
+
+  En producción esa variable no existe, así que esto no cambia nada.
+*/
+const ensayoSinEmuladoresDeServidor =
+  process.env.NEXT_PUBLIC_USE_EMULATOR === "true" &&
+  !(process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST);
+
+if (ensayoSinEmuladoresDeServidor) {
+  console.error(
+    "🛑 NEXT_PUBLIC_USE_EMULATOR=true pero faltan FIRESTORE_EMULATOR_HOST y " +
+      "FIREBASE_AUTH_EMULATOR_HOST en el servidor. El Admin SDK NO se inicializa, para " +
+      "no tocar producción. Arranca con las tres variables (ver docs/accesos-compartidos.md)."
+  );
+} else if (!admin.apps.length) {
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   
