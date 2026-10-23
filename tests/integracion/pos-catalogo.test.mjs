@@ -281,3 +281,54 @@ test('sin la cookie de sesión de configuración, limpiar da 401 y no borra nada
     assert.equal(r.status, 401);
     assert.equal(await contar(D, 'generals'), 1, 'el catálogo sigue ahí');
 });
+
+// ── Cantidades decimales: los insumos se compran por kilo o por litro ───────
+
+const F = 'tenant-compras-decimales';
+
+test('una compra con cantidad decimal se acepta y su monto es cantidad × costo', async () => {
+    await sembrarTenant(F);
+    const r = await llamar(compras, {
+        headers: bearer,
+        body: { ...compra(F, 'd1'), productId: 'sup-aguacate', productName: 'Aguacate', quantity: 2.5, unitCost: 48.2, unit: 'kg' },
+    });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+
+    const tx = (await db.collection(`tenants/${F}/transacciones`).doc(r.body.chagoTransactionId).get()).data();
+    assert.equal(tx.amount, 120.5);
+    assert.equal(tx.quantity, 2.5);
+    assert.equal(tx.posUnit, 'kg');
+    assert.match(tx.description, /2\.5 kg/);
+});
+
+test('sin unidad la descripción dice «unidad(es)» como siempre, y los enteros se comportan igual', async () => {
+    const r = await llamar(compras, { headers: bearer, body: { ...compra(F, 'd2'), quantity: 3, unitCost: 10 } });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+
+    const tx = (await db.collection(`tenants/${F}/transacciones`).doc(r.body.chagoTransactionId).get()).data();
+    assert.equal(tx.amount, 30);
+    assert.match(tx.description, /3 unidad\(es\)/);
+    assert.equal(tx.posUnit, undefined, 'sin unidad no se inventa el campo');
+});
+
+test('una cantidad en cero, negativa, no numérica o con más de 4 decimales se rechaza sin escribir nada', async () => {
+    const antes = await contar(F, 'transacciones');
+    for (const quantity of [0, -1, 'abc', 1.23456, null]) {
+        const r = await llamar(compras, { headers: bearer, body: { ...compra(F, `d-malo-${quantity}`), quantity } });
+        assert.equal(r.status, 400, `quantity=${quantity}`);
+    }
+    assert.equal(await contar(F, 'transacciones'), antes);
+});
+
+test('reintentar una compra decimal devuelve la misma transacción y no la duplica', async () => {
+    const body = { ...compra(F, 'd3'), productId: 'sup-leche', productName: 'Leche', quantity: 1.25, unitCost: 22, unit: 'lt' };
+    const primera = await llamar(compras, { headers: bearer, body });
+    assert.equal(primera.status, 201, JSON.stringify(primera.body));
+
+    const antes = await contar(F, 'transacciones');
+    const segunda = await llamar(compras, { headers: bearer, body });
+    assert.equal(segunda.status, 200);
+    assert.equal(segunda.body.alreadyExisted, true);
+    assert.equal(segunda.body.chagoTransactionId, primera.body.chagoTransactionId);
+    assert.equal(await contar(F, 'transacciones'), antes);
+});

@@ -13,6 +13,9 @@
  *
  * Solo llegan aquí los surtidos CON costo unitario: sin costo no hay compra
  * que registrar, y una salida de $0 solo ensuciaría los reportes de gasto.
+ *
+ * La cantidad puede ser decimal (hasta 4 cifras): un insumo se compra por kilo o
+ * por litro. `unit` es opcional y solo rotula la descripción.
  * Las restas de almacén (merma, ajuste de conteo) no llegan nunca — no son
  * un gasto, y el POS ni las envía.
  *
@@ -30,6 +33,23 @@ import {
   POS_KIND_PURCHASE,
 } from "../../../lib/server/posTransactionWriter";
 
+/**
+ * Una cantidad de compra válida: mayor a cero y de hasta 4 decimales.
+ *
+ * Era un entero, y bastaba mientras el único punto de venta surtía piezas. Un
+ * insumo se compra por kilo o por litro (2.5 kg de aguacate), y rechazar eso
+ * obligaba al POS a mentir sobre la cantidad. Los enteros de siempre pasan igual.
+ *
+ * Cuatro decimales porque es lo que guardan los puntos de venta; más que eso no
+ * es una cantidad que alguien haya tecleado.
+ */
+const MAX_DECIMALES = 4;
+function esCantidadValida(qty) {
+  if (!Number.isFinite(qty) || qty <= 0) return false;
+  const escalada = qty * 10 ** MAX_DECIMALES;
+  return Math.abs(escalada - Math.round(escalada)) < 1e-6;
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", ["POST"]);
@@ -39,7 +59,7 @@ export default async function handler(req, res) {
   if (!assertAdminInitialized(res)) return;
 
   const token = extractBearerToken(req);
-  const { chagoTenantId, externalId, productId, productName, quantity, unitCost, date, note, businessName } = req.body || {};
+  const { chagoTenantId, externalId, productId, productName, quantity, unitCost, unit, date, note, businessName } = req.body || {};
 
   if (!chagoTenantId) return res.status(400).json({ error: "chagoTenantId es requerido" });
   if (!externalId) return res.status(400).json({ error: "externalId es requerido" });
@@ -47,8 +67,8 @@ export default async function handler(req, res) {
   if (!String(productName || "").trim()) return res.status(400).json({ error: "productName es requerido" });
 
   const qty = Number(quantity);
-  if (!Number.isInteger(qty) || qty <= 0) {
-    return res.status(400).json({ error: "quantity debe ser un entero mayor a 0" });
+  if (!esCantidadValida(qty)) {
+    return res.status(400).json({ error: "quantity debe ser un número mayor a 0, de hasta 4 decimales" });
   }
   const cost = Number(unitCost);
   if (!Number.isFinite(cost) || cost <= 0) {
@@ -106,7 +126,10 @@ export default async function handler(req, res) {
 
     // La descripción se arma SIEMPRE aquí, nunca se acepta del cliente: que
     // diga cuánto se compró es un requisito del cliente, no una sugerencia.
-    const description = [`Compra POS · ${name} · ${qty} unidad(es)`, String(note || "").trim()]
+    // La unidad (kg, lt…) sí la manda el POS, pero solo como etiqueta corta; sin
+    // ella queda «unidad(es)», que es lo que siempre dijo.
+    const unidad = String(unit || "").trim().slice(0, 10);
+    const description = [`Compra POS · ${name} · ${qty} ${unidad || "unidad(es)"}`, String(note || "").trim()]
       .filter(Boolean)
       .join(" · ");
 
@@ -128,6 +151,7 @@ export default async function handler(req, res) {
       posProductName: name,
       quantity: qty,
       unitCost: cost,
+      ...(unidad && { posUnit: unidad }),
     });
 
     return res.status(201).json({ chagoTransactionId: docRef.id, subconceptId: sub.subconceptId });
