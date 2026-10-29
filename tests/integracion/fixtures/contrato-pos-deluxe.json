@@ -13,10 +13,16 @@
     "amount": 150,
     "currency": "MXN",
     "paymentMethod": "Efectivo",
-    "payments": [{ "method": "Efectivo", "amount": 150 }],
+    "payments": [
+      {
+        "method": "Efectivo",
+        "amount": 150
+      }
+    ],
     "folio": "ORD-20261020-0001",
     "date": "2026-10-20T18:30:00.000Z",
-    "description": "Venta POS · Folio ORD-20261020-0001"
+    "description": "Venta POS · Folio ORD-20261020-0001",
+    "sistemaOrigen": "pos-deluxe"
   },
   "ventaDividida": {
     "chagoTenantId": "__TENANT__",
@@ -25,12 +31,19 @@
     "currency": "MXN",
     "paymentMethod": "Efectivo",
     "payments": [
-      { "method": "Efectivo", "amount": 100 },
-      { "method": "Tarjeta Débito", "amount": 50 }
+      {
+        "method": "Efectivo",
+        "amount": 100
+      },
+      {
+        "method": "Tarjeta Débito",
+        "amount": 50
+      }
     ],
     "folio": "ORD-20261020-0002",
     "date": "2026-10-20T18:45:00.000Z",
-    "description": "Venta POS · Folio ORD-20261020-0002"
+    "description": "Venta POS · Folio ORD-20261020-0002",
+    "sistemaOrigen": "pos-deluxe"
   },
   "ventaCorregida": {
     "chagoTenantId": "__TENANT__",
@@ -38,10 +51,16 @@
     "amount": 120,
     "currency": "MXN",
     "paymentMethod": "Efectivo",
-    "payments": [{ "method": "Efectivo", "amount": 120 }],
+    "payments": [
+      {
+        "method": "Efectivo",
+        "amount": 120
+      }
+    ],
     "folio": "ORD-20261020-0001",
     "date": "2026-10-20T18:30:00.000Z",
-    "description": "Venta POS · Folio ORD-20261020-0001 · con corrección"
+    "description": "Venta POS · Folio ORD-20261020-0001 · con corrección",
+    "sistemaOrigen": "pos-deluxe"
   },
   "compra": {
     "chagoTenantId": "__TENANT__",
@@ -54,7 +73,8 @@
     "currency": "MXN",
     "date": "2026-10-20T12:00:00.000Z",
     "note": "factura F-100 · mercado",
-    "businessName": "Negocio Contrato"
+    "businessName": "Negocio Contrato",
+    "sistemaOrigen": "pos-deluxe"
   },
   "compraIdHeredado": {
     "chagoTenantId": "__TENANT__",
@@ -67,6 +87,7 @@
     "currency": "MXN",
     "date": "2026-10-21T12:00:00.000Z",
     "note": null,
-    "businessName": "Negocio Contrato"
+    "businessName": "Negocio Contrato",
+    "sistemaOrigen": "pos-deluxe"
   }
 }

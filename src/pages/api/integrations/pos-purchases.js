@@ -24,7 +24,7 @@
  */
 
 import admin, { assertAdminInitialized } from "../../../lib/firebase/firebaseAdmin";
-import { verifyPosIntegrationToken, extractBearerToken } from "../../../lib/server/posIntegrationService";
+import { verifyPosIntegrationToken, extractBearerToken, motivoDeOrigenRechazado } from "../../../lib/server/posIntegrationService";
 import { ensurePurchaseBranch, ensureProductSubconcept } from "../../../lib/server/posCatalog";
 import {
   createPosTransactionWithPayment,
@@ -59,7 +59,7 @@ export default async function handler(req, res) {
   if (!assertAdminInitialized(res)) return;
 
   const token = extractBearerToken(req);
-  const { chagoTenantId, externalId, productId, productName, quantity, unitCost, unit, date, note, businessName } = req.body || {};
+  const { chagoTenantId, externalId, productId, productName, quantity, unitCost, unit, date, note, businessName, sistemaOrigen } = req.body || {};
 
   if (!chagoTenantId) return res.status(400).json({ error: "chagoTenantId es requerido" });
   if (!externalId) return res.status(400).json({ error: "externalId es requerido" });
@@ -81,6 +81,10 @@ export default async function handler(req, res) {
   if (!verification.ok) return res.status(401).json({ error: verification.error });
 
   const { integration } = verification;
+
+  // Un solo sistema a la vez (ver `motivoDeOrigenRechazado`)
+  const origenRechazado = motivoDeOrigenRechazado(integration, sistemaOrigen);
+  if (origenRechazado) return res.status(409).json({ error: origenRechazado, codigo: "ORIGEN_NO_VIGENTE" });
 
   try {
     const db = admin.firestore();

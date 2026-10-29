@@ -24,7 +24,7 @@
  */
 
 import admin, { assertAdminInitialized } from "../../../lib/firebase/firebaseAdmin";
-import { verifyPosIntegrationToken, extractBearerToken } from "../../../lib/server/posIntegrationService";
+import { verifyPosIntegrationToken, extractBearerToken, motivoDeOrigenRechazado } from "../../../lib/server/posIntegrationService";
 import {
   createPosTransactionGroupWithPayments,
   findPosTransactionByExternalId,
@@ -84,6 +84,7 @@ export default async function handler(req, res) {
     date,
     description,
     ticketPdfBase64,
+    sistemaOrigen,
   } = req.body || {};
 
   if (!chagoTenantId) return res.status(400).json({ error: "chagoTenantId es requerido" });
@@ -97,6 +98,11 @@ export default async function handler(req, res) {
   if (!verification.ok) return res.status(401).json({ error: verification.error });
 
   const { integration } = verification;
+
+  // Un solo sistema a la vez: un negocio que cambió de punto de venta no recibe del anterior
+  // (ver `motivoDeOrigenRechazado`). 409 y no 400: el envío es válido, es el remitente el que ya no.
+  const origenRechazado = motivoDeOrigenRechazado(integration, sistemaOrigen);
+  if (origenRechazado) return res.status(409).json({ error: origenRechazado, codigo: "ORIGEN_NO_VIGENTE" });
   const amountNum = parseFloat(amount);
 
   /*

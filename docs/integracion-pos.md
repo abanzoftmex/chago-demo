@@ -37,6 +37,18 @@ Todo nace `locked` con `origen:'pos_sync'`. El cliente solo puede renombrarlo. E
 - `tenants/{id}.posIntegration.sistemaOrigen` dice qué sistema alimenta el vínculo. Si cambia, se conservan `origenAnterior` y `cambioDeOrigenEl`. Se ve en la tarjeta de Superadmin.
 - Cada transacción **nueva** lleva `posSystem` con el sistema vigente al llegar. Las anteriores, y las de un tenant cuyo emisor aún no lo manda, no lo llevan: no se inventa.
 
+## Un solo sistema a la vez
+
+`pos-transactions` y `pos-purchases` aceptan `sistemaOrigen` en el cuerpo. pos-deluxe siempre lo manda; punto-de-venta todavía no.
+
+| Sistema vigente del negocio | Envío que dice `punto-de-venta` | Envío que dice `pos-deluxe` | Envío sin `sistemaOrigen` |
+|---|---|---|---|
+| ninguno (todo negocio anterior) | se acepta | se acepta | se acepta |
+| `punto-de-venta` | se acepta | **409** | se acepta |
+| `pos-deluxe` | **409** | se acepta | **409** |
+
+El rechazo es `409` con `codigo: "ORIGEN_NO_VIGENTE"` y no escribe nada. Así, cuando un negocio pasa a deluxe, un envío tardío del básico no puede duplicar una venta aunque el corte se haga en otro orden. Volver al básico es volver a guardar su vínculo (su `activate` deja el sistema en `punto-de-venta`). Anular (`/void`) no se restringe: una entrada vieja se puede seguir anulando.
+
 ## Cambiar un negocio de un sistema a otro
 
 1. **No revocar.** Revocar borra los ids del catálogo; al volver a vincular con otro nombre se parte el historial en dos Generales y lo viejo queda bloqueado en el General anterior.

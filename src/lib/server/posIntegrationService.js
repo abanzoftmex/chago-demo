@@ -131,6 +131,34 @@ export async function recordPosSystem(tenantId, sistemaOrigen) {
   });
 }
 
+/**
+ * ¿Este envío viene del sistema que hoy alimenta el vínculo? Devuelve el motivo del rechazo, o null.
+ *
+ * Es lo que hace cumplir «un solo sistema a la vez» cuando un negocio cambia de punto de venta: una
+ * venta que llegara de los dos quedaría registrada dos veces. La regla:
+ *
+ *   · Si el envío dice de qué sistema es, tiene que ser el vigente.
+ *   · Si no lo dice (un punto-de-venta que aún no lo manda), se acepta como siempre, salvo que el
+ *     negocio ya se haya pasado a pos-deluxe: entonces solo deluxe, que siempre lo dice, puede enviar.
+ *
+ * Un negocio que nunca registró sistema (todos los anteriores a esto) no cambia en nada.
+ */
+export function motivoDeOrigenRechazado(integration, sistemaDeclarado) {
+  const vigente = integration?.sistemaOrigen || null;
+  if (sistemaDeclarado != null && !POS_SYSTEMS.includes(sistemaDeclarado)) {
+    return `sistemaOrigen debe ser uno de: ${POS_SYSTEMS.join(", ")}`;
+  }
+  if (!vigente) return null;
+  if (sistemaDeclarado) {
+    return sistemaDeclarado === vigente
+      ? null
+      : `Este negocio recibe hoy desde ${vigente}, no desde ${sistemaDeclarado}. Vuelve a guardar el vínculo en ese sistema si de verdad cambió.`;
+  }
+  return vigente === "pos-deluxe"
+    ? "Este negocio ya se pasó a pos-deluxe: los envíos del punto de venta anterior ya no se aceptan."
+    : null;
+}
+
 /** Guarda el catálogo (general + concepto + subconceptos) resuelto al activar. */
 export async function savePosIntegrationCatalog(tenantId, { generalId, conceptId, subconceptIds }) {
   await admin

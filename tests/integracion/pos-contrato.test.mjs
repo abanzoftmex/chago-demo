@@ -58,6 +58,15 @@ async function preparar(id, emisor = PDV) {
     return { id, token, headers, ids: r.body };
 }
 
+/**
+ * El negocio pasa a recibir del otro emisor, como en el corte de una migración: ese emisor vuelve a
+ * activar con el mismo token. Desde aquí chago-demo solo acepta lo que diga venir de él.
+ */
+async function cambiarA(t, emisor) {
+    const r = await llamar(activate, { headers: t.headers, body: para(emisor.activate, t.id) });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+}
+
 const tx = async (tenant, id) => (await db.collection(`tenants/${tenant}/transacciones`).doc(id).get()).data();
 const pago = async (tenant, txId) => (await db.collection(`tenants/${tenant}/payments`).doc(`pos_${txId}`).get()).data();
 const contar = async (tenant, col) => (await db.collection(`tenants/${tenant}/${col}`).get()).size;
@@ -69,6 +78,7 @@ test('una venta en efectivo de cada emisor cae en el mismo General, concepto y s
     const t = await preparar('c-venta');
 
     const a = await llamar(ventas, { headers: t.headers, body: para(PDV.venta, t.id) });
+    await cambiarA(t, DX);
     const b = await llamar(ventas, { headers: t.headers, body: para(DX.venta, t.id) });
     assert.equal(a.status, 201, JSON.stringify(a.body));
     assert.equal(b.status, 201, JSON.stringify(b.body));
@@ -95,6 +105,7 @@ test('una venta con pago dividido se parte igual para los dos emisores: una tran
     const t = await preparar('c-dividida');
 
     for (const [nombre, emisor] of [['punto-de-venta', PDV], ['pos-deluxe', DX]]) {
+        await cambiarA(t, emisor);
         const r = await llamar(ventas, { headers: t.headers, body: para(emisor.ventaDividida, t.id) });
         assert.equal(r.status, 201, `${nombre}: ${JSON.stringify(r.body)}`);
         assert.equal(r.body.chagoTransactionIds.length, 2, nombre);
@@ -113,7 +124,7 @@ test('una venta con pago dividido se parte igual para los dos emisores: una tran
 });
 
 test('una venta corregida en pos-deluxe (externalId con -r1) entra como venta nueva y la vieja se anula aparte', async () => {
-    const t = await preparar('c-corregida');
+    const t = await preparar('c-corregida', DX);
     const original = await llamar(ventas, { headers: t.headers, body: para(DX.venta, t.id) });
     assert.equal(original.status, 201);
 
@@ -152,6 +163,7 @@ test('reenviar una venta es idempotente y los externalId de los dos emisores no 
     const t = await preparar('c-ids');
     const primera = await llamar(ventas, { headers: t.headers, body: para(PDV.venta, t.id) });
     const repetida = await llamar(ventas, { headers: t.headers, body: para(PDV.venta, t.id) });
+    await cambiarA(t, DX);
     const otroEmisor = await llamar(ventas, { headers: t.headers, body: para(DX.venta, t.id) });
 
     assert.equal(primera.status, 201);
@@ -183,6 +195,7 @@ test('un externalId de venta no puede reusarse como compra, ni al revés (409)',
 test('las compras de los dos emisores cuelgan de la misma rama «Compras POS»', async () => {
     const t = await preparar('c-compras');
     const a = await llamar(compras, { headers: t.headers, body: para(PDV.compra, t.id) });
+    await cambiarA(t, DX);
     const b = await llamar(compras, { headers: t.headers, body: para(DX.compra, t.id) });
     assert.equal(a.status, 201, JSON.stringify(a.body));
     assert.equal(b.status, 201, JSON.stringify(b.body));
@@ -218,6 +231,7 @@ test('la compra de un producto migrado a pos-deluxe reusa el subconcepto que ya 
     const antes = await llamar(compras, { headers: t.headers, body: para(PDV.compra, t.id) });
     assert.equal(antes.status, 201);
 
+    await cambiarA(t, DX);
     const despues = await llamar(compras, { headers: t.headers, body: para(DX.compraIdHeredado, t.id) });
     assert.equal(despues.status, 201, JSON.stringify(despues.body));
     assert.equal(despues.body.subconceptId, antes.body.subconceptId);
@@ -232,6 +246,7 @@ test('con un id distinto, el mismo producto abre un segundo subconcepto con el m
     // Es lo que pasaría sin conservar el id: chago-demo identifica por id, no por nombre.
     const t = await preparar('c-duplicado');
     await llamar(compras, { headers: t.headers, body: para(PDV.compra, t.id) });
+    await cambiarA(t, DX);
     const r = await llamar(compras, {
         headers: t.headers, body: para(DX.compra, t.id, { productName: PDV.compra.productName }),
     });
@@ -383,6 +398,7 @@ test('activar sigue reparando un General con el nombre del formato anterior (sin
 test('el token del negocio anula entradas de cualquier emisor, y un grupo dividido se anula completo', async () => {
     const t = await preparar('c-anula');
     const deBasico = await llamar(ventas, { headers: t.headers, body: para(PDV.venta, t.id) });
+    await cambiarA(t, DX);
     const dividida = await llamar(ventas, { headers: t.headers, body: para(DX.ventaDividida, t.id) });
     const compra = await llamar(compras, { headers: t.headers, body: para(DX.compra, t.id) });
 
@@ -440,4 +456,63 @@ test('COMPORTAMIENTO ACTUAL: revocar y volver a activar con OTRO nombre parte el
     });
     assert.equal(despues.status, 201, JSON.stringify(despues.body));
     assert.equal((await tx(t.id, despues.body.chagoTransactionId)).generalId, r.body.generalId, 'lo nuevo va al General nuevo');
+});
+
+// ── Un solo sistema a la vez ────────────────────────────────────────────────
+
+test('ya pasado a pos-deluxe, un envío del punto de venta anterior se rechaza y no se escribe nada', async () => {
+    const t = await preparar('c-uno-solo', PDV);
+    await cambiarA(t, DX);
+    const antes = await contar(t.id, 'transacciones');
+
+    const venta = await llamar(ventas, { headers: t.headers, body: para(PDV.venta, t.id) });
+    const compra = await llamar(compras, { headers: t.headers, body: para(PDV.compra, t.id) });
+    for (const r of [venta, compra]) {
+        assert.equal(r.status, 409, JSON.stringify(r.body));
+        assert.equal(r.body.codigo, 'ORIGEN_NO_VIGENTE');
+        assert.match(r.body.error, /ya se pasó a pos-deluxe/);
+    }
+    assert.equal(await contar(t.id, 'transacciones'), antes, 'una venta tardía del básico no se duplica');
+
+    const deluxe = await llamar(ventas, { headers: t.headers, body: para(DX.venta, t.id) });
+    assert.equal(deluxe.status, 201, 'y deluxe sí entra');
+});
+
+test('pos-deluxe no puede enviar antes del corte: mientras recibe del básico, se rechaza', async () => {
+    const t = await preparar('c-antes-del-corte', PDV);
+    const r = await llamar(ventas, { headers: t.headers, body: para(DX.venta, t.id) });
+    assert.equal(r.status, 409);
+    assert.match(r.body.error, /recibe hoy desde punto-de-venta, no desde pos-deluxe/);
+    assert.equal(await contar(t.id, 'transacciones'), 0);
+});
+
+test('volver al básico (re-activar desde punto-de-venta) lo deja enviar otra vez, y entonces deluxe ya no', async () => {
+    const t = await preparar('c-reversa', PDV);
+    await cambiarA(t, DX);
+    await cambiarA(t, PDV);
+    assert.equal((await llamar(ventas, { headers: t.headers, body: para(PDV.venta, t.id) })).status, 201);
+    assert.equal((await llamar(ventas, { headers: t.headers, body: para(DX.venta, t.id) })).status, 409);
+});
+
+test('un negocio sin sistema registrado acepta envíos con o sin sistemaOrigen, como siempre', async () => {
+    const { sistemaOrigen: _omitido, ...sinOrigen } = PDV.activate;
+    const t = await preparar('c-legado-sin-origen', { activate: sinOrigen });
+    assert.equal((await llamar(ventas, { headers: t.headers, body: para(PDV.venta, t.id) })).status, 201);
+    assert.equal((await llamar(ventas, { headers: t.headers, body: para(DX.venta, t.id) })).status, 201);
+});
+
+test('un sistemaOrigen desconocido en un envío se rechaza', async () => {
+    const t = await preparar('c-envio-raro', PDV);
+    const r = await llamar(ventas, { headers: t.headers, body: para(PDV.venta, t.id, { sistemaOrigen: 'otro-pos' }) });
+    assert.equal(r.status, 409);
+    assert.match(r.body.error, /sistemaOrigen debe ser uno de/);
+});
+
+test('anular sigue funcionando para las entradas del sistema anterior después del corte', async () => {
+    const t = await preparar('c-anula-tras-corte', PDV);
+    const vieja = await llamar(ventas, { headers: t.headers, body: para(PDV.venta, t.id) });
+    await cambiarA(t, DX);
+    const r = await llamar(anular, { headers: t.headers, query: { id: vieja.body.chagoTransactionId }, body: { chagoTenantId: t.id } });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal((await tx(t.id, vieja.body.chagoTransactionId)).voided, true);
 });
