@@ -34,6 +34,14 @@ import {
   CardTitle,
 } from "../../../../components/superadmin/ui/card";
 import { Button } from "../../../../components/superadmin/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../../../../components/superadmin/ui/dialog";
 import { Badge } from "../../../../components/superadmin/ui/badge";
 import { Skeleton } from "../../../../components/superadmin/ui/skeleton";
 import { EmptyState } from "../../../../components/superadmin/ui/empty-state";
@@ -53,6 +61,12 @@ const roleMeta = {
   viewer: { label: "Viewer", variant: "secondary" },
 };
 
+// Los valores de `sistemaOrigen` (ver `POS_SYSTEMS` en posIntegrationService.js).
+const posSystemLabel = {
+  "punto-de-venta": "Punto de venta (básico)",
+  "pos-deluxe": "POS Deluxe",
+};
+
 function TenantDetailContent() {
   const router = useRouter();
   const { tenantId } = router.query;
@@ -68,6 +82,7 @@ function TenantDetailContent() {
   const [posLoading, setPosLoading] = useState(true);
   const [posWorking, setPosWorking] = useState(false);
   const [generatedToken, setGeneratedToken] = useState(null); // solo se ve una vez, tras generarlo
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
 
   const { backups, backupsLoading, working, loadBackups, createBackup, runConfirmedAction } =
     useBackups({ setResult });
@@ -487,6 +502,21 @@ function TenantDetailContent() {
                           : "Todavía no se ha generado un token para este tenant."}
                       </p>
 
+                      {posIntegration?.sistemaOrigen && (
+                        <p className="text-sm text-muted-foreground">
+                          Sistema de origen:{" "}
+                          <span className="font-medium text-foreground">
+                            {posSystemLabel[posIntegration.sistemaOrigen] || posIntegration.sistemaOrigen}
+                          </span>
+                          {posIntegration.origenAnterior &&
+                            ` · antes: ${posSystemLabel[posIntegration.origenAnterior] || posIntegration.origenAnterior}${
+                              posIntegration.cambioDeOrigenEl
+                                ? ` (cambió el ${formatDateTime(posIntegration.cambioDeOrigenEl)})`
+                                : ""
+                            }`}
+                        </p>
+                      )}
+
                       <div className="flex flex-wrap items-center gap-2">
                         <Button
                           variant="outline"
@@ -511,7 +541,7 @@ function TenantDetailContent() {
                           <Button
                             variant="destructive-outline"
                             size="sm"
-                            onClick={() => runPosAction("revoke")}
+                            onClick={() => setConfirmRevoke(true)}
                             disabled={posWorking}
                           >
                             <ShieldOff className="size-3.5" />
@@ -579,6 +609,49 @@ function TenantDetailContent() {
         onConfirm={handleConfirm}
         working={working}
       />
+
+      <Dialog open={confirmRevoke} onOpenChange={(open) => !open && !posWorking && setConfirmRevoke(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <div className="mb-1 flex size-11 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
+              <ShieldOff className="size-5" strokeWidth={1.8} />
+            </div>
+            <DialogTitle>Revocar el vínculo con punto de venta</DialogTitle>
+            <DialogDescription>
+              Se borran el token y las referencias al catálogo de Ventas POS y Compras POS. No se
+              desbloquea ni se borra nada del historial: las entradas y salidas que ya llegaron
+              siguen bloqueadas.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="mt-4 rounded-2xl border border-border/70 bg-accent/50 px-4 py-3 text-[13px] text-foreground">
+            Si lo que quieres es <span className="font-semibold">cambiar de sistema</span> (por
+            ejemplo, de punto de venta a POS Deluxe), no revoques: reutiliza el mismo token. Volver
+            a vincular después de revocar, con otro nombre de negocio, puede partir el historial en
+            dos Generales.
+          </p>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirmRevoke(false)}
+              disabled={posWorking}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={posWorking}
+              onClick={async () => {
+                await runPosAction("revoke");
+                setConfirmRevoke(false);
+              }}
+            >
+              {posWorking ? <Spinner /> : "Revocar vínculo"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

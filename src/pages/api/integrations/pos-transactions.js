@@ -166,7 +166,13 @@ export default async function handler(req, res) {
 
     const base = description || `Venta POS · Folio ${folio || externalId}`;
     const transactionParts = partes.map((p) => ({
-      ...posTransactionBase({ amount: p.amount, externalId, date, posKind: POS_KIND_SALE }),
+      ...posTransactionBase({
+        amount: p.amount,
+        externalId,
+        date,
+        posKind: POS_KIND_SALE,
+        posSystem: integration.sistemaOrigen,
+      }),
       type: "entrada",
       generalId: integration.generalId,
       conceptId: integration.conceptId,

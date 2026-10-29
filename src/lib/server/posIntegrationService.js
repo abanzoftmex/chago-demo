@@ -91,6 +91,46 @@ export async function revokePosIntegration(tenantId) {
     );
 }
 
+/**
+ * Los sistemas que pueden alimentar el vínculo. Lista cerrada: un valor mal
+ * escrito debe fallar al activar, no quedar registrado.
+ */
+export const POS_SYSTEMS = ["punto-de-venta", "pos-deluxe"];
+
+/**
+ * Anota qué sistema alimenta hoy el vínculo del tenant.
+ *
+ * chago-demo no distingue quién le habla —autentica por el token del negocio—, así
+ * que sin esto no hay forma de saber de dónde vino lo que se ve, ni cuándo cambió.
+ * Solo escribe cuando el valor cambia: reactivar desde el mismo sistema no mueve
+ * nada. Al cambiar conserva el anterior y la fecha, no una bitácora completa.
+ *
+ * El primer registro de un tenant ya vinculado desde antes no trae `origenAnterior`:
+ * no se sabe, y no se inventa.
+ */
+export async function recordPosSystem(tenantId, sistemaOrigen) {
+  const db = admin.firestore();
+  const ref = db.collection("tenants").doc(tenantId);
+  await db.runTransaction(async (t) => {
+    const actual = (await t.get(ref)).data()?.posIntegration?.sistemaOrigen || null;
+    if (actual === sistemaOrigen) return;
+    t.set(
+      ref,
+      {
+        posIntegration: {
+          sistemaOrigen,
+          ...(actual && {
+            origenAnterior: actual,
+            cambioDeOrigenEl: admin.firestore.FieldValue.serverTimestamp(),
+          }),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+      },
+      { merge: true }
+    );
+  });
+}
+
 /** Guarda el catálogo (general + concepto + subconceptos) resuelto al activar. */
 export async function savePosIntegrationCatalog(tenantId, { generalId, conceptId, subconceptIds }) {
   await admin

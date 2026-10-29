@@ -61,8 +61,13 @@ export async function findPosTransactionByExternalId(db, tenantId, externalId) {
  *
  * `locked:true` + `origen:'pos_sync'` es lo que impide editarla o borrarla
  * desde la UI y desde las reglas de Firestore. El que manda es el que envía.
+ *
+ * `origen` dice que la creó la integración; `posSystem` dice con qué SISTEMA
+ * estaba vinculado el tenant cuando llegó ('punto-de-venta' | 'pos-deluxe'). Solo
+ * se escribe si el vínculo ya lo registró: una transacción anterior, o de un tenant
+ * cuyo emisor aún no lo manda, no lo lleva y no se inventa uno.
  */
-export function posTransactionBase({ amount, externalId, date, posKind }) {
+export function posTransactionBase({ amount, externalId, date, posKind, posSystem }) {
   const now = admin.firestore.FieldValue.serverTimestamp();
   const value = Number(amount);
   return {
@@ -75,6 +80,7 @@ export function posTransactionBase({ amount, externalId, date, posKind }) {
     balance: 0,
     externalId: String(externalId),
     posKind,
+    ...(posSystem && { posSystem }),
     origen: "pos_sync",
     locked: true,
     voided: false,

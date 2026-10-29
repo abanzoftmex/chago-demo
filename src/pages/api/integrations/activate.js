@@ -37,9 +37,16 @@
  *
  * Auth: Authorization: Bearer <token> — el mismo que generó chago-demo y que
  * el superadmin pegó en Torre de Control.
- * Body: { chagoTenantId, businessName? } — businessName es el nombre del
- * negocio en punto-de-venta, usado solo para nombrar el General; si no
- * llega, se usa el propio chagoTenantId para que el nombre nunca quede vacío.
+ * Body: { chagoTenantId, businessName?, sistemaOrigen? } — businessName es el
+ * nombre del negocio en punto-de-venta, usado solo para nombrar el General al
+ * crearlo; si no llega, se usa el propio chagoTenantId para que el nombre nunca
+ * quede vacío. Un General que ya existe NO se renombra (ver más abajo): no
+ * importa qué nombre mande cada sistema.
+ *
+ * `sistemaOrigen` ('punto-de-venta' | 'pos-deluxe') es opcional: dice qué
+ * sistema alimenta el vínculo. Se guarda en `posIntegration`, y cada
+ * transacción nueva lo lleva como `posSystem`. Sin él todo se comporta como
+ * siempre, que es lo que hacen los emisores que aún no lo mandan.
  *
  * Los 3 niveles nacen con `locked:true, origen:'pos_sync'` — es la marca que
  * generalService/conceptService/subconceptService usan para impedir que se
@@ -51,12 +58,19 @@
  */
 
 import admin, { assertAdminInitialized } from "../../../lib/firebase/firebaseAdmin";
-import { verifyPosIntegrationToken, extractBearerToken, savePosIntegrationCatalog } from "../../../lib/server/posIntegrationService";
+import {
+  verifyPosIntegrationToken,
+  extractBearerToken,
+  savePosIntegrationCatalog,
+  recordPosSystem,
+  POS_SYSTEMS,
+} from "../../../lib/server/posIntegrationService";
 import {
   CONCEPT_NAME,
   SUBCONCEPT_NAMES,
   SALES_GENERAL_SUFFIX,
   generalNameFor,
+  isLegacyGeneralName,
   nameFor,
   pickAdoptable,
 } from "../../../lib/server/posCatalog";
@@ -70,11 +84,16 @@ export default async function handler(req, res) {
   if (!assertAdminInitialized(res)) return;
 
   const token = extractBearerToken(req);
-  const { chagoTenantId, businessName } = req.body || {};
+  const { chagoTenantId, businessName, sistemaOrigen } = req.body || {};
   if (!chagoTenantId) return res.status(400).json({ error: "chagoTenantId es requerido" });
 
   const verification = await verifyPosIntegrationToken(chagoTenantId, token);
   if (!verification.ok) return res.status(401).json({ error: verification.error });
+
+  // Se valida antes de escribir nada: un valor desconocido no deja el catálogo a medias.
+  if (sistemaOrigen != null && !POS_SYSTEMS.includes(sistemaOrigen)) {
+    return res.status(400).json({ error: `sistemaOrigen debe ser uno de: ${POS_SYSTEMS.join(", ")}` });
+  }
 
   const integration = verification.integration || {};
   // Marca de "este tenant ya se había activado alguna vez". Los que se
@@ -109,8 +128,10 @@ export default async function handler(req, res) {
         // concepto de ventas ofreciéndose al capturar salidas.
         if (data.type !== "entrada") fix.type = "entrada";
         // Y se adopta la nomenclatura con sufijo, para que los dos árboles del
-        // mismo negocio se distingan en la lista de Generales.
-        if (data.name !== generalName) fix.name = generalName;
+        // mismo negocio se distingan en la lista de Generales. SOLO el nombre del
+        // formato anterior: uno elegido por el cliente, o puesto por otro sistema
+        // al vincularse, es suyo y no se pisa (ver `isLegacyGeneralName`).
+        if (isLegacyGeneralName(data.name)) fix.name = generalName;
         if (Object.keys(fix).length > 0) await generalsRef.doc(generalId).update(fix);
       }
     }
@@ -227,6 +248,7 @@ export default async function handler(req, res) {
     }
 
     await savePosIntegrationCatalog(chagoTenantId, { generalId, conceptId, subconceptIds });
+    if (sistemaOrigen) await recordPosSystem(chagoTenantId, sistemaOrigen);
 
     // La rama de COMPRAS NO se crea aquí, a propósito.
     //

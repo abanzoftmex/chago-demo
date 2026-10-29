@@ -39,6 +39,23 @@ export const PURCHASE_GENERAL_SUFFIX = " · Compras";
 export const generalNameFor = (negocio, suffix) => `Punto de venta · ${negocio}${suffix}`;
 
 /**
+ * ¿Es el nombre de un General del formato ANTERIOR, sin sufijo de árbol?
+ *
+ * Antes de separar ventas y compras el General se llamaba solo `Punto de venta ·
+ * {negocio}`. `activate` pone al día ESOS nombres y ningún otro: uno que el
+ * cliente eligió, o que ya lleva el sufijo (también con el ` (integración)` de
+ * un choque), no se toca. Reescribirlo siempre pisaba el renombre del cliente
+ * cada vez que se volvía a guardar el vínculo, y dejaba que el nombre del negocio
+ * en el POS —que cambia según el sistema que hable— mandara sobre su catálogo.
+ */
+const GENERAL_PREFIX = "Punto de venta · ";
+export const isLegacyGeneralName = (name) =>
+  typeof name === "string" &&
+  name.startsWith(GENERAL_PREFIX) &&
+  !name.includes(SALES_GENERAL_SUFFIX) &&
+  !name.includes(PURCHASE_GENERAL_SUFFIX);
+
+/**
  * Sufijo para cuando el nombre que nos toca ya lo ocupa un documento del
  * cliente que NO vamos a adoptar: sin él, el tenant vería dos "Ventas POS"
  * idénticos y no sabría cuál es cuál. Solo se aplica al crear, y solo si de

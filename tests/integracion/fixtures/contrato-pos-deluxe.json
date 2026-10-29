@@ -1,0 +1,72 @@
+{
+  "emisor": "pos-deluxe",
+  "fuente": "pos-deluxe/src/domain/services/chago-payload.ts (saleBody, purchaseBody) y src/application/use-cases/chago/link.ts (activate)",
+  "nota": "__TENANT__ lo sustituye la prueba por el id del tenant de cada caso. pos-deluxe/tests/chago-contrato.test.ts falla si sus constructores dejan de producir exactamente esto.",
+  "activate": {
+    "chagoTenantId": "__TENANT__",
+    "businessName": "Negocio Contrato",
+    "sistemaOrigen": "pos-deluxe"
+  },
+  "venta": {
+    "chagoTenantId": "__TENANT__",
+    "externalId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+    "amount": 150,
+    "currency": "MXN",
+    "paymentMethod": "Efectivo",
+    "payments": [{ "method": "Efectivo", "amount": 150 }],
+    "folio": "ORD-20261020-0001",
+    "date": "2026-10-20T18:30:00.000Z",
+    "description": "Venta POS · Folio ORD-20261020-0001"
+  },
+  "ventaDividida": {
+    "chagoTenantId": "__TENANT__",
+    "externalId": "7c9e6679-7425-40de-944b-e07fc1f90ae8",
+    "amount": 150,
+    "currency": "MXN",
+    "paymentMethod": "Efectivo",
+    "payments": [
+      { "method": "Efectivo", "amount": 100 },
+      { "method": "Tarjeta Débito", "amount": 50 }
+    ],
+    "folio": "ORD-20261020-0002",
+    "date": "2026-10-20T18:45:00.000Z",
+    "description": "Venta POS · Folio ORD-20261020-0002"
+  },
+  "ventaCorregida": {
+    "chagoTenantId": "__TENANT__",
+    "externalId": "7c9e6679-7425-40de-944b-e07fc1f90ae7-r1",
+    "amount": 120,
+    "currency": "MXN",
+    "paymentMethod": "Efectivo",
+    "payments": [{ "method": "Efectivo", "amount": 120 }],
+    "folio": "ORD-20261020-0001",
+    "date": "2026-10-20T18:30:00.000Z",
+    "description": "Venta POS · Folio ORD-20261020-0001 · con corrección"
+  },
+  "compra": {
+    "chagoTenantId": "__TENANT__",
+    "externalId": "pos-purchase-3b241101-e2bb-4255-8caf-4136c566a962",
+    "productId": "9a0e1b2c-5d4f-4a6b-8c7d-1e2f3a4b5c6d",
+    "productName": "Aguacate",
+    "quantity": 2.5,
+    "unitCost": 48.2,
+    "unit": "kg",
+    "currency": "MXN",
+    "date": "2026-10-20T12:00:00.000Z",
+    "note": "factura F-100 · mercado",
+    "businessName": "Negocio Contrato"
+  },
+  "compraIdHeredado": {
+    "chagoTenantId": "__TENANT__",
+    "externalId": "pos-purchase-5d6e7f80-1a2b-4c3d-9e4f-a1b2c3d4e5f6",
+    "productId": "65f1c0a2b7e4d93a5c1f8a01",
+    "productName": "Tornillo 1/4",
+    "quantity": 4,
+    "unitCost": 12.5,
+    "unit": "pz",
+    "currency": "MXN",
+    "date": "2026-10-21T12:00:00.000Z",
+    "note": null,
+    "businessName": "Negocio Contrato"
+  }
+}

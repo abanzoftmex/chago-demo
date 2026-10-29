@@ -19,6 +19,7 @@
     "test:unit": "node --test \"tests/unit/**/*.test.mjs\"",
     "test:rules": "firebase emulators:exec --only firestore --project demo-chago \"node tests/rules/firestore.rules.test.mjs\"",
     "test:integracion": "firebase emulators:exec --only firestore --project demo-chago \"node --test tests/integracion/pos-catalogo.test.mjs\"",
+    "test:contrato": "firebase emulators:exec --only firestore --project demo-chago \"node --test tests/integracion/pos-contrato.test.mjs\"",
     "test:servicios": "firebase emulators:exec --only auth,firestore --project demo-chago \"node --test tests/integracion/servicios-con-reglas.test.mjs\"",
     "test:acceso": "firebase emulators:exec --only auth,firestore --project demo-chago \"node --test tests/integracion/acceso-compartido.test.mjs\"",
     "emu": "firebase emulators:start --only auth,firestore --project chago-demo",

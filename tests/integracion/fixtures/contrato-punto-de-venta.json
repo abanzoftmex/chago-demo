@@ -1,0 +1,64 @@
+{
+  "emisor": "punto-de-venta",
+  "fuente": "punto-de-venta/src/lib/chagoSync.js (syncSaleToChago, syncStockMovementToChago) y src/pages/api/torre-control/chago-link.js (activate)",
+  "nota": "__TENANT__ lo sustituye la prueba por el id del tenant de cada caso. ticketPdfBase64 '__PDF__' es un marcador: el real es el PDF del ticket en base64. punto-de-venta/tests/chago-contrato.test.mjs falla si su constructor deja de producir exactamente esto.",
+  "activate": {
+    "chagoTenantId": "__TENANT__",
+    "businessName": "Negocio Contrato",
+    "sistemaOrigen": "punto-de-venta"
+  },
+  "venta": {
+    "chagoTenantId": "__TENANT__",
+    "externalId": "65f1c0a2b7e4d93a5c1f8e01",
+    "amount": 150,
+    "currency": "MXN",
+    "paymentMethod": "Efectivo",
+    "payments": [{ "method": "Efectivo", "amount": 150 }],
+    "folio": "5C1F8E01",
+    "date": "2026-10-20T18:30:00.000Z",
+    "description": "Venta POS · Folio 5C1F8E01",
+    "ticketPdfBase64": "__PDF__"
+  },
+  "ventaDividida": {
+    "chagoTenantId": "__TENANT__",
+    "externalId": "65f1c0a2b7e4d93a5c1f8e02",
+    "amount": 150,
+    "currency": "MXN",
+    "paymentMethod": "Efectivo",
+    "payments": [
+      { "method": "Efectivo", "amount": 100 },
+      { "method": "Tarjeta Débito", "amount": 50 }
+    ],
+    "folio": "5C1F8E02",
+    "date": "2026-10-20T18:45:00.000Z",
+    "description": "Venta POS · Folio 5C1F8E02",
+    "ticketPdfBase64": "__PDF__"
+  },
+  "ventaDivididaConPropina": {
+    "chagoTenantId": "__TENANT__",
+    "externalId": "65f1c0a2b7e4d93a5c1f8e03",
+    "amount": 200,
+    "currency": "MXN",
+    "paymentMethod": "Efectivo",
+    "payments": [
+      { "method": "Efectivo", "amount": 150 },
+      { "method": "Tarjeta Débito", "amount": 70 }
+    ],
+    "folio": "5C1F8E03",
+    "date": "2026-10-20T19:00:00.000Z",
+    "description": "Venta POS · Folio 5C1F8E03",
+    "ticketPdfBase64": "__PDF__"
+  },
+  "compra": {
+    "chagoTenantId": "__TENANT__",
+    "externalId": "pos-mov-65f1c0a2b7e4d93a5c1f8f01",
+    "productId": "65f1c0a2b7e4d93a5c1f8a01",
+    "productName": "Tornillo 1/4",
+    "quantity": 10,
+    "unitCost": 12.5,
+    "currency": "MXN",
+    "date": "2026-10-20T15:00:00.000Z",
+    "note": "Compra de proveedor",
+    "businessName": "Negocio Contrato"
+  }
+}

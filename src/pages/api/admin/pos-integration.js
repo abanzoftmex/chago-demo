@@ -39,6 +39,10 @@ export default async function handler(req, res) {
         enabled: !!integration?.enabled,
         hasToken: !!integration?.tokenHash,
         conceptId: integration?.conceptId || null,
+        // Qué sistema alimenta el vínculo, y el anterior si cambió (ver `recordPosSystem`).
+        sistemaOrigen: integration?.sistemaOrigen || null,
+        origenAnterior: integration?.origenAnterior || null,
+        cambioDeOrigenEl: toIso(integration?.cambioDeOrigenEl),
         linkedAt: toIso(integration?.linkedAt),
         updatedAt: toIso(integration?.updatedAt),
       });

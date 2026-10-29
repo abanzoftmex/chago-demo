@@ -135,7 +135,13 @@ export default async function handler(req, res) {
 
     // Nace junto con el pago que la salda — ver `createPosTransactionWithPayment`.
     const docRef = await createPosTransactionWithPayment(db, chagoTenantId, {
-      ...posTransactionBase({ amount, externalId, date, posKind: POS_KIND_PURCHASE }),
+      ...posTransactionBase({
+        amount,
+        externalId,
+        date,
+        posKind: POS_KIND_PURCHASE,
+        posSystem: integration.sistemaOrigen,
+      }),
       type: "salida",
       generalId: purchaseGeneralId,
       conceptId: purchaseConceptId,
