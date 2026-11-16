@@ -11,9 +11,10 @@ Todas son `POST` con `Authorization: Bearer <token>` y `chagoTenantId` en el cue
 | `/api/integrations/activate` | Crea o repara la rama de catálogo de Ventas. Idempotente. |
 | `/api/integrations/pos-transactions` | Venta cobrada → Entrada. Con pago dividido, una transacción por método. |
 | `/api/integrations/pos-purchases` | Surtido con costo → Salida. Cantidad hasta 4 decimales. |
-| `/api/integrations/pos-transactions/[id]/void` | Anula una venta o compra (nunca borra). |
+| `/api/integrations/pos-wastes` | Merma con costo → Salida de pérdidas, por causa. Cantidad hasta 4 decimales. |
+| `/api/integrations/pos-transactions/[id]/void` | Anula una venta, compra o merma (nunca borra). |
 
-Idempotencia por `externalId` dentro del tenant. Un `externalId` de venta no puede usarse como compra, ni al revés (409).
+Idempotencia por `externalId` dentro del tenant. Un `externalId` de venta no puede usarse como compra o merma, ni al revés (409).
 
 ## Token
 
@@ -24,7 +25,17 @@ Lo emite chago-demo desde Superadmin → tenant → Punto de venta. Solo se guar
 ```
 Punto de venta · {negocio} · Ventas   > Ventas POS   > Efectivo | Tarjeta Débito | Tarjeta Crédito | Transferencia
 Punto de venta · {negocio} · Compras  > Compras POS  > un subconcepto por producto (pos_prod_{productId})
+Punto de venta · {negocio} · Mermas   > Mermas POS   > un subconcepto por CAUSA (pos_merma_{código de la causa})
 ```
+
+Las **mermas** son un árbol propio y se miran por **causa** (la pregunta es «¿por qué se pierde?»): el artículo, la cantidad y el
+costo van en el detalle de cada movimiento (`posProductId`, `posProductName`, `quantity`, `unitCost`, `posWasteCause`). La identidad
+del subconcepto es el **código** de la causa, no su etiqueta: renombrarla en el POS no abre otro, y si el cliente renombró el suyo
+aquí no se le pisa. Su General se llama `Punto de venta · {negocio} · Mermas`.
+
+**Una merma no es un desembolso**, pero el modelo de E/S solo tiene Salidas con su pago: el pago de una merma lo dice en sus notas
+(*«Pérdida registrada por el punto de venta»*). Quien totalice gastos sin separar el árbol de Mermas contará dos veces la mercancía
+(como compra y como merma).
 
 Todo nace `locked` con `origen:'pos_sync'`. El cliente solo puede renombrarlo. El `productId` es el que manda el sistema de origen: si dos sistemas usan ids distintos para el mismo producto, aparecen dos subconceptos con el mismo nombre.
 

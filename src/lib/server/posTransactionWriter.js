@@ -12,6 +12,7 @@ import admin from "../firebase/firebaseAdmin";
 
 export const POS_KIND_SALE = "venta";
 export const POS_KIND_PURCHASE = "compra";
+export const POS_KIND_WASTE = "merma";
 
 const transaccionesRef = (db, tenantId) => db.collection(`tenants/${tenantId}/transacciones`);
 const paymentsRef = (db, tenantId) => db.collection(`tenants/${tenantId}/payments`);
@@ -26,9 +27,11 @@ const paymentsRef = (db, tenantId) => db.collection(`tenants/${tenantId}/payment
 export const posPaymentId = (transactionId) => `pos_${transactionId}`;
 
 export const posPaymentNotes = (posKind) =>
-  posKind === POS_KIND_PURCHASE
-    ? "Pago registrado por el punto de venta"
-    : "Cobro registrado por el punto de venta";
+  posKind === POS_KIND_WASTE
+    ? "Pérdida registrada por el punto de venta (merma: mercancía perdida, no un desembolso)"
+    : posKind === POS_KIND_PURCHASE
+      ? "Pago registrado por el punto de venta"
+      : "Cobro registrado por el punto de venta";
 
 /**
  * Busca una transacción ya recibida por su `externalId`.

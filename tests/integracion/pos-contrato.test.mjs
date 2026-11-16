@@ -23,6 +23,7 @@ import { cargar, llamar, db, RAIZ } from './ayuda/emulador.mjs';
 const { default: activate } = await cargar('pages/api/integrations/activate.js');
 const { default: ventas } = await cargar('pages/api/integrations/pos-transactions.js');
 const { default: compras } = await cargar('pages/api/integrations/pos-purchases.js');
+const { default: mermas } = await cargar('pages/api/integrations/pos-wastes.js');
 const { default: anular } = await cargar('pages/api/integrations/pos-transactions/[id]/void.js');
 const { generatePosIntegrationToken, revokePosIntegration } = await cargar('lib/server/posIntegrationService.js');
 
@@ -515,4 +516,186 @@ test('anular sigue funcionando para las entradas del sistema anterior después d
     const r = await llamar(anular, { headers: t.headers, query: { id: vieja.body.chagoTransactionId }, body: { chagoTenantId: t.id } });
     assert.equal(r.status, 200, JSON.stringify(r.body));
     assert.equal((await tx(t.id, vieja.body.chagoTransactionId)).voided, true);
+});
+
+// ── Mermas ──────────────────────────────────────────────────────────────────
+
+test('una merma de pos-deluxe cuelga de la rama «Mermas POS», en el subconcepto de su causa', async () => {
+    const t = await preparar('c-merma', DX);
+    const r = await llamar(mermas, { headers: t.headers, body: para(DX.merma, t.id) });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    assert.equal(r.body.subconceptId, 'pos_merma_EXPIRED');
+
+    const x = await tx(t.id, r.body.chagoTransactionId);
+    assert.equal(x.generalId, 'pos_general_mermas');
+    assert.equal(x.conceptId, 'pos_mermas');
+    assert.equal(x.subconceptId, 'pos_merma_EXPIRED');
+    assert.equal(x.type, 'salida');
+    assert.equal(x.posKind, 'merma');
+    assert.equal(x.origen, 'pos_sync');
+    assert.equal(x.posSystem, 'pos-deluxe');
+    assert.equal(x.locked, true);
+    assert.equal(x.status, 'pagado');
+    assert.equal(x.balance, 0);
+    assert.equal(x.division, 'general', 'sin división no entra al desglose de reportes');
+    assert.equal(x.amount, 120.5, '2.5 kg × $48.20');
+    assert.equal(x.quantity, 2.5);
+    assert.equal(x.unitCost, 48.2);
+    assert.equal(x.posUnit, 'kg');
+    assert.equal(x.posProductId, DX.merma.productId);
+    assert.equal(x.posProductName, 'Aguacate');
+    assert.equal(x.posWasteCause, 'EXPIRED');
+    assert.equal(x.description, 'Merma POS · Aguacate · 2.5 kg · Caducado · Lote 4412');
+    assert.equal(x.voided, false);
+
+    const p = await pago(t.id, r.body.chagoTransactionId);
+    assert.ok(p, 'nace con su pago, como toda transacción del POS');
+    assert.match(p.notes, /Pérdida registrada/, 'el pago dice que es una pérdida, no un desembolso');
+});
+
+test('la rama de mermas es un árbol propio: no se mezcla con compras ni con ventas', async () => {
+    const t = await preparar('c-merma-arbol', DX);
+    await llamar(compras, { headers: t.headers, body: para(DX.compra, t.id) });
+    await llamar(mermas, { headers: t.headers, body: para(DX.merma, t.id) });
+
+    const general = (await db.collection(`tenants/${t.id}/generals`).doc('pos_general_mermas').get()).data();
+    assert.equal(general.name, 'Punto de venta · Negocio Contrato · Mermas');
+    assert.equal(general.type, 'salida');
+    assert.equal(general.locked, true);
+    assert.equal(general.origen, 'pos_sync');
+
+    const concepto = (await db.collection(`tenants/${t.id}/concepts`).doc('pos_mermas').get()).data();
+    assert.equal(concepto.name, 'Mermas POS');
+    assert.equal(concepto.generalId, 'pos_general_mermas');
+    // Compras sigue en el suyo
+    const compra = (await db.collection(`tenants/${t.id}/concepts`).doc('pos_compras').get()).data();
+    assert.equal(compra.generalId, 'pos_general_compras');
+
+    const integ = (await db.collection('tenants').doc(t.id).get()).data().posIntegration;
+    assert.equal(integ.wasteGeneralId, 'pos_general_mermas');
+    assert.equal(integ.wasteConceptId, 'pos_mermas');
+    assert.ok(integ.wasteReadyAt);
+});
+
+test('cada causa tiene su subconcepto, y la misma causa no abre otro aunque cambie su etiqueta', async () => {
+    const t = await preparar('c-merma-causas', DX);
+    const a = await llamar(mermas, { headers: t.headers, body: para(DX.merma, t.id) });
+    const b = await llamar(mermas, {
+        headers: t.headers,
+        body: para(DX.merma, t.id, { externalId: 'pos-waste-otra', cause: 'DROPPED', causeLabel: 'Accidente' }),
+    });
+    // Misma causa, etiqueta renombrada en el POS
+    const c = await llamar(mermas, {
+        headers: t.headers,
+        body: para(DX.merma, t.id, { externalId: 'pos-waste-tercera', causeLabel: 'Producto caducado' }),
+    });
+    assert.equal(a.status, 201);
+    assert.equal(b.status, 201);
+    assert.equal(c.status, 201);
+    assert.equal(a.body.subconceptId, 'pos_merma_EXPIRED');
+    assert.equal(b.body.subconceptId, 'pos_merma_DROPPED');
+    assert.equal(c.body.subconceptId, 'pos_merma_EXPIRED');
+
+    const subs = await db.collection(`tenants/${t.id}/subconcepts`).where('conceptId', '==', 'pos_mermas').get();
+    assert.equal(subs.size, 2, 'dos causas, dos subconceptos');
+    // La etiqueta nueva la sigue el nombre solo si el cliente no lo había cambiado
+    const caducado = subs.docs.find((d) => d.id === 'pos_merma_EXPIRED').data();
+    assert.equal(caducado.name, 'Producto caducado');
+});
+
+test('si el cliente renombró el subconcepto de una causa en E/S, el POS no se lo pisa', async () => {
+    const t = await preparar('c-merma-renombre', DX);
+    await llamar(mermas, { headers: t.headers, body: para(DX.merma, t.id) });
+    await db.collection(`tenants/${t.id}/subconcepts`).doc('pos_merma_EXPIRED').update({ name: 'Perdido por fecha' });
+    await llamar(mermas, {
+        headers: t.headers,
+        body: para(DX.merma, t.id, { externalId: 'pos-waste-otra', causeLabel: 'Producto caducado' }),
+    });
+    const sub = (await db.collection(`tenants/${t.id}/subconcepts`).doc('pos_merma_EXPIRED').get()).data();
+    assert.equal(sub.name, 'Perdido por fecha');
+});
+
+test('una merma es idempotente por externalId: reenviarla no la duplica', async () => {
+    const t = await preparar('c-merma-idem', DX);
+    const a = await llamar(mermas, { headers: t.headers, body: para(DX.merma, t.id) });
+    const b = await llamar(mermas, { headers: t.headers, body: para(DX.merma, t.id) });
+    assert.equal(a.status, 201);
+    assert.equal(b.status, 200);
+    assert.equal(b.body.alreadyExisted, true);
+    assert.equal(b.body.chagoTransactionId, a.body.chagoTransactionId);
+    assert.equal(await contar(t.id, 'transacciones'), 1);
+    assert.equal(await contar(t.id, 'payments'), 1);
+});
+
+test('un externalId de merma no puede reusarse como venta o compra, ni al revés (409)', async () => {
+    const t = await preparar('c-merma-colision', DX);
+    await llamar(mermas, { headers: t.headers, body: para(DX.merma, t.id) });
+    await llamar(ventas, { headers: t.headers, body: para(DX.venta, t.id) });
+
+    const mermaConIdDeVenta = await llamar(mermas, { headers: t.headers, body: para(DX.merma, t.id, { externalId: DX.venta.externalId }) });
+    const ventaConIdDeMerma = await llamar(ventas, { headers: t.headers, body: para(DX.venta, t.id, { externalId: DX.merma.externalId }) });
+    const compraConIdDeMerma = await llamar(compras, { headers: t.headers, body: para(DX.compra, t.id, { externalId: DX.merma.externalId }) });
+    assert.equal(mermaConIdDeVenta.status, 409);
+    assert.equal(ventaConIdDeMerma.status, 409);
+    assert.equal(compraConIdDeMerma.status, 409);
+});
+
+test('lo mal formado se rechaza con un 400 y no escribe nada', async () => {
+    const t = await preparar('c-merma-400', DX);
+    const casos = [
+        ['sin causa', { cause: '' }],
+        ['causa con barra (no cabe en un id de documento)', { cause: 'A/B' }],
+        ['sin costo', { unitCost: 0 }],
+        ['costo negativo', { unitCost: -3 }],
+        ['sin cantidad', { quantity: 0 }],
+        ['cantidad con 5 decimales', { quantity: 0.12345 }],
+        ['sin producto', { productId: '' }],
+        ['sin nombre de producto', { productName: '  ' }],
+        ['sin externalId', { externalId: '' }],
+    ];
+    for (const [nombre, cambios] of casos) {
+        const r = await llamar(mermas, { headers: t.headers, body: para(DX.merma, t.id, cambios) });
+        assert.equal(r.status, 400, `${nombre}: ${JSON.stringify(r.body)}`);
+    }
+    assert.equal(await contar(t.id, 'transacciones'), 0);
+    // Ni siquiera se armó la rama: nada que ensuciar
+    assert.equal((await db.collection(`tenants/${t.id}/generals`).doc('pos_general_mermas').get()).exists, false);
+});
+
+test('sin token válido no se registra nada (401)', async () => {
+    const t = await preparar('c-merma-401', DX);
+    const r = await llamar(mermas, { headers: bearer('token-falso'), body: para(DX.merma, t.id) });
+    assert.equal(r.status, 401);
+    assert.equal(await contar(t.id, 'transacciones'), 0);
+});
+
+test('con pos-deluxe vigente, una merma que dice venir de punto-de-venta se rechaza (409) y no escribe', async () => {
+    const t = await preparar('c-merma-origen', DX);
+    const r = await llamar(mermas, { headers: t.headers, body: para(DX.merma, t.id, { sistemaOrigen: 'punto-de-venta' }) });
+    assert.equal(r.status, 409);
+    assert.equal(r.body.codigo, 'ORIGEN_NO_VIGENTE');
+    assert.equal(await contar(t.id, 'transacciones'), 0);
+});
+
+test('anular una merma la marca anulada con su pago, y no se borra', async () => {
+    const t = await preparar('c-merma-anula', DX);
+    const r = await llamar(mermas, { headers: t.headers, body: para(DX.merma, t.id) });
+    const id = r.body.chagoTransactionId;
+    const a = await llamar(anular, { headers: t.headers, query: { id }, body: { chagoTenantId: t.id, reason: 'Merma anulada en el POS' } });
+    assert.equal(a.status, 200, JSON.stringify(a.body));
+    const x = await tx(t.id, id);
+    assert.equal(x.voided, true);
+    assert.equal(x.voidReason, 'Merma anulada en el POS');
+    assert.equal((await pago(t.id, id)).voided, true);
+    assert.equal(await contar(t.id, 'transacciones'), 1, 'queda el rastro');
+});
+
+test('revocar el vínculo suelta también la rama de mermas', async () => {
+    const t = await preparar('c-merma-revoca', DX);
+    await llamar(mermas, { headers: t.headers, body: para(DX.merma, t.id) });
+    await revokePosIntegration(t.id);
+    const integ = (await db.collection('tenants').doc(t.id).get()).data().posIntegration;
+    assert.equal(integ.wasteGeneralId, null);
+    assert.equal(integ.wasteConceptId, null);
+    assert.equal(integ.wasteReadyAt, null);
 });

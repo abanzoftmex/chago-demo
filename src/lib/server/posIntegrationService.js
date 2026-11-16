@@ -84,6 +84,10 @@ export async function revokePosIntegration(tenantId) {
           purchaseGeneralId: null,
           purchaseConceptId: null,
           purchaseReadyAt: null,
+          // Lo mismo con la rama de mermas
+          wasteGeneralId: null,
+          wasteConceptId: null,
+          wasteReadyAt: null,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
       },
@@ -203,6 +207,29 @@ export async function savePosPurchaseCatalog(tenantId, { purchaseGeneralId, purc
           purchaseGeneralId,
           purchaseConceptId,
           purchaseReadyAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+      },
+      { merge: true }
+    );
+}
+
+/**
+ * Guarda la rama de MERMAS resuelta por `ensureWasteBranch`. Solo escalares, por la misma razón que la de compras: los
+ * subconceptos por causa se resuelven por id determinista y no necesitan mapa. `wasteReadyAt` es el memo que deja al
+ * endpoint de mermas saltarse la comprobación de la rama en el caso normal.
+ */
+export async function savePosWasteCatalog(tenantId, { wasteGeneralId, wasteConceptId }) {
+  await admin
+    .firestore()
+    .collection("tenants")
+    .doc(tenantId)
+    .set(
+      {
+        posIntegration: {
+          wasteGeneralId,
+          wasteConceptId,
+          wasteReadyAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
       },

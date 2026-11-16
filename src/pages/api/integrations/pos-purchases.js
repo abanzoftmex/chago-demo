@@ -16,8 +16,9 @@
  *
  * La cantidad puede ser decimal (hasta 4 cifras): un insumo se compra por kilo o
  * por litro. `unit` es opcional y solo rotula la descripción.
- * Las restas de almacén (merma, ajuste de conteo) no llegan nunca — no son
- * un gasto, y el POS ni las envía.
+ * Las restas de almacén (ajuste de conteo) no llegan nunca — no son un gasto, y
+ * el POS ni las envía. Las MERMAS tienen su propia ruta y su propia rama
+ * (`pos-wastes.js`): una pérdida con su causa, no una compra.
  *
  * Idempotente por `externalId`, igual que las ventas. Para anularla sirve el
  * mismo `/api/integrations/pos-transactions/{id}/void`.

@@ -1,6 +1,6 @@
 {
   "emisor": "pos-deluxe",
-  "fuente": "pos-deluxe/src/domain/services/chago-payload.ts (saleBody, purchaseBody) y src/application/use-cases/chago/link.ts (activate)",
+  "fuente": "pos-deluxe/src/domain/services/chago-payload.ts (saleBody, purchaseBody, wasteBody) y src/application/use-cases/chago/link.ts (activate)",
   "nota": "__TENANT__ lo sustituye la prueba por el id del tenant de cada caso. pos-deluxe/tests/chago-contrato.test.ts falla si sus constructores dejan de producir exactamente esto.",
   "activate": {
     "chagoTenantId": "__TENANT__",
@@ -87,6 +87,22 @@
     "currency": "MXN",
     "date": "2026-10-21T12:00:00.000Z",
     "note": null,
+    "businessName": "Negocio Contrato",
+    "sistemaOrigen": "pos-deluxe"
+  },
+  "merma": {
+    "chagoTenantId": "__TENANT__",
+    "externalId": "pos-waste-0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+    "productId": "9a0e1b2c-5d4f-4a6b-8c7d-1e2f3a4b5c6d",
+    "productName": "Aguacate",
+    "quantity": 2.5,
+    "unitCost": 48.2,
+    "unit": "kg",
+    "cause": "EXPIRED",
+    "causeLabel": "Caducado",
+    "currency": "MXN",
+    "date": "2026-10-20T12:00:00.000Z",
+    "note": "Lote 4412",
     "businessName": "Negocio Contrato",
     "sistemaOrigen": "pos-deluxe"
   }

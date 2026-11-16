@@ -16,10 +16,14 @@
  *   Punto de venta · {negocio} · Compras   (general, 'salida', locked)
  *     └─ Compras POS                       (concepto, 'salida', locked)
  *          └─ un subconcepto por producto surtido en el POS
+ *
+ *   Punto de venta · {negocio} · Mermas    (general, 'salida', locked)
+ *     └─ Mermas POS                        (concepto, 'salida', locked)
+ *          └─ un subconcepto por CAUSA de la pérdida (caducado, accidente…)
  */
 
 import admin from "../firebase/firebaseAdmin";
-import { savePosPurchaseCatalog } from "./posIntegrationService";
+import { savePosPurchaseCatalog, savePosWasteCatalog } from "./posIntegrationService";
 
 export const CONCEPT_NAME = "Ventas POS";
 export const PURCHASE_CONCEPT_NAME = "Compras POS";
@@ -29,8 +33,15 @@ export const PURCHASE_CONCEPT_ID = "pos_compras";
 export const PURCHASE_GENERAL_ID = "pos_general_compras";
 export const SUBCONCEPT_NAMES = ["Efectivo", "Tarjeta Débito", "Tarjeta Crédito", "Transferencia"];
 
+/** Pérdidas: lo que el POS reporta que se echó a perder, con su causa. Un árbol aparte del de compras: es otra pregunta. */
+export const WASTE_CONCEPT_NAME = "Mermas POS";
+/** Ids fijos, por el mismo motivo que los de compras — ver `ensureWasteBranch`. */
+export const WASTE_CONCEPT_ID = "pos_mermas";
+export const WASTE_GENERAL_ID = "pos_general_mermas";
+
 export const SALES_GENERAL_SUFFIX = " · Ventas";
 export const PURCHASE_GENERAL_SUFFIX = " · Compras";
+export const WASTE_GENERAL_SUFFIX = " · Mermas";
 
 /**
  * El nombre de un General de la integración. El sufijo es lo que distingue los
@@ -53,7 +64,8 @@ export const isLegacyGeneralName = (name) =>
   typeof name === "string" &&
   name.startsWith(GENERAL_PREFIX) &&
   !name.includes(SALES_GENERAL_SUFFIX) &&
-  !name.includes(PURCHASE_GENERAL_SUFFIX);
+  !name.includes(PURCHASE_GENERAL_SUFFIX) &&
+  !name.includes(WASTE_GENERAL_SUFFIX);
 
 /**
  * Sufijo para cuando el nombre que nos toca ya lo ocupa un documento del
@@ -304,6 +316,146 @@ export async function ensureProductSubconcept(db, tenantId, purchaseConceptId, {
     // único que puede editar de un subconcepto bloqueado; si lo tocó, fue a
     // propósito y no se lo pisamos.
     if (data.name === data.posProductName) fix.name = name;
+  }
+  if (Object.keys(fix).length > 0) await ref.update(fix);
+
+  return { subconceptId: docId };
+}
+
+/**
+ * Deja lista la rama de MERMAS y devuelve `{ wasteGeneralId, wasteConceptId }`.
+ *
+ * Las mermas cuelgan de su PROPIO General, igual que las compras: una pérdida no es un gasto de operación y mezclarla con
+ * «Compras POS» haría que el mismo insumo se contara dos veces en el mismo árbol (lo comprado y lo que se perdió de eso).
+ * Separadas, quien mira Compras ve lo que costó surtirse y quien mira Mermas ve lo que se perdió, y la diferencia es
+ * visible en vez de estar escondida.
+ *
+ * Ids deterministas (`pos_general_mermas`, `pos_mermas`): dos mermas que lleguen a la vez no pueden crear dos ramas; el
+ * segundo `create()` falla con ALREADY_EXISTS y solo lee. Idempotente y barata de repetir: si ya existen, no escribe nada.
+ * Se llama perezosamente desde el endpoint de mermas, así que un negocio que nunca registre una merma jamás verá esta rama.
+ */
+export async function ensureWasteBranch(db, tenantId, businessName) {
+  const { generalsRef, conceptsRef } = catalogRefs(db, tenantId);
+
+  // Nivel 1: el General de mermas
+  const generalRef = generalsRef.doc(WASTE_GENERAL_ID);
+  const generalSnap = await generalRef.get();
+  const negocio =
+    String(businessName || "").trim() ||
+    (await db.collection("tenants").doc(tenantId).get()).data()?.name ||
+    tenantId;
+  const wasteGeneralName = generalNameFor(negocio, WASTE_GENERAL_SUFFIX);
+
+  if (generalSnap.exists && isOurs(generalSnap.data())) {
+    const data = generalSnap.data();
+    const fix = {};
+    if (data.type !== "salida") fix.type = "salida";
+    if (data.locked !== true) { fix.locked = true; fix.origen = "pos_sync"; }
+    if (Object.keys(fix).length > 0) await generalRef.update(fix);
+  } else {
+    // Un documento con ese id que no es nuestro no se adopta ni se pisa
+    if (generalSnap.exists) return { conflict: true };
+    const byName = await generalsRef.where("name", "==", wasteGeneralName).limit(10).get();
+    const ajenos = byName.docs.filter((d) => !isOurs(d.data()));
+    try {
+      await generalRef.create({
+        name: nameFor(wasteGeneralName, ajenos),
+        type: "salida",
+        isActive: true,
+        locked: true,
+        origen: "pos_sync",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      if (error.code !== 6) throw error; // ALREADY_EXISTS: otra merma ganó la carrera
+    }
+  }
+
+  // Nivel 2: el concepto
+  const conceptRef = conceptsRef.doc(WASTE_CONCEPT_ID);
+  const conceptSnap = await conceptRef.get();
+  if (conceptSnap.exists && isOurs(conceptSnap.data())) {
+    const data = conceptSnap.data();
+    const fix = {};
+    if (data.generalId !== WASTE_GENERAL_ID) fix.generalId = WASTE_GENERAL_ID;
+    if (data.type !== "salida") fix.type = "salida";
+    if (data.locked !== true) { fix.locked = true; fix.origen = "pos_sync"; }
+    if (Object.keys(fix).length > 0) await conceptRef.update(fix);
+  } else {
+    if (conceptSnap.exists) return { conflict: true };
+    // El nombre solo decide cómo LLAMARLO: si el cliente ya tiene un «Mermas POS» suyo, el nuestro nace con sufijo
+    const byName = await conceptsRef.where("name", "==", WASTE_CONCEPT_NAME).limit(10).get();
+    const ajenos = byName.docs.filter((d) => !isOurs(d.data()));
+    try {
+      await conceptRef.create({
+        name: nameFor(WASTE_CONCEPT_NAME, ajenos),
+        type: "salida",
+        generalId: WASTE_GENERAL_ID,
+        isActive: true,
+        locked: true,
+        origen: "pos_sync",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      if (error.code !== 6) throw error;
+    }
+  }
+
+  await savePosWasteCatalog(tenantId, { wasteGeneralId: WASTE_GENERAL_ID, wasteConceptId: WASTE_CONCEPT_ID });
+  return { wasteGeneralId: WASTE_GENERAL_ID, wasteConceptId: WASTE_CONCEPT_ID };
+}
+
+/** Un código de causa válido: cabe en el id de un documento (`pos_merma_{causa}`). Los de deluxe son EXPIRED, DROPPED… */
+const SAFE_CAUSE = /^[A-Za-z0-9_-]{1,40}$/;
+
+/**
+ * Devuelve el subconcepto de una CAUSA de merma, creándolo la primera vez.
+ *
+ * La identidad es el CÓDIGO de la causa, nunca su etiqueta: renombrar «Caducado» en el POS no abre otro subconcepto, y el
+ * cliente que renombró el suyo en E/S no se lo pisamos (misma regla que `ensureProductSubconcept`). Id determinista:
+ * sin consultas ni carreras.
+ *
+ * Devuelve `{ subconceptId }`, `{ invalid: true }` si el código no es un identificador seguro, o `{ conflict: true }` si
+ * ese id lo ocupa un documento que no es nuestro.
+ */
+export async function ensureWasteCauseSubconcept(db, tenantId, wasteConceptId, { cause, causeLabel }) {
+  const code = String(cause);
+  if (!SAFE_CAUSE.test(code)) return { invalid: true };
+
+  const { subconceptsRef } = catalogRefs(db, tenantId);
+  const docId = `pos_merma_${code}`;
+  const ref = subconceptsRef.doc(docId);
+  const name = String(causeLabel || "").trim() || code;
+  const snap = await ref.get();
+
+  if (!snap.exists) {
+    try {
+      await ref.create({
+        name,
+        conceptId: wasteConceptId,
+        posWasteCause: code,
+        // Copia sombra de la etiqueta que traía la causa la última vez: distingue «el cliente lo renombró» de «cambió en el POS»
+        posWasteCauseLabel: name,
+        isActive: true,
+        locked: true,
+        origen: "pos_sync",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      if (error.code !== 6) throw error;
+    }
+    return { subconceptId: docId };
+  }
+
+  const data = snap.data();
+  if (!isOurs(data)) return { conflict: true };
+
+  const fix = {};
+  if (data.conceptId !== wasteConceptId) fix.conceptId = wasteConceptId;
+  if (data.locked !== true) { fix.locked = true; fix.origen = "pos_sync"; }
+  if (data.posWasteCauseLabel !== name) {
+    fix.posWasteCauseLabel = name;
+    if (data.name === data.posWasteCauseLabel) fix.name = name;
   }
   if (Object.keys(fix).length > 0) await ref.update(fix);
 
